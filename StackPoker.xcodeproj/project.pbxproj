@@ -7,13 +7,48 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		36C91CC12F7F592800697E42 /* StackPokerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CC02F7F592800697E42 /* StackPokerApp.swift */; };
-		36C91CC32F7F592800697E42 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CC22F7F592800697E42 /* ContentView.swift */; };
-		36C91CC52F7F592A00697E42 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36C91CC42F7F592A00697E42 /* Assets.xcassets */; };
-		36C91CC82F7F592A00697E42 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36C91CC72F7F592A00697E42 /* Preview Assets.xcassets */; };
 		36C91CD22F7F592A00697E42 /* StackPokerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CD12F7F592A00697E42 /* StackPokerTests.swift */; };
 		36C91CDC2F7F592A00697E42 /* StackPokerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDB2F7F592A00697E42 /* StackPokerUITests.swift */; };
 		36C91CDE2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDD2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift */; };
+		36C91D312F7F5B8B00697E42 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CEA2F7F5B8A00697E42 /* AppState.swift */; };
+		36C91D322F7F5B8B00697E42 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CEB2F7F5B8A00697E42 /* MainTabView.swift */; };
+		36C91D332F7F5B8B00697E42 /* StackPokerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CEC2F7F5B8A00697E42 /* StackPokerApp.swift */; };
+		36C91D342F7F5B8B00697E42 /* ViewExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CEF2F7F5B8A00697E42 /* ViewExtensions.swift */; };
+		36C91D352F7F5B8B00697E42 /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CF12F7F5B8A00697E42 /* NetworkService.swift */; };
+		36C91D362F7F5B8B00697E42 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CF32F7F5B8A00697E42 /* KeychainManager.swift */; };
+		36C91D372F7F5B8B00697E42 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CF82F7F5B8A00697E42 /* AuthModels.swift */; };
+		36C91D382F7F5B8B00697E42 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CFA2F7F5B8A00697E42 /* AuthViewModel.swift */; };
+		36C91D392F7F5B8B00697E42 /* AuthFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CFC2F7F5B8A00697E42 /* AuthFlowView.swift */; };
+		36C91D3A2F7F5B8B00697E42 /* AvatarPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CFD2F7F5B8A00697E42 /* AvatarPickerSheet.swift */; };
+		36C91D3B2F7F5B8B00697E42 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CFE2F7F5B8A00697E42 /* LoginView.swift */; };
+		36C91D3C2F7F5B8B00697E42 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CFF2F7F5B8A00697E42 /* RegisterView.swift */; };
+		36C91D3D2F7F5B8B00697E42 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D002F7F5B8A00697E42 /* SplashView.swift */; };
+		36C91D3E2F7F5B8B00697E42 /* UsernameSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D012F7F5B8A00697E42 /* UsernameSetupView.swift */; };
+		36C91D3F2F7F5B8B00697E42 /* GameSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D072F7F5B8A00697E42 /* GameSocketClient.swift */; };
+		36C91D402F7F5B8B00697E42 /* GameModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D092F7F5B8A00697E42 /* GameModels.swift */; };
+		36C91D412F7F5B8B00697E42 /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */; };
+		36C91D422F7F5B8B00697E42 /* ActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */; };
+		36C91D432F7F5B8B00697E42 /* AdminPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */; };
+		36C91D442F7F5B8B00697E42 /* CardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0F2F7F5B8A00697E42 /* CardViews.swift */; };
+		36C91D452F7F5B8B00697E42 /* GameHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D102F7F5B8A00697E42 /* GameHUD.swift */; };
+		36C91D462F7F5B8B00697E42 /* GameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D112F7F5B8A00697E42 /* GameView.swift */; };
+		36C91D472F7F5B8B00697E42 /* PlayerSeatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D122F7F5B8A00697E42 /* PlayerSeatView.swift */; };
+		36C91D482F7F5B8B00697E42 /* PokerTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D132F7F5B8A00697E42 /* PokerTableView.swift */; };
+		36C91D492F7F5B8B00697E42 /* LobbyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D172F7F5B8A00697E42 /* LobbyModels.swift */; };
+		36C91D4A2F7F5B8B00697E42 /* FriendsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D192F7F5B8A00697E42 /* FriendsViewModel.swift */; };
+		36C91D4B2F7F5B8B00697E42 /* LobbyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D1A2F7F5B8A00697E42 /* LobbyViewModel.swift */; };
+		36C91D4C2F7F5B8B00697E42 /* CreateTableSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D1C2F7F5B8A00697E42 /* CreateTableSheet.swift */; };
+		36C91D4D2F7F5B8B00697E42 /* FriendsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D1D2F7F5B8A00697E42 /* FriendsSheet.swift */; };
+		36C91D4E2F7F5B8B00697E42 /* LobbySheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D1E2F7F5B8A00697E42 /* LobbySheets.swift */; };
+		36C91D4F2F7F5B8B00697E42 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D1F2F7F5B8A00697E42 /* LobbyView.swift */; };
+		36C91D502F7F5B8B00697E42 /* TableCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D202F7F5B8A00697E42 /* TableCardView.swift */; };
+		36C91D512F7F5B8B00697E42 /* ChipsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D242F7F5B8A00697E42 /* ChipsViewModel.swift */; };
+		36C91D522F7F5B8B00697E42 /* ChipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D262F7F5B8A00697E42 /* ChipsView.swift */; };
+		36C91D532F7F5B8B00697E42 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D272F7F5B8A00697E42 /* ProfileView.swift */; };
+		36C91D542F7F5B8B00697E42 /* SPComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */; };
+		36C91D552F7F5B8B00697E42 /* SPTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */; };
+		36C91D562F7F5B8B00697E43 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D572F7F5B8B00697E43 /* SoundManager.swift */; };
+		36C91E012F80000000697E42 /* Sounds in Resources */ = {isa = PBXBuildFile; fileRef = 36C91E002F80000000697E42 /* Sounds */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,15 +70,50 @@
 
 /* Begin PBXFileReference section */
 		36C91CBD2F7F592800697E42 /* StackPoker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StackPoker.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		36C91CC02F7F592800697E42 /* StackPokerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackPokerApp.swift; sourceTree = "<group>"; };
-		36C91CC22F7F592800697E42 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		36C91CC42F7F592A00697E42 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		36C91CC72F7F592A00697E42 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		36C91CCD2F7F592A00697E42 /* StackPokerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StackPokerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CD12F7F592A00697E42 /* StackPokerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackPokerTests.swift; sourceTree = "<group>"; };
 		36C91CD72F7F592A00697E42 /* StackPokerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StackPokerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CDB2F7F592A00697E42 /* StackPokerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackPokerUITests.swift; sourceTree = "<group>"; };
 		36C91CDD2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackPokerUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		36C91CEA2F7F5B8A00697E42 /* AppState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		36C91CEB2F7F5B8A00697E42 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		36C91CEC2F7F5B8A00697E42 /* StackPokerApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StackPokerApp.swift; sourceTree = "<group>"; };
+		36C91CEF2F7F5B8A00697E42 /* ViewExtensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ViewExtensions.swift; sourceTree = "<group>"; };
+		36C91CF12F7F5B8A00697E42 /* NetworkService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
+		36C91CF32F7F5B8A00697E42 /* KeychainManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		36C91CF82F7F5B8A00697E42 /* AuthModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
+		36C91CFA2F7F5B8A00697E42 /* AuthViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
+		36C91CFC2F7F5B8A00697E42 /* AuthFlowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthFlowView.swift; sourceTree = "<group>"; };
+		36C91CFD2F7F5B8A00697E42 /* AvatarPickerSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AvatarPickerSheet.swift; sourceTree = "<group>"; };
+		36C91CFE2F7F5B8A00697E42 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		36C91CFF2F7F5B8A00697E42 /* RegisterView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
+		36C91D002F7F5B8A00697E42 /* SplashView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		36C91D012F7F5B8A00697E42 /* UsernameSetupView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UsernameSetupView.swift; sourceTree = "<group>"; };
+		36C91D072F7F5B8A00697E42 /* GameSocketClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameSocketClient.swift; sourceTree = "<group>"; };
+		36C91D572F7F5B8B00697E43 /* SoundManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
+		36C91D092F7F5B8A00697E42 /* GameModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameModels.swift; sourceTree = "<group>"; };
+		36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
+		36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
+		36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AdminPanelView.swift; sourceTree = "<group>"; };
+		36C91D0F2F7F5B8A00697E42 /* CardViews.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CardViews.swift; sourceTree = "<group>"; };
+		36C91D102F7F5B8A00697E42 /* GameHUD.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameHUD.swift; sourceTree = "<group>"; };
+		36C91D112F7F5B8A00697E42 /* GameView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
+		36C91D122F7F5B8A00697E42 /* PlayerSeatView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlayerSeatView.swift; sourceTree = "<group>"; };
+		36C91D132F7F5B8A00697E42 /* PokerTableView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PokerTableView.swift; sourceTree = "<group>"; };
+		36C91D172F7F5B8A00697E42 /* LobbyModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LobbyModels.swift; sourceTree = "<group>"; };
+		36C91D192F7F5B8A00697E42 /* FriendsViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FriendsViewModel.swift; sourceTree = "<group>"; };
+		36C91D1A2F7F5B8A00697E42 /* LobbyViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LobbyViewModel.swift; sourceTree = "<group>"; };
+		36C91D1C2F7F5B8A00697E42 /* CreateTableSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CreateTableSheet.swift; sourceTree = "<group>"; };
+		36C91D1D2F7F5B8A00697E42 /* FriendsSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FriendsSheet.swift; sourceTree = "<group>"; };
+		36C91D1E2F7F5B8A00697E42 /* LobbySheets.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LobbySheets.swift; sourceTree = "<group>"; };
+		36C91D1F2F7F5B8A00697E42 /* LobbyView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LobbyView.swift; sourceTree = "<group>"; };
+		36C91D202F7F5B8A00697E42 /* TableCardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TableCardView.swift; sourceTree = "<group>"; };
+		36C91D242F7F5B8A00697E42 /* ChipsViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipsViewModel.swift; sourceTree = "<group>"; };
+		36C91D262F7F5B8A00697E42 /* ChipsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipsView.swift; sourceTree = "<group>"; };
+		36C91D272F7F5B8A00697E42 /* ProfileView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPComponents.swift; sourceTree = "<group>"; };
+		36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPTokens.swift; sourceTree = "<group>"; };
+		36C91E002F80000000697E42 /* Sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StackPoker/Sounds; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,7 +144,11 @@
 		36C91CB42F7F592800697E42 = {
 			isa = PBXGroup;
 			children = (
-				36C91CBF2F7F592800697E42 /* StackPoker */,
+				36C91CED2F7F5B8A00697E42 /* App */,
+				36C91CF62F7F5B8A00697E42 /* Core */,
+				36C91D302F7F5B8B00697E42 /* DesignSystem */,
+				36C91D2A2F7F5B8A00697E42 /* Features */,
+				36C91E002F80000000697E42 /* Sounds */,
 				36C91CD02F7F592A00697E42 /* StackPokerTests */,
 				36C91CDA2F7F592A00697E42 /* StackPokerUITests */,
 				36C91CBE2F7F592800697E42 /* Products */,
@@ -89,25 +163,6 @@
 				36C91CD72F7F592A00697E42 /* StackPokerUITests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		36C91CBF2F7F592800697E42 /* StackPoker */ = {
-			isa = PBXGroup;
-			children = (
-				36C91CC02F7F592800697E42 /* StackPokerApp.swift */,
-				36C91CC22F7F592800697E42 /* ContentView.swift */,
-				36C91CC42F7F592A00697E42 /* Assets.xcassets */,
-				36C91CC62F7F592A00697E42 /* Preview Content */,
-			);
-			path = StackPoker;
-			sourceTree = "<group>";
-		};
-		36C91CC62F7F592A00697E42 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				36C91CC72F7F592A00697E42 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
 			sourceTree = "<group>";
 		};
 		36C91CD02F7F592A00697E42 /* StackPokerTests */ = {
@@ -125,6 +180,312 @@
 				36C91CDD2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift */,
 			);
 			path = StackPokerUITests;
+			sourceTree = "<group>";
+		};
+		36C91CED2F7F5B8A00697E42 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CEA2F7F5B8A00697E42 /* AppState.swift */,
+				36C91CEB2F7F5B8A00697E42 /* MainTabView.swift */,
+				36C91CEC2F7F5B8A00697E42 /* StackPokerApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		36C91CEE2F7F5B8A00697E42 /* {Network,Storage,Extensions,Utilities} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Network,Storage,Extensions,Utilities}";
+			sourceTree = "<group>";
+		};
+		36C91CF02F7F5B8A00697E42 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CEF2F7F5B8A00697E42 /* ViewExtensions.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		36C91CF22F7F5B8A00697E42 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CF12F7F5B8A00697E42 /* NetworkService.swift */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		36C91CF42F7F5B8A00697E42 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CF32F7F5B8A00697E42 /* KeychainManager.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		36C91CF52F7F5B8A00697E42 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		36C91CF62F7F5B8A00697E42 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CEE2F7F5B8A00697E42 /* {Network,Storage,Extensions,Utilities} */,
+				36C91CF02F7F5B8A00697E42 /* Extensions */,
+				36C91CF22F7F5B8A00697E42 /* Network */,
+				36C91CF42F7F5B8A00697E42 /* Storage */,
+				36C91CF52F7F5B8A00697E42 /* Utilities */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		36C91CF72F7F5B8A00697E42 /* {Views,ViewModels,Models} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Views,ViewModels,Models}";
+			sourceTree = "<group>";
+		};
+		36C91CF92F7F5B8A00697E42 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CF82F7F5B8A00697E42 /* AuthModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		36C91CFB2F7F5B8A00697E42 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CFA2F7F5B8A00697E42 /* AuthViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		36C91D022F7F5B8A00697E42 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CFC2F7F5B8A00697E42 /* AuthFlowView.swift */,
+				36C91CFD2F7F5B8A00697E42 /* AvatarPickerSheet.swift */,
+				36C91CFE2F7F5B8A00697E42 /* LoginView.swift */,
+				36C91CFF2F7F5B8A00697E42 /* RegisterView.swift */,
+				36C91D002F7F5B8A00697E42 /* SplashView.swift */,
+				36C91D012F7F5B8A00697E42 /* UsernameSetupView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		36C91D032F7F5B8A00697E42 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				36C91CF72F7F5B8A00697E42 /* {Views,ViewModels,Models} */,
+				36C91CF92F7F5B8A00697E42 /* Models */,
+				36C91CFB2F7F5B8A00697E42 /* ViewModels */,
+				36C91D022F7F5B8A00697E42 /* Views */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		36C91D042F7F5B8A00697E42 /* {Views,ViewModels,Models} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Views,ViewModels,Models}";
+			sourceTree = "<group>";
+		};
+		36C91D052F7F5B8A00697E42 /* Clubs */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D042F7F5B8A00697E42 /* {Views,ViewModels,Models} */,
+			);
+			path = Clubs;
+			sourceTree = "<group>";
+		};
+		36C91D062F7F5B8A00697E42 /* {Views,ViewModels,Models,Engine} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Views,ViewModels,Models,Engine}";
+			sourceTree = "<group>";
+		};
+		36C91D082F7F5B8A00697E42 /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D072F7F5B8A00697E42 /* GameSocketClient.swift */,
+				36C91D572F7F5B8B00697E43 /* SoundManager.swift */,
+			);
+			path = Engine;
+			sourceTree = "<group>";
+		};
+		36C91D0A2F7F5B8A00697E42 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D092F7F5B8A00697E42 /* GameModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		36C91D0C2F7F5B8A00697E42 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		36C91D142F7F5B8A00697E42 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */,
+				36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */,
+				36C91D0F2F7F5B8A00697E42 /* CardViews.swift */,
+				36C91D102F7F5B8A00697E42 /* GameHUD.swift */,
+				36C91D112F7F5B8A00697E42 /* GameView.swift */,
+				36C91D122F7F5B8A00697E42 /* PlayerSeatView.swift */,
+				36C91D132F7F5B8A00697E42 /* PokerTableView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		36C91D152F7F5B8A00697E42 /* Game */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D062F7F5B8A00697E42 /* {Views,ViewModels,Models,Engine} */,
+				36C91D082F7F5B8A00697E42 /* Engine */,
+				36C91D0A2F7F5B8A00697E42 /* Models */,
+				36C91D0C2F7F5B8A00697E42 /* ViewModels */,
+				36C91D142F7F5B8A00697E42 /* Views */,
+			);
+			path = Game;
+			sourceTree = "<group>";
+		};
+		36C91D162F7F5B8A00697E42 /* {Views,ViewModels,Models} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Views,ViewModels,Models}";
+			sourceTree = "<group>";
+		};
+		36C91D182F7F5B8A00697E42 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D172F7F5B8A00697E42 /* LobbyModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		36C91D1B2F7F5B8A00697E42 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D192F7F5B8A00697E42 /* FriendsViewModel.swift */,
+				36C91D1A2F7F5B8A00697E42 /* LobbyViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		36C91D212F7F5B8A00697E42 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D1C2F7F5B8A00697E42 /* CreateTableSheet.swift */,
+				36C91D1D2F7F5B8A00697E42 /* FriendsSheet.swift */,
+				36C91D1E2F7F5B8A00697E42 /* LobbySheets.swift */,
+				36C91D1F2F7F5B8A00697E42 /* LobbyView.swift */,
+				36C91D202F7F5B8A00697E42 /* TableCardView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		36C91D222F7F5B8A00697E42 /* Lobby */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D162F7F5B8A00697E42 /* {Views,ViewModels,Models} */,
+				36C91D182F7F5B8A00697E42 /* Models */,
+				36C91D1B2F7F5B8A00697E42 /* ViewModels */,
+				36C91D212F7F5B8A00697E42 /* Views */,
+			);
+			path = Lobby;
+			sourceTree = "<group>";
+		};
+		36C91D232F7F5B8A00697E42 /* {Views,ViewModels} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Views,ViewModels}";
+			sourceTree = "<group>";
+		};
+		36C91D252F7F5B8A00697E42 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D242F7F5B8A00697E42 /* ChipsViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		36C91D282F7F5B8A00697E42 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D262F7F5B8A00697E42 /* ChipsView.swift */,
+				36C91D272F7F5B8A00697E42 /* ProfileView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		36C91D292F7F5B8A00697E42 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D232F7F5B8A00697E42 /* {Views,ViewModels} */,
+				36C91D252F7F5B8A00697E42 /* ViewModels */,
+				36C91D282F7F5B8A00697E42 /* Views */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		36C91D2A2F7F5B8A00697E42 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D032F7F5B8A00697E42 /* Auth */,
+				36C91D052F7F5B8A00697E42 /* Clubs */,
+				36C91D152F7F5B8A00697E42 /* Game */,
+				36C91D222F7F5B8A00697E42 /* Lobby */,
+				36C91D292F7F5B8A00697E42 /* Profile */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		36C91D2B2F7F5B8B00697E42 /* {Components,Tokens} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Components,Tokens}";
+			sourceTree = "<group>";
+		};
+		36C91D2D2F7F5B8B00697E42 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		36C91D2F2F7F5B8B00697E42 /* Tokens */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */,
+			);
+			path = Tokens;
+			sourceTree = "<group>";
+		};
+		36C91D302F7F5B8B00697E42 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D2B2F7F5B8B00697E42 /* {Components,Tokens} */,
+				36C91D2D2F7F5B8B00697E42 /* Components */,
+				36C91D2F2F7F5B8B00697E42 /* Tokens */,
+			);
+			path = DesignSystem;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -231,8 +592,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				36C91CC82F7F592A00697E42 /* Preview Assets.xcassets in Resources */,
-				36C91CC52F7F592A00697E42 /* Assets.xcassets in Resources */,
+				36C91E012F80000000697E42 /* Sounds in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,8 +617,44 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				36C91CC32F7F592800697E42 /* ContentView.swift in Sources */,
-				36C91CC12F7F592800697E42 /* StackPokerApp.swift in Sources */,
+				36C91D492F7F5B8B00697E42 /* LobbyModels.swift in Sources */,
+				36C91D512F7F5B8B00697E42 /* ChipsViewModel.swift in Sources */,
+				36C91D352F7F5B8B00697E42 /* NetworkService.swift in Sources */,
+				36C91D472F7F5B8B00697E42 /* PlayerSeatView.swift in Sources */,
+				36C91D4B2F7F5B8B00697E42 /* LobbyViewModel.swift in Sources */,
+				36C91D362F7F5B8B00697E42 /* KeychainManager.swift in Sources */,
+				36C91D3A2F7F5B8B00697E42 /* AvatarPickerSheet.swift in Sources */,
+				36C91D312F7F5B8B00697E42 /* AppState.swift in Sources */,
+				36C91D3E2F7F5B8B00697E42 /* UsernameSetupView.swift in Sources */,
+				36C91D392F7F5B8B00697E42 /* AuthFlowView.swift in Sources */,
+				36C91D442F7F5B8B00697E42 /* CardViews.swift in Sources */,
+				36C91D4C2F7F5B8B00697E42 /* CreateTableSheet.swift in Sources */,
+				36C91D532F7F5B8B00697E42 /* ProfileView.swift in Sources */,
+				36C91D502F7F5B8B00697E42 /* TableCardView.swift in Sources */,
+				36C91D322F7F5B8B00697E42 /* MainTabView.swift in Sources */,
+				36C91D412F7F5B8B00697E42 /* GameViewModel.swift in Sources */,
+				36C91D4F2F7F5B8B00697E42 /* LobbyView.swift in Sources */,
+				36C91D382F7F5B8B00697E42 /* AuthViewModel.swift in Sources */,
+				36C91D552F7F5B8B00697E42 /* SPTokens.swift in Sources */,
+				36C91D542F7F5B8B00697E42 /* SPComponents.swift in Sources */,
+				36C91D3F2F7F5B8B00697E42 /* GameSocketClient.swift in Sources */,
+				36C91D562F7F5B8B00697E43 /* SoundManager.swift in Sources */,
+				36C91D402F7F5B8B00697E42 /* GameModels.swift in Sources */,
+				36C91D432F7F5B8B00697E42 /* AdminPanelView.swift in Sources */,
+				36C91D422F7F5B8B00697E42 /* ActionBar.swift in Sources */,
+				36C91D372F7F5B8B00697E42 /* AuthModels.swift in Sources */,
+				36C91D522F7F5B8B00697E42 /* ChipsView.swift in Sources */,
+				36C91D3D2F7F5B8B00697E42 /* SplashView.swift in Sources */,
+				36C91D462F7F5B8B00697E42 /* GameView.swift in Sources */,
+				36C91D452F7F5B8B00697E42 /* GameHUD.swift in Sources */,
+				36C91D4E2F7F5B8B00697E42 /* LobbySheets.swift in Sources */,
+				36C91D482F7F5B8B00697E42 /* PokerTableView.swift in Sources */,
+				36C91D3B2F7F5B8B00697E42 /* LoginView.swift in Sources */,
+				36C91D3C2F7F5B8B00697E42 /* RegisterView.swift in Sources */,
+				36C91D342F7F5B8B00697E42 /* ViewExtensions.swift in Sources */,
+				36C91D4A2F7F5B8B00697E42 /* FriendsViewModel.swift in Sources */,
+				36C91D4D2F7F5B8B00697E42 /* FriendsSheet.swift in Sources */,
+				36C91D332F7F5B8B00697E42 /* StackPokerApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -421,14 +817,15 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"StackPoker/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = FKT42UHJN5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StackPoker/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -450,14 +847,15 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"StackPoker/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = FKT42UHJN5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StackPoker/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
