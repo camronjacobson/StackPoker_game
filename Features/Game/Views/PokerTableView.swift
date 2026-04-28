@@ -110,6 +110,20 @@ struct PokerTableView: View {
     @AppStorage("tableThemeId") private var tableThemeId: String = "classic_blue"
     private var theme: TableTheme { TableTheme.find(tableThemeId) }
 
+    // Tapping an empty seat surfaces this confirmation dialog so the user
+    // can fill the seat with a bot (or, when more options arrive, an invite).
+    @State private var showOpenSeatSheet = false
+
+    private var hasBotSeated: Bool {
+        vm.gameState?.seats.contains { $0.username == "StackBot" } ?? false
+    }
+
+    /// Honors the per-table bot preference recorded when the creator opted
+    /// in/out at table creation. Defaults to true for tables we joined.
+    private var botsAllowedHere: Bool {
+        TablePreferences.botsAllowed(forTableId: vm.tableId)
+    }
+
     var body: some View {
         GeometryReader { geo in
             let layout = TableLayout(size: geo.size, isLandscape: isLandscape)
@@ -124,6 +138,7 @@ struct PokerTableView: View {
                 blindsLabel(layout)
                 hostedByLabel(layout)
                 dealerRailButton(layout)
+                blindRailChips(layout)
                 betChipsLayer(layout)
                 potFlowLayer(layout)
 
@@ -133,6 +148,24 @@ struct PokerTableView: View {
             .animation(.easeInOut(duration: 0.3), value: vm.gameState?.communityCards.count)
             .animation(.easeInOut(duration: 0.3), value: vm.gameState?.totalPot)
             .animation(.spring(response: 0.5, dampingFraction: 0.82), value: betsSignature)
+            .confirmationDialog(
+                "Open Seat",
+                isPresented: $showOpenSeatSheet,
+                titleVisibility: .visible
+            ) {
+                if !hasBotSeated && botsAllowedHere {
+                    Button("Add Bot Player") { vm.addBot() }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                if !botsAllowedHere {
+                    Text("Bots are disabled for this table. Invite a friend from the lobby to fill this seat.")
+                } else if hasBotSeated {
+                    Text("A bot is already seated. Invite a friend from the lobby to fill more seats.")
+                } else {
+                    Text("Fill this seat with StackBot or invite a friend from the lobby.")
+                }
+            }
         }
     }
 
@@ -141,82 +174,181 @@ struct PokerTableView: View {
     }
 
     // ─── Felt + rail ──────────────────────────────────────────────────────────
+    // Rendered as a layered stack:
+    //   1. Cast shadow on the "floor" beneath the table
+    //   2. Padded leather rail surrounding the felt
+    //   3. Inner bevel + stitch line where rail meets felt
+    //   4. Felt surface (themed gradient + cloth texture + sheen + vignette)
+    //   5. Inset betting line where chips land
+
+    private static let railWidth: CGFloat = 22
 
     private func feltOval(_ l: TableLayout) -> some View {
-        let cr = l.tableCornerRadius
+        let cr      = l.tableCornerRadius
+        let rw      = Self.railWidth
+        let outerW  = l.tableWidth  + rw * 2
+        let outerH  = l.tableHeight + rw * 2
+        let outerCR = cr + rw
+
         return ZStack {
-            // Soft outer glow
-            RoundedRectangle(cornerRadius: cr + 6)
-                .fill(Color.clear)
-                .frame(width: l.tableWidth + 12, height: l.tableHeight + 12)
-                .shadow(color: Color(hex: "#1A3A6B").opacity(0.5), radius: 30)
+            // 1. Cast shadow on the floor — soft, slightly offset down
+            RoundedRectangle(cornerRadius: outerCR)
+                .fill(Color.black.opacity(0.55))
+                .frame(width: outerW + 28, height: outerH + 28)
+                .blur(radius: 26)
+                .offset(y: 18)
+                .allowsHitTesting(false)
 
-            // Felt base — themed radial gradient
-            RoundedRectangle(cornerRadius: cr)
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(hex: theme.inner),
-                            Color(hex: theme.mid),
-                            Color(hex: theme.edge),
-                        ],
-                        center: UnitPoint(x: 0.5, y: 0.45),
-                        startRadius: l.tableWidth * 0.05,
-                        endRadius: l.tableWidth * 0.65
-                    )
-                )
-                .frame(width: l.tableWidth, height: l.tableHeight)
-                .overlay(
-                    ZStack {
-                        // Inner rail line
-                        RoundedRectangle(cornerRadius: cr - 14)
-                            .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
-                            .frame(width: l.tableWidth - 28, height: l.tableHeight - 28)
+            // 2. Padded leather rail
+            railLayer(outerW: outerW, outerH: outerH, outerCR: outerCR)
 
-                        // Soft upper sheen
-                        RoundedRectangle(cornerRadius: cr)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.06),
-                                        Color.white.opacity(0.01),
-                                        Color.clear
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .center
-                                )
-                            )
-                            .frame(width: l.tableWidth, height: l.tableHeight)
-                            .blendMode(.plusLighter)
-
-                        // Vignette
-                        RoundedRectangle(cornerRadius: cr)
-                            .fill(
-                                RadialGradient(
-                                    colors: [Color.clear, Color.black.opacity(0.15)],
-                                    center: .center,
-                                    startRadius: l.tableWidth * 0.30,
-                                    endRadius: l.tableWidth * 0.60
-                                )
-                            )
-                            .frame(width: l.tableWidth, height: l.tableHeight)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: cr))
-                    .allowsHitTesting(false)
-                )
-
-            // Outer rail stroke
-            RoundedRectangle(cornerRadius: cr)
+            // 3a. Inner bevel — bright top edge / dark bottom edge sells the
+            //     felt as recessed below the padded rail
+            RoundedRectangle(cornerRadius: cr + 2)
                 .strokeBorder(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.20), Color.white.opacity(0.08)],
+                        colors: [
+                            Color.white.opacity(0.18),
+                            Color.white.opacity(0.04),
+                            Color.black.opacity(0.55),
+                        ],
                         startPoint: .top, endPoint: .bottom
                     ),
                     lineWidth: 2.5
                 )
-                .frame(width: l.tableWidth, height: l.tableHeight)
+                .frame(width: l.tableWidth + 4, height: l.tableHeight + 4)
+                .allowsHitTesting(false)
+
+            // 3b. Saddle stitching where rail meets felt
+            RoundedRectangle(cornerRadius: cr + 1)
+                .strokeBorder(
+                    Color(hex: "#C9A574").opacity(0.32),
+                    style: StrokeStyle(lineWidth: 0.6, dash: [3, 2.5])
+                )
+                .frame(width: l.tableWidth + 2, height: l.tableHeight + 2)
+                .allowsHitTesting(false)
+
+            // 4. Felt surface (gradient + cloth texture + sheen + vignette)
+            feltSurface(l, cr: cr)
+
+            // 5. Inset betting line — the guide curve where action chips land
+            RoundedRectangle(cornerRadius: max(0, cr - 30))
+                .strokeBorder(Color.white.opacity(0.085), lineWidth: 1)
+                .frame(width: l.tableWidth - 60, height: l.tableHeight - 60)
+                .allowsHitTesting(false)
         }
         .position(x: l.tableCenter.x, y: l.tableCenter.y)
+    }
+
+    // ── Rail (padded leather) ────────────────────────────────────────────────
+
+    private func railLayer(outerW: CGFloat, outerH: CGFloat, outerCR: CGFloat) -> some View {
+        ZStack {
+            // Base leather — top-lit gradient (warm umber → near-black)
+            RoundedRectangle(cornerRadius: outerCR)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#3A2616"),
+                            Color(hex: "#231408"),
+                            Color(hex: "#0C0703"),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(width: outerW, height: outerH)
+
+            // Top sheen — light hitting from above, fades by the felt line
+            RoundedRectangle(cornerRadius: outerCR)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.22),
+                            Color.white.opacity(0.06),
+                            Color.clear,
+                        ],
+                        startPoint: .top,
+                        endPoint: UnitPoint(x: 0.5, y: 0.42)
+                    )
+                )
+                .frame(width: outerW, height: outerH)
+                .blendMode(.plusLighter)
+
+            // Outer rail edge — bright top, dark bottom for roundness
+            RoundedRectangle(cornerRadius: outerCR)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.24),
+                            Color.white.opacity(0.05),
+                            Color.black.opacity(0.45),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+                .frame(width: outerW, height: outerH)
+        }
+        .allowsHitTesting(false)
+    }
+
+    // ── Felt surface ─────────────────────────────────────────────────────────
+
+    private func feltSurface(_ l: TableLayout, cr: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cr)
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color(hex: theme.inner),
+                        Color(hex: theme.mid),
+                        Color(hex: theme.edge),
+                    ],
+                    center: UnitPoint(x: 0.5, y: 0.45),
+                    startRadius: l.tableWidth * 0.05,
+                    endRadius: l.tableWidth * 0.65
+                )
+            )
+            .frame(width: l.tableWidth, height: l.tableHeight)
+            .overlay(
+                // Cloth weave — fine speckle clipped to felt shape
+                FeltTexture()
+                    .frame(width: l.tableWidth, height: l.tableHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: cr))
+                    .allowsHitTesting(false)
+            )
+            .overlay(
+                ZStack {
+                    // Top sheen — slight dome highlight
+                    RoundedRectangle(cornerRadius: cr)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.10),
+                                    Color.white.opacity(0.02),
+                                    Color.clear,
+                                ],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                        .frame(width: l.tableWidth, height: l.tableHeight)
+                        .blendMode(.plusLighter)
+
+                    // Vignette toward edges — pushes attention to center
+                    RoundedRectangle(cornerRadius: cr)
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.clear, Color.black.opacity(0.22)],
+                                center: .center,
+                                startRadius: l.tableWidth * 0.30,
+                                endRadius: l.tableWidth * 0.62
+                            )
+                        )
+                        .frame(width: l.tableWidth, height: l.tableHeight)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: cr))
+                .allowsHitTesting(false)
+            )
     }
 
     // ─── StackPoker watermark ────────────────────────────────────────────────
@@ -313,15 +445,11 @@ struct PokerTableView: View {
                 let bx = seatPt.x + dx * 0.50
                 let by = seatPt.y + dy * 0.50
 
-                Text("D")
-                    .font(.system(size: 10, weight: .black))
-                    .foregroundStyle(.white)
-                    .frame(width: 20, height: 20)
-                    .background(
-                        Circle()
-                            .fill(Color(hex: "#4A90E2"))
-                    )
-                    .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+                // Dealer button — classic ivory chip with bold "D".
+                PokerChip(text: "D",
+                          tint: Color(hex: "#F4ECDC"),
+                          textColor: Color(hex: "#1B1B1B"),
+                          size: 24)
                     .position(x: bx, y: by)
             }
         }
@@ -329,6 +457,35 @@ struct PokerTableView: View {
 
     private var dealerDisplayIndex: Int? {
         seats.firstIndex(where: { $0.isDealer })
+    }
+
+    // ─── Blind rail chips ────────────────────────────────────────────────────
+    // Render SB / BB as realistic-looking chips on the felt, placed along the
+    // line from each blind seat toward the table center. Same rail ratio as
+    // the dealer button (which sits at a different seat), so all three
+    // markers form a clean concentric ring around the felt.
+    @ViewBuilder
+    private func blindRailChips(_ l: TableLayout) -> some View {
+        let positions = l.seatPositions(count: maxSeats)
+        ForEach(Array(seats.enumerated()), id: \.element.userId) { idx, seat in
+            if idx < positions.count, seat.isSmallBlind || seat.isBigBlind {
+                let seatPt = positions[idx]
+                let dx = l.tableCenter.x - seatPt.x
+                let dy = l.tableCenter.y - seatPt.y
+                let bx = seatPt.x + dx * 0.50
+                let by = seatPt.y + dy * 0.50
+                // SB → blue, BB → red. Standard live-poker color coding.
+                let tint = seat.isSmallBlind
+                    ? Color(hex: "#3B7DD8")
+                    : Color(hex: "#C9342B")
+                let label = seat.isSmallBlind ? "SB" : "BB"
+                PokerChip(text: label,
+                          tint: tint,
+                          textColor: .white,
+                          size: 22)
+                    .position(x: bx, y: by)
+            }
+        }
     }
 
     // ─── Pot flow layer ──────────────────────────────────────────────────────
@@ -393,13 +550,17 @@ struct PokerTableView: View {
                         turnProgress: isActive ? vm.turnTimeRemaining : 1.0,
                         turnSecondsLeft: isActive ? vm.turnSecondsLeft : 0,
                         lastAction: vm.gameState?.lastAction,
-                        avatarSize: l.seatAvatarSize
+                        avatarSize: l.seatAvatarSize,
+                        winningCardIds: winnerCardIds,
+                        anyWinnersDeclared: !winnerIds.isEmpty
                     )
                     .position(x: positions[idx].x, y: positions[idx].y)
                     .zIndex(isWinner ? 20 : (isActive ? 10 : 1))
                 } else {
                     TargetEmptySeat(avatarSize: l.seatAvatarSize)
                         .position(x: positions[idx].x, y: positions[idx].y)
+                        .contentShape(Rectangle())
+                        .onTapGesture { showOpenSeatSheet = true }
                 }
             }
         }
@@ -463,6 +624,96 @@ private func pokerChipIcon(diameter: CGFloat, amount: Int = 0) -> some View {
     }
     .frame(width: diameter, height: diameter)
     .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+}
+
+// ─── Poker Chip ──────────────────────────────────────────────────────────────
+// Reusable chip view used for the dealer button (D) and blind markers (SB/BB).
+// Designed to look like a real ceramic / clay chip rather than a flat badge:
+//   • Tinted outer rim with radial sheen for a subtle 3D feel.
+//   • 6 white edge spots evenly spaced around the rim.
+//   • Recessed center inset (top→bottom shading) holding the letters.
+//   • Drop shadow so the chip reads as resting on the felt.
+
+private struct PokerChip: View {
+    let text:      String
+    let tint:      Color
+    let textColor: Color
+    var size:      CGFloat = 22
+
+    var body: some View {
+        ZStack {
+            // Outer rim — tinted disk with off-center radial highlight.
+            Circle()
+                .fill(tint)
+                .overlay(
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.35),
+                            Color.clear,
+                            Color.black.opacity(0.22)
+                        ],
+                        center: UnitPoint(x: 0.32, y: 0.30),
+                        startRadius: 0,
+                        endRadius: size * 0.72
+                    )
+                    .clipShape(Circle())
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.black.opacity(0.45), lineWidth: 0.6)
+                )
+
+            // 6 white edge spots evenly spaced around the rim.
+            ForEach(0..<6, id: \.self) { i in
+                Capsule()
+                    .fill(Color.white.opacity(0.92))
+                    .frame(width: size * 0.16, height: size * 0.26)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.black.opacity(0.20), lineWidth: 0.4)
+                    )
+                    .offset(y: -size * 0.37)
+                    .rotationEffect(.degrees(Double(i) * 60))
+            }
+
+            // Thin dark separator between rim and center inset.
+            Circle()
+                .strokeBorder(Color.black.opacity(0.45), lineWidth: 0.6)
+                .frame(width: size * 0.70, height: size * 0.70)
+
+            // Center inset disk — same tint with a top→bottom shade gradient
+            // so it reads as recessed.
+            Circle()
+                .fill(tint)
+                .overlay(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.28),
+                            Color.black.opacity(0.22)
+                        ],
+                        startPoint: .top,
+                        endPoint:   .bottom
+                    )
+                    .clipShape(Circle())
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                )
+                .frame(width: size * 0.62, height: size * 0.62)
+
+            // Letters in the center inset.
+            Text(text)
+                .font(.system(size: size * 0.40,
+                              weight: .black,
+                              design: .rounded))
+                .foregroundStyle(textColor)
+                .shadow(color: .black.opacity(0.35), radius: 0.5, y: 0.5)
+        }
+        .frame(width: size, height: size)
+        .compositingGroup()
+        .shadow(color: .black.opacity(0.55), radius: 2.5, x: 0, y: 1.5)
+    }
 }
 
 // ─── Pot Flow Chip ───────────────────────────────────────────────────────────
@@ -655,6 +906,10 @@ struct TargetSeatView: View {
     var turnSecondsLeft: Int = 0
     var lastAction:   LastAction?
     let avatarSize:   CGFloat
+    // Showdown context — used by OpponentHoleCardsView to highlight the
+    // cards in the winning combination once winners have been declared.
+    var winningCardIds:     Set<String> = []
+    var anyWinnersDeclared: Bool = false
 
     @State private var allInPulse = false
     @State private var winnerPulse = false
@@ -769,37 +1024,28 @@ struct TargetSeatView: View {
                         .zIndex(5)
                 }
 
-                // Face-down card backs beside avatar (for players with cards)
+                // Opponent hole cards. During the hand these render face-down;
+                // at showdown the server starts populating `seat.holeCards`,
+                // which triggers a flip-up + elevate animation. Cards in the
+                // winning combination are then highlighted in gold while the
+                // rest dim, so the winning hand reads at a glance across the
+                // whole table.
                 if seat.hasCards && seat.status != .folded && !isMe {
-                    HStack(spacing: -8) {
-                        ForEach(0..<min(seat.cardCount, 4), id: \.self) { i in
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color(hex: "#2D2D4A"), Color(hex: "#1A1A30")],
-                                        startPoint: .topLeading, endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 18, height: 24)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
-                                )
-                                .rotationEffect(.degrees(Double(i) * 5 - 5))
-                                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-                        }
-                    }
+                    OpponentHoleCardsView(
+                        revealedCards:      seat.holeCards,
+                        cardCount:          seat.cardCount,
+                        isWinner:           isWinner,
+                        anyWinnersDeclared: anyWinnersDeclared,
+                        winningCardIds:     winningCardIds
+                    )
                     .offset(x: -avatarSize * 0.52, y: -avatarSize * 0.15)
+                    .zIndex(8)
                 }
 
-                // SB / BB badges
-                if seat.isSmallBlind {
-                    blindBadge("SB", color: Color(hex: "#4A90E2"))
-                        .offset(x: -avatarSize * 0.42, y: -avatarSize * 0.40)
-                } else if seat.isBigBlind {
-                    blindBadge("BB", color: Color(hex: "#4A90E2"))
-                        .offset(x: -avatarSize * 0.42, y: -avatarSize * 0.40)
-                }
+                // SB / BB markers are rendered on the felt itself (see
+                // `blindRailChips` in the table layer), not pinned to the
+                // avatar — that way they can't collide with the opponent
+                // face-down cards or the avatar plate.
 
                 // Disconnect indicator
                 if !seat.isConnected {
@@ -814,27 +1060,30 @@ struct TargetSeatView: View {
             }
             .frame(width: avatarSize + 10, height: avatarSize + 10)
 
-            // Name plate
-            VStack(spacing: 1) {
-                Text(truncatedName)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(formatChips(String(seat.stack)))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(stackColor)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .frame(width: plateWidth)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(hex: "#1C2030").opacity(0.9))
-                    .shadow(color: .black.opacity(0.5), radius: 3, y: 2)
-            )
-            .offset(y: -4)
+            // ── Name pill ─ slim, just the username
+            Text(truncatedName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.95))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 2.5)
+                .frame(maxWidth: plateWidth)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color(hex: "#1C2030").opacity(0.92))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+                .offset(y: -4)
+
+            // ── Stack pill ─ dedicated chip-amount area beneath the icon
+            // Chip-tier-colored accents so the value reads at a glance and
+            // ties visually to the chip stacks on the felt.
+            StackPill(amount: seat.stack, status: seat.status)
+                .offset(y: -2)
         }
         .onAppear {
             if seat.status == .allIn { startAllInPulse() }
@@ -882,17 +1131,6 @@ struct TargetSeatView: View {
         }
     }
 
-    private func blindBadge(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.system(size: 9, weight: .black))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(color)
-            .clipShape(Circle())
-            .overlay(Circle().strokeBorder(Color.white.opacity(0.4), lineWidth: 0.5))
-    }
-
     private struct ActionKind { let label: String; let color: Color }
     private func actionBubbleKind(for raw: String) -> ActionKind? {
         switch raw {
@@ -905,12 +1143,213 @@ struct TargetSeatView: View {
     }
 }
 
+// ─── Stack Pill ──────────────────────────────────────────────────────────────
+// Small dedicated chip-amount area shown beneath each seat. Color tiers
+// mirror the chip stacks on the felt so the value reads at a glance:
+// white → red → blue → black → purple → gold as the stack grows.
+
+private struct StackPill: View {
+    let amount: Int
+    let status: PlayerStatus
+
+    private var tier: ChipTier { ChipTier.forAmount(amount) }
+
+    private var amountColor: Color {
+        switch status {
+        case .folded:       return Color.white.opacity(0.45)
+        case .sittingOut,
+             .disconnected: return Color.white.opacity(0.55)
+        case .allIn:        return Color(hex: "#F5C842")
+        default:            return tier.colors.primary
+        }
+    }
+
+    private var borderColor: Color {
+        switch status {
+        case .folded, .sittingOut, .disconnected:
+            return Color.white.opacity(0.12)
+        default:
+            return tier.colors.primary.opacity(0.40)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            // Mini chip — same visual language as the felt chips, scaled
+            // way down so it reads as a "chip-icon + amount" pill.
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [tier.colors.primary, tier.colors.secondary],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        )
+                    )
+                Circle()
+                    .strokeBorder(Color.white.opacity(0.55), lineWidth: 0.6)
+                Circle()
+                    .strokeBorder(
+                        tier.colors.edge,
+                        style: StrokeStyle(lineWidth: 0.8, dash: [1.5, 1.5])
+                    )
+                    .padding(2)
+            }
+            .frame(width: 11, height: 11)
+            .opacity(status == .folded ? 0.45 : 1.0)
+            .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+
+            Text(formatChips(String(amount)))
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(amountColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .contentTransition(.numericText())
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(Color(hex: "#0E1220").opacity(0.92))
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(borderColor, lineWidth: 0.6)
+        )
+        .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
+    }
+}
+
+// ─── Opponent Hole Cards ─────────────────────────────────────────────────────
+// Renders the small pair of hole cards beside an opponent's avatar. Three
+// states, in order:
+//   1. Hidden — face-down rectangles (during the hand)
+//   2. Revealed — flips face-up the moment the server sends `holeCards`
+//      (i.e. at showdown). Cards lift slightly off the seat to read clearly.
+//   3. Resolved — once winners are declared, cards in the winning hand glow
+//      gold; cards that aren't part of the winning combo dim and desaturate.
+
+private struct OpponentHoleCardsView: View {
+    let revealedCards:      [PokerCard]?
+    let cardCount:          Int
+    let isWinner:           Bool
+    let anyWinnersDeclared: Bool
+    let winningCardIds:     Set<String>
+
+    @State private var revealed:   Bool    = false
+    @State private var flipScaleX: CGFloat = 1
+    @State private var lifted:     Bool    = false
+    @State private var glowPulse:  Bool    = false
+
+    private var hasReveal: Bool { (revealedCards?.count ?? 0) > 0 }
+    private let cardSize: PlayingCardView.CardSize = .custom(22)
+
+    var body: some View {
+        HStack(spacing: -6) {
+            ForEach(0..<displayCount, id: \.self) { i in
+                cardSlot(at: i)
+                    .rotationEffect(.degrees(Double(i) * 5 - 5))
+            }
+        }
+        .scaleEffect(x: flipScaleX, y: 1)
+        .scaleEffect(lifted ? 1.55 : 1.0)
+        .offset(y: lifted ? -10 : 0)
+        .shadow(color: .black.opacity(lifted ? 0.6 : 0.3),
+                radius: lifted ? 8 : 2,
+                y: lifted ? 4 : 1)
+        .shadow(color: (isWinner && glowPulse) ? Color(hex: "#F5C842").opacity(0.7) : .clear,
+                radius: 14)
+        .animation(.spring(response: 0.45, dampingFraction: 0.78), value: lifted)
+        .onAppear {
+            // Late-joiner safety: if the seat already has revealed cards when
+            // this view first mounts (e.g. user opened the app mid-showdown),
+            // jump straight to the revealed state without animating.
+            if hasReveal {
+                revealed = true
+                lifted   = true
+            }
+            if isWinner { startGlowPulse() }
+        }
+        .onChange(of: hasReveal) { _, new in
+            if new { runRevealSequence() }
+        }
+        .onChange(of: isWinner) { _, new in
+            if new { startGlowPulse() } else { glowPulse = false }
+        }
+    }
+
+    private var displayCount: Int {
+        max(min(hasReveal ? (revealedCards?.count ?? 0) : cardCount, 4), 0)
+    }
+
+    @ViewBuilder
+    private func cardSlot(at i: Int) -> some View {
+        if revealed, let cards = revealedCards, i < cards.count {
+            let card = cards[i]
+            let isWinningCard = winningCardIds.contains(card.id)
+            // Once winners are declared, dim cards that aren't part of the
+            // winning hand so the gold-bordered ones pop.
+            let dim = anyWinnersDeclared && !isWinningCard
+            PlayingCardView(card: card, size: cardSize)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cardSize.cornerRadius)
+                        .strokeBorder(
+                            isWinningCard ? Color(hex: "#F5C842") : Color.clear,
+                            lineWidth: 1.6
+                        )
+                )
+                .shadow(color: isWinningCard ? Color(hex: "#F5C842").opacity(0.6) : .clear,
+                        radius: 5)
+                .saturation(dim ? 0.5 : 1.0)
+                .opacity(dim ? 0.55 : 1.0)
+        } else {
+            cardBack
+        }
+    }
+
+    private var cardBack: some View {
+        RoundedRectangle(cornerRadius: 3)
+            .fill(
+                LinearGradient(
+                    colors: [Color(hex: "#2D2D4A"), Color(hex: "#1A1A30")],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: 18, height: 24)
+            .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+            )
+    }
+
+    // X-axis squish-flip → swap to face-up → expand. Then a small spring
+    // lift settles the cards above the seat so they read as "presented".
+    private func runRevealSequence() {
+        withAnimation(.easeIn(duration: 0.14)) { flipScaleX = 0.001 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            revealed = true
+            withAnimation(.easeOut(duration: 0.14)) { flipScaleX = 1 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) {
+            lifted = true
+        }
+    }
+
+    private func startGlowPulse() {
+        withAnimation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true)) {
+            glowPulse = true
+        }
+    }
+}
+
 // ─── Empty Seat ──────────────────────────────────────────────────────────────
 
 struct TargetEmptySeat: View {
     let avatarSize: CGFloat
     var body: some View {
-        VStack(spacing: 4) {
+        // Match the seated layout's vertical footprint (avatar + name pill +
+        // stack pill) so empty seats sit at the same rim height as filled
+        // ones — no jagged misalignment around the table.
+        VStack(spacing: 3) {
             Circle()
                 .strokeBorder(
                     Color.white.opacity(0.08),
@@ -920,11 +1359,30 @@ struct TargetEmptySeat: View {
                 .overlay(
                     Image(systemName: "plus")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.15))
+                        .foregroundStyle(.white.opacity(0.18))
                 )
             Text("Open")
-                .font(.system(size: 10))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white.opacity(0.30))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 2.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color(hex: "#1C2030").opacity(0.55))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+                .offset(y: -2)
+
+            // Placeholder dash to match the stack-pill height on filled seats.
+            Text("—")
+                .font(.system(size: 10, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white.opacity(0.15))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color(hex: "#0E1220").opacity(0.45)))
         }
     }
 }
@@ -971,4 +1429,54 @@ struct TableTheme: Identifiable, Equatable {
 
     var primaryColor: Color { Color(hex: inner) }
     var edgeColor:    Color { Color(hex: edge) }
+}
+
+// ─── Felt Texture ─────────────────────────────────────────────────────────────
+// Procedural cloth weave drawn into a Canvas — small light/dark speckle dots
+// at deterministic pseudorandom positions (seeded LCG so the pattern is stable
+// across renders and identical for every table). The result is a subtle noise
+// that breaks up the gradient and reads as fabric instead of plastic.
+
+private struct FeltTexture: View {
+    private struct Dot { let x: CGFloat; let y: CGFloat; let alpha: Double; let size: CGFloat; let light: Bool }
+
+    private static let dots: [Dot] = {
+        // Seeded linear-congruential generator → deterministic, no Foundation rand.
+        var state: UInt64 = 0x9E3779B97F4A7C15
+        func next() -> Double {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Double(state >> 11) / Double(1 << 53)
+        }
+        var arr: [Dot] = []
+        arr.reserveCapacity(520)
+        for i in 0..<520 {
+            arr.append(Dot(
+                x: CGFloat(next()),
+                y: CGFloat(next()),
+                alpha: 0.022 + next() * 0.060,
+                size: 0.5 + CGFloat(next()) * 1.2,
+                light: i % 2 == 0
+            ))
+        }
+        return arr
+    }()
+
+    var body: some View {
+        Canvas { ctx, size in
+            for d in Self.dots {
+                let rect = CGRect(
+                    x: d.x * size.width,
+                    y: d.y * size.height,
+                    width: d.size,
+                    height: d.size
+                )
+                let color: Color = d.light
+                    ? Color.white.opacity(d.alpha)
+                    : Color.black.opacity(d.alpha * 0.75)
+                ctx.fill(Path(ellipseIn: rect), with: .color(color))
+            }
+        }
+        .blendMode(.overlay)
+        .opacity(0.85)
+    }
 }

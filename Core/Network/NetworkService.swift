@@ -8,7 +8,7 @@ enum APIConfig {
     //   Local (simulator): "http://localhost:3000"
     //   Local (real device on Wi-Fi): "http://192.168.0.55:3000"
     //   Production: "https://your-app.up.railway.app"
-    private static let host = "http://192.168.0.42:3000"
+    private static let host = "http://192.168.0.55:3000"
 
     static let baseURL = host + "/api"
     static let wsURL   = host.replacingOccurrences(of: "http", with: "ws")
@@ -45,6 +45,7 @@ enum APIEndpoint {
     case tableDetail(id: String)
     case leaveTable(id: String)
     case closeTable(id: String)
+    case topUpChips(tableId: String)
 
     // Friends
     case friends
@@ -69,6 +70,7 @@ enum APIEndpoint {
     // Invites
     case tableInvites
     case respondInvite(id: String)
+    case sendInvite(tableId: String)
 
     // Bot
     case addBot(tableId: String)
@@ -96,6 +98,7 @@ enum APIEndpoint {
         case .tableDetail(let id):   return "/tables/\(id)"
         case .leaveTable(let id):    return "/tables/\(id)/leave"
         case .closeTable(let id):    return "/tables/\(id)/close"
+        case .topUpChips(let id):    return "/tables/\(id)/topup"
         case .friends:               return "/friends"
         case .sendFriendRequest(let id): return "/friends/request/\(id)"
         case .respondFriendRequest(let id): return "/friends/\(id)/respond"
@@ -112,6 +115,7 @@ enum APIEndpoint {
         case .transferChips:         return "/chips/transfer"
         case .tableInvites:                return "/tables/invites/pending"
         case .respondInvite(let id):       return "/tables/invites/\(id)/respond"
+        case .sendInvite(let tid):         return "/tables/\(tid)/invite"
         case .addBot(let tid):             return "/tables/\(tid)/add-bot"
         case .adminKick(let tid, _): return "/admin/tables/\(tid)/kick"
         case .adminBan(let uid):           return "/admin/users/\(uid)/ban"

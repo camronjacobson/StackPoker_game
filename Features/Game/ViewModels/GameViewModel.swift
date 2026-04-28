@@ -1,6 +1,20 @@
 import SwiftUI
 import Combine
 
+// Cached subset of TableDetail used by the in-game side menu. The websocket
+// game state doesn't include join code, owner, or buy-in limits — those come
+// from the lobby's REST detail endpoint and are loaded lazily.
+struct TableInfoSnapshot: Equatable {
+    let name:       String
+    let joinCode:   String
+    let smallBlind: Int
+    let bigBlind:   Int
+    let minBuyIn:   Int
+    let maxBuyIn:   Int
+    let ownerName:  String
+    let isMine:     Bool
+}
+
 @MainActor
 final class GameViewModel: ObservableObject {
 
@@ -49,6 +63,15 @@ final class GameViewModel: ObservableObject {
     @Published var wasKicked = false
     @Published var shouldExit = false
     @Published var showCloseConfirm = false
+
+    // In-game side menu (sliding drawer from the left). Holds Add Chips,
+    // Table Info, Copy Join Code, Leave / Close Table.
+    @Published var showSideMenu = false
+    @Published var showTopUpSheet = false
+    @Published var topUpInProgress = false
+    // Cached table detail for the side menu (joinCode, blinds, max buy-in,
+    // owner name). Loaded lazily the first time the menu is opened.
+    @Published var tableDetail: TableInfoSnapshot?
 
     // ─── Dependencies ─────────────────────────────────────────────────────────
 
@@ -112,6 +135,8 @@ final class GameViewModel: ObservableObject {
                     SoundManager.shared.play(.win)
                     self.notificationHaptic(.success)
                 }
+                // Persist to local hand history for the Review feature.
+                HandRecorder.shared.finalize(winners: payouts)
                 Task {
                     try? await Task.sleep(nanoseconds: 4_000_000_000)
                     withAnimation { self.showWinners = false }
@@ -147,6 +172,15 @@ final class GameViewModel: ObservableObject {
             gameState = state
         }
         updateTurnTimer(state)
+
+        // Capture for hand-history / review feature. Cheap, runs on main.
+        let myUsername = state.seats.first(where: { $0.userId == userId })?.username ?? ""
+        HandRecorder.shared.observe(
+            state: state,
+            tableName: tableName,
+            userId: userId,
+            myUsername: myUsername
+        )
 
         // Community card deal sound — stagger one play per new card so the
         // audio tracks each card landing on the felt (flop = 3 staggered plays).
@@ -337,6 +371,72 @@ final class GameViewModel: ObservableObject {
         }
     }
 
+    // ─── Top-up chips ────────────────────────────────────────────────────────
+    // Adds chips to the local player's stack between hands. Server enforces
+    // the mid-hand block, max-buy-in cap, and chip balance check; we just
+    // surface any error message.
+    func topUpChips(amount: Int) {
+        guard amount > 0 else { return }
+        topUpInProgress = true
+        Task {
+            defer { topUpInProgress = false }
+            do {
+                struct Body: Encodable { let amount: Int }
+                struct TopUpResponse: Decodable { let newStack: String; let addedAmount: String }
+                let _: TopUpResponse = try await NetworkService.shared.request(
+                    .topUpChips(tableId: tableId),
+                    method: .POST,
+                    body: Body(amount: amount)
+                )
+                showTopUpSheet = false
+            } catch let err as NetworkError {
+                errorMessage = err.localizedDescription
+            } catch {
+                errorMessage = "Failed to add chips"
+            }
+        }
+    }
+
+    // ─── Load table detail for the side menu ─────────────────────────────────
+    // The websocket gameState doesn't include join code, owner, or buy-in
+    // limits — those live on the lobby's TableDetail. Fetched lazily so it
+    // doesn't run for users who never open the menu.
+    func loadTableDetailIfNeeded() {
+        guard tableDetail == nil else { return }
+        Task {
+            do {
+                struct Player: Decodable { let userId: String; let stack: String }
+                struct Owner:  Decodable { let id: String; let username: String; let displayName: String? }
+                struct Detail: Decodable {
+                    let id: String
+                    let name: String
+                    let joinCode: String
+                    let smallBlind: String
+                    let bigBlind: String
+                    let minBuyIn: String
+                    let maxBuyIn: String
+                    let owner: Owner
+                    let players: [Player]?
+                }
+                let d: Detail = try await NetworkService.shared.request(
+                    .tableDetail(id: tableId), method: .GET
+                )
+                tableDetail = TableInfoSnapshot(
+                    name:       d.name,
+                    joinCode:   d.joinCode,
+                    smallBlind: Int(d.smallBlind) ?? 0,
+                    bigBlind:   Int(d.bigBlind)   ?? 0,
+                    minBuyIn:   Int(d.minBuyIn)   ?? 0,
+                    maxBuyIn:   Int(d.maxBuyIn)   ?? 0,
+                    ownerName:  d.owner.displayName ?? d.owner.username,
+                    isMine:     d.owner.id == userId
+                )
+            } catch {
+                // Non-fatal — menu will show without the extra info.
+            }
+        }
+    }
+
     func addBot() {
         Task {
             do {
@@ -357,6 +457,21 @@ final class GameViewModel: ObservableObject {
     var mySeat: GameSeat? { gameState?.seats.first { $0.userId == userId } }
     var isMyTurn: Bool    { gameState?.activePlayerId == userId }
     var myCards:  [PokerCard] { mySeat?.holeCards ?? [] }
+
+    /// Card IDs (e.g. "AH", "KD") that appear in any winner's best 5. Used by
+    /// the table + local-player overlay to highlight the cards that made the
+    /// winning hand at showdown.
+    var winningCardIds: Set<String> {
+        guard let winners = gameState?.winners else { return [] }
+        return Set(winners.flatMap { $0.bestCards.map(\.id) })
+    }
+
+    /// True once the server has declared winners for the current hand —
+    /// flips on at showdown, flips off when the next hand begins. Drives the
+    /// dim-the-losers / highlight-the-winners visual state.
+    var anyWinnersDeclared: Bool {
+        !(gameState?.winners?.isEmpty ?? true)
+    }
 
     var legalActions: [LegalAction] { gameState?.legalActions ?? [] }
 

@@ -162,6 +162,33 @@ struct CreateTableSheet: View {
               .padding(.horizontal, SPSpacing.md)
             }
 
+            // Bot opponent toggle — opt-in instead of the old auto-add flow.
+            VStack(spacing: 0) {
+              SPSectionHeader(title: "Opponent")
+                .padding(.bottom, SPSpacing.sm)
+              SPCard {
+                Toggle(isOn: $vm.addBotOnCreate) {
+                  HStack(spacing: SPSpacing.sm) {
+                    Image(systemName: vm.addBotOnCreate ? "cpu.fill" : "cpu")
+                      .font(.system(size: 15))
+                      .foregroundStyle(vm.addBotOnCreate ? SPColors.accent : SPColors.textSecondary)
+                      .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                      Text(vm.addBotOnCreate ? "Add a bot opponent" : "No bot — wait for players")
+                        .font(SPFonts.body())
+                        .foregroundStyle(SPColors.textPrimary)
+                      Text(vm.addBotOnCreate ? "StackBot will sit down so you can start right away" : "You can still add a bot from the table later")
+                        .font(SPFonts.caption(12))
+                        .foregroundStyle(SPColors.textTertiary)
+                    }
+                  }
+                }
+                .tint(SPColors.accent)
+                .padding(SPSpacing.md)
+              }
+              .padding(.horizontal, SPSpacing.md)
+            }
+
             // Error
             if let err = vm.createError {
               ErrorBanner(message: err)

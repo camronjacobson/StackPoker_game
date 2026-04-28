@@ -58,18 +58,28 @@ struct GameView: View {
 
                 // ── Overlays (z-ordered) ──────────────────────────────────────
 
-                // Winner celebration overlay
-                if vm.showWinners {
-                    WinnerCelebrationOverlay(winners: vm.winnerPayouts)
-                        .transition(.opacity)
-                        .zIndex(40)
-                }
+                // (Winner reveal happens at the table — see PokerTableView's
+                //  showdown logic. No full-screen modal.)
 
                 // Chat panel
                 if vm.showChat {
                     ChatOverlay(vm: vm)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                         .zIndex(50)
+                }
+
+                // Side menu — sliding drawer from the left
+                if vm.showSideMenu {
+                    TableSideMenu(vm: vm)
+                        .transition(.move(edge: .leading))
+                        .zIndex(55)
+                }
+
+                // Top-up sheet (presented from the side menu)
+                if vm.showTopUpSheet {
+                    TopUpSheet(vm: vm)
+                        .transition(.opacity)
+                        .zIndex(70)
                 }
 
                 // Error toast
@@ -179,11 +189,15 @@ struct GameView: View {
 
     private var topBar: some View {
         HStack(spacing: 12) {
-            // Hamburger / back menu
+            // Hamburger — opens the in-game side menu (Add Chips, Table
+            // Info, Leave / Close, etc.) instead of leaving the table directly.
             Button {
-                if vm.isAloneAtTable { vm.showCloseConfirm = true } else { dismiss() }
+                vm.loadTableDetailIfNeeded()
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                    vm.showSideMenu = true
+                }
             } label: {
-                Image(systemName: vm.isAloneAtTable ? "xmark" : "line.3.horizontal")
+                Image(systemName: "line.3.horizontal")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white.opacity(0.7))
                     .frame(width: 40, height: 40)
@@ -257,7 +271,22 @@ struct GameView: View {
                 // avatar + timer ring. Otherwise they sit side-by-side.
                 HStack(spacing: vm.isMyTurn ? -22 : 6) {
                     ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
+                        let isWinningCard = vm.winningCardIds.contains(card.id)
+                        let dim = vm.anyWinnersDeclared && !isWinningCard
                         PlayingCardView(card: card, size: .large)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: PlayingCardView.CardSize.large.cornerRadius)
+                                    .strokeBorder(
+                                        isWinningCard ? Color(hex: "#F5C842") : Color.clear,
+                                        lineWidth: 2.5
+                                    )
+                            )
+                            .saturation(dim ? 0.5 : 1.0)
+                            .opacity(dim ? 0.55 : 1.0)
+                            .shadow(
+                                color: isWinningCard ? Color(hex: "#F5C842").opacity(0.7) : .clear,
+                                radius: 10
+                            )
                             .rotationEffect(.degrees(
                                 vm.isMyTurn
                                     ? (idx == 0 ? -10 : 6)
@@ -282,9 +311,12 @@ struct GameView: View {
             // When it's my turn: shrink the fanned hole cards, nudge them
             // slightly right, and push the whole overlay behind the seat (via
             // zIndex on the containing ZStack) so the turn-timer ring around
-            // my avatar draws cleanly in front of the cards.
-            .scaleEffect(vm.isMyTurn ? 0.55 : 1.0, anchor: .bottom)
-            .offset(x: vm.isMyTurn ? 120 : 0)
+            // my avatar draws cleanly in front of the cards. The y-offset
+            // drops the shrunken stack just enough to clear the stack-amount
+            // chip pill below the avatar, which the cards used to ride over.
+            .scaleEffect(vm.isMyTurn ? 0.48 : 1.0, anchor: .bottom)
+            .offset(x: vm.isMyTurn ? 120 : 0,
+                    y: vm.isMyTurn ? 22  : 0)
             .transition(.asymmetric(
                 insertion: .move(edge: .bottom).combined(with: .opacity),
                 // Fold: slide toward the muck (off to the right) while rotating
@@ -313,6 +345,38 @@ struct GameView: View {
                     isLandscape: isLandscape
                 )
 
+                // "Waiting for next hand" pill — shown when a hand is in
+                // progress but I'm not part of it (e.g. I just sat down
+                // mid-hand, or I'm sitting out). Without this the user sees
+                // an empty action bar with no cards and is confused; the
+                // real reason is they're benched until the next hand starts.
+                if let state = vm.gameState,
+                   state.phase != .waiting,
+                   let seat = vm.mySeat,
+                   (seat.holeCards?.isEmpty ?? true),
+                   seat.status != .folded {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.white)
+                                .scaleEffect(0.7)
+                            Text("Waiting for next hand…")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5))
+                        .padding(.bottom, 110)
+                    }
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+                    .zIndex(35)
+                }
+
                 // Waiting overlay
                 if vm.gameState?.phase == .waiting || vm.gameState == nil {
                     Color.black.opacity(0.55).ignoresSafeArea()
@@ -329,9 +393,13 @@ struct GameView: View {
                             let seated = vm.gameState!.seats.filter { $0.status != .sittingOut }.count
                             WaitingForPlayersView(seated: seated, required: 2)
 
-                            // Add bot button — lets you play solo against an AI opponent
+                            // Add bot button — lets you play solo against an AI opponent.
+                            // Only shown when the creator opted into bots at table
+                            // creation (or for tables where we have no preference,
+                            // i.e. ones we joined rather than created).
                             let hasBot = vm.gameState!.seats.contains { $0.username == "StackBot" }
-                            if !hasBot {
+                            let botsAllowed = TablePreferences.botsAllowed(forTableId: vm.tableId)
+                            if !hasBot && botsAllowed {
                                 Button {
                                     vm.addBot()
                                 } label: {
@@ -628,5 +696,532 @@ private struct FoldTossModifier: ViewModifier {
             .offset(x: 260 * progress, y: -40 * progress)
             .rotationEffect(.degrees(Double(progress) * 35))
             .scaleEffect(1 - 0.15 * progress)
+    }
+}
+
+// ─── Table Side Menu ──────────────────────────────────────────────────────────
+// Sliding drawer from the leading edge with in-game options. Replaces the
+// old "tap top-left to leave" behavior — leaving is now one option among
+// several. Width is bounded so the felt remains partially visible behind
+// the dimmed scrim, signaling it's a transient panel rather than a route.
+
+struct TableSideMenu: View {
+    @ObservedObject var vm: GameViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    private var midHand: Bool {
+        // True when a hand is in progress and the user can't rebuy. Matches
+        // the server's gate so the UI never shows "Add Chips enabled" while
+        // the API would reject it.
+        guard let phase = vm.gameState?.phase else { return false }
+        return phase != .waiting && phase != .ended
+    }
+
+    private var stackBBs: Int? {
+        guard let bb = vm.gameState?.bigBlind, bb > 0,
+              let stack = vm.mySeat?.stack else { return nil }
+        return stack / bb
+    }
+
+    private func close() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            vm.showSideMenu = false
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let panelWidth = min(geo.size.width * 0.82, 340)
+
+            ZStack(alignment: .leading) {
+                // Scrim — tap to dismiss
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { close() }
+
+                // Drawer
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            stackCard
+                            tableInfoCard
+                            actionsList
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 24)
+                    }
+                }
+                .frame(width: panelWidth)
+                .frame(maxHeight: .infinity)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "#0F1422"), Color(hex: "#0A0E1A")],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                )
+                .overlay(
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 1)
+                        .frame(maxHeight: .infinity),
+                    alignment: .trailing
+                )
+                .shadow(color: .black.opacity(0.55), radius: 20, x: 6)
+            }
+        }
+    }
+
+    // ─── Header ──────────────────────────────────────────────────────────────
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Table")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .tracking(1.2)
+                Text(vm.tableDetail?.name ?? vm.tableName)
+                    .font(.system(size: 17, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .frame(width: 32, height: 32)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+        .background(Color.white.opacity(0.02))
+        .overlay(
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 0.5),
+            alignment: .bottom
+        )
+    }
+
+    // ─── Stack card — your chips at a glance ─────────────────────────────────
+
+    private var stackCard: some View {
+        let stack = vm.mySeat?.stack ?? 0
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Your Stack")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.45))
+                .tracking(1.2)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(formatChips(String(stack)))
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(ChipTier.forAmount(stack).colors.primary)
+                    .contentTransition(.numericText())
+                if let bbs = stackBBs {
+                    Text("\(bbs) BB")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+            }
+            if let info = vm.tableDetail {
+                Text("Buy-in range: \(formatChips(String(info.minBuyIn))) – \(formatChips(String(info.maxBuyIn)))")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.6)
+        )
+    }
+
+    // ─── Table info card ──────────────────────────────────────────────────────
+
+    @ViewBuilder
+    private var tableInfoCard: some View {
+        if let info = vm.tableDetail {
+            VStack(spacing: 0) {
+                infoRow(label: "Blinds", value: "\(formatChips(String(info.smallBlind)))/\(formatChips(String(info.bigBlind)))")
+                Divider().background(Color.white.opacity(0.06))
+                infoRow(label: "Game", value: (vm.gameState?.gameType ?? "TEXAS_HOLDEM") == "PLO" ? "Pot-Limit Omaha" : "No-Limit Hold'em")
+                Divider().background(Color.white.opacity(0.06))
+                infoRow(label: "Hand #", value: "\(vm.gameState?.handNumber ?? 0)")
+                Divider().background(Color.white.opacity(0.06))
+                infoRow(label: "Hosted by", value: info.ownerName)
+            }
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.6)
+            )
+        }
+    }
+
+    private func infoRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.5))
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+    }
+
+    // ─── Actions ─────────────────────────────────────────────────────────────
+
+    private var actionsList: some View {
+        VStack(spacing: 8) {
+            // Add chips — primary action. Disabled mid-hand with a subtitle
+            // explaining why; the server enforces the same rule.
+            menuRow(
+                icon: "plus.circle.fill",
+                iconColor: midHand ? Color.white.opacity(0.35) : Color(hex: "#2ECC71"),
+                title: "Add Chips",
+                subtitle: midHand
+                    ? "Available between hands"
+                    : (vm.tableDetail.map { "Top up to \(formatChips(String($0.maxBuyIn))) max" } ?? "Top up your stack"),
+                disabled: midHand
+            ) {
+                close()
+                // Tiny delay so the drawer slide-out doesn't fight the
+                // sheet's fade-in — feels less janky.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                    vm.showTopUpSheet = true
+                }
+            }
+
+            // Copy join code — handy for inviting friends from the table.
+            if let info = vm.tableDetail {
+                menuRow(
+                    icon: "doc.on.doc.fill",
+                    iconColor: Color(hex: "#4A90E2"),
+                    title: "Copy Join Code",
+                    subtitle: info.joinCode,
+                    trailing: AnyView(
+                        Text(info.joinCode)
+                            .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .tracking(1.2)
+                    )
+                ) {
+                    UIPasteboard.general.string = info.joinCode
+                    vm.errorMessage = "Join code copied"
+                }
+            }
+
+            // Chat shortcut — same as the existing top-right bubble, but
+            // discoverable from the menu.
+            menuRow(
+                icon: "bubble.right.fill",
+                iconColor: Color(hex: "#4A90E2"),
+                title: "Open Chat",
+                subtitle: "Send a message to the table"
+            ) {
+                close()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                    vm.showChat = true
+                }
+            }
+
+            Divider()
+                .background(Color.white.opacity(0.06))
+                .padding(.vertical, 6)
+
+            // Leave / Close — destructive at the bottom. Owners alone at
+            // the table get the close option; everyone else gets leave.
+            if vm.isAloneAtTable && (vm.tableDetail?.isMine ?? true) {
+                menuRow(
+                    icon: "xmark.circle.fill",
+                    iconColor: Color(hex: "#E05555"),
+                    title: "Close Table",
+                    subtitle: "Ends the table for everyone"
+                ) {
+                    close()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                        vm.showCloseConfirm = true
+                    }
+                }
+            } else {
+                menuRow(
+                    icon: "rectangle.portrait.and.arrow.right",
+                    iconColor: Color(hex: "#E05555"),
+                    title: "Leave Table",
+                    subtitle: midHand ? "You'll be marked sitting-out for this hand" : "Cash out and return to lobby"
+                ) {
+                    close()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    // ─── Menu row ────────────────────────────────────────────────────────────
+
+    private func menuRow(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        subtitle: String,
+        disabled: Bool = false,
+        trailing: AnyView? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: { if !disabled { action() } }) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(iconColor.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(iconColor)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(disabled ? Color.white.opacity(0.4) : .white)
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                if let trailing { trailing }
+                else if !disabled {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.25))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(disabled ? 0.02 : 0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color.white.opacity(0.05), lineWidth: 0.6)
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(disabled)
+    }
+}
+
+// ─── Top-up Sheet ─────────────────────────────────────────────────────────────
+// Modal for adding chips mid-table. Presets honor the table's buy-in range
+// (so the user can't accidentally request a top-up that exceeds maxBuyIn —
+// the slider/presets are derived from `headroom = maxBuyIn - currentStack`).
+
+struct TopUpSheet: View {
+    @ObservedObject var vm: GameViewModel
+    @State private var amount: Double = 0
+
+    private var currentStack: Int { vm.mySeat?.stack ?? 0 }
+    private var maxBuyIn: Int { vm.tableDetail?.maxBuyIn ?? max(currentStack * 2, 1000) }
+    private var headroom: Int { max(maxBuyIn - currentStack, 0) }
+
+    private func close() {
+        withAnimation(.easeInOut(duration: 0.2)) { vm.showTopUpSheet = false }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.65)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { close() }
+
+            VStack(spacing: 16) {
+                // Header
+                HStack {
+                    Text("Add Chips")
+                        .font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button(action: close) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .frame(width: 30, height: 30)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(Circle())
+                    }
+                }
+
+                // Stack preview: current → after
+                HStack(spacing: 12) {
+                    stackBox(label: "Current", amount: currentStack, accent: Color.white.opacity(0.5))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.4))
+                    stackBox(label: "After", amount: currentStack + Int(amount), accent: Color(hex: "#2ECC71"))
+                }
+
+                // Slider
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("Amount")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.5))
+                        Spacer()
+                        Text(formatChips(String(Int(amount))))
+                            .font(.system(size: 14, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText())
+                    }
+                    Slider(value: $amount, in: 0...Double(max(headroom, 1)), step: 1)
+                        .tint(Color(hex: "#2ECC71"))
+                        .disabled(headroom == 0)
+                }
+
+                // Preset chips — quick fills for common rebuys.
+                HStack(spacing: 8) {
+                    ForEach(presets, id: \.label) { preset in
+                        presetChip(label: preset.label, value: preset.value)
+                    }
+                }
+
+                Text("Max top-up: \(formatChips(String(headroom))) chips (caps at table max buy-in)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .multilineTextAlignment(.center)
+
+                // Confirm
+                Button {
+                    vm.topUpChips(amount: Int(amount))
+                } label: {
+                    HStack(spacing: 8) {
+                        if vm.topUpInProgress {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 15))
+                        }
+                        Text(vm.topUpInProgress ? "Adding…" : "Confirm Top-Up")
+                            .font(.system(size: 15, weight: .heavy))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(amount > 0 ? Color(hex: "#2ECC71") : Color.white.opacity(0.1))
+                    )
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(amount <= 0 || vm.topUpInProgress)
+            }
+            .padding(20)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(hex: "#0F1422"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+            )
+            .shadow(color: .black.opacity(0.6), radius: 30, y: 12)
+            .padding(.horizontal, 24)
+        }
+        .onAppear {
+            // Default to a half-fill so the sheet starts useful.
+            amount = Double(headroom / 2)
+        }
+    }
+
+    private struct Preset { let label: String; let value: Int }
+    private var presets: [Preset] {
+        [
+            Preset(label: "25%",  value: headroom / 4),
+            Preset(label: "50%",  value: headroom / 2),
+            Preset(label: "Max",  value: headroom),
+        ]
+    }
+
+    private func presetChip(label: String, value: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.25)) { amount = Double(value) }
+        } label: {
+            VStack(spacing: 1) {
+                Text(label)
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundStyle(.white)
+                Text(formatChips(String(value)))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Int(amount) == value ? Color(hex: "#2ECC71").opacity(0.25) : Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(
+                        Int(amount) == value ? Color(hex: "#2ECC71").opacity(0.6) : Color.white.opacity(0.08),
+                        lineWidth: 0.6
+                    )
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(value <= 0)
+    }
+
+    private func stackBox(label: String, amount: Int, accent: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.45))
+                .tracking(1.0)
+            Text(formatChips(String(amount)))
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(accent)
+                .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+        )
     }
 }

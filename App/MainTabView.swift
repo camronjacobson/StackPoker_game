@@ -1,17 +1,31 @@
 import SwiftUI
 
+// ─── Tab bar visibility coordinator ──────────────────────────────────────────
+// Lets pushed views (e.g. HandReplayView) hide the custom bottom bar so their
+// own scrolling content isn't covered by it. Singleton because the bar lives
+// at the root of MainTabView and the pushed views are deep inside a
+// NavigationStack — environment binding through that path is brittle.
+
+@MainActor
+final class TabBarVisibility: ObservableObject {
+    static let shared = TabBarVisibility()
+    @Published var isHidden: Bool = false
+    private init() {}
+}
+
 struct MainTabView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var lobbyVM = LobbyViewModel()
+    @StateObject private var tabBarVis = TabBarVisibility.shared
     @State private var selectedTab: AppTab = .home
 
     enum AppTab: Int, CaseIterable {
-        case home, groups, create, alerts, friends
+        case home, history, create, alerts, friends
 
         var icon: String {
             switch self {
             case .home:    return "house.fill"
-            case .groups:  return "globe"
+            case .history: return "clock.arrow.circlepath"
             case .create:  return "plus"
             case .alerts:  return "bell.fill"
             case .friends: return "person.2.fill"
@@ -21,7 +35,7 @@ struct MainTabView: View {
         var label: String {
             switch self {
             case .home:    return "Home"
-            case .groups:  return "Groups"
+            case .history: return "History"
             case .create:  return ""
             case .alerts:  return "Alerts"
             case .friends: return "Friends"
@@ -37,19 +51,23 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .home:    LobbyView().environmentObject(lobbyVM)
-                case .groups:  ClubsPlaceholderView()
+                case .history: HistoryListView()
                 case .create:  LobbyView().environmentObject(lobbyVM) // Create triggers sheet, not a tab
                 case .alerts:  AlertsPlaceholderView()
                 case .friends: FriendsTabView()
                 }
             }
 
-            // Tab bar
-            PokerTabBar(selectedTab: $selectedTab, onCreateTap: {
-                selectedTab = .home
-                lobbyVM.showCreateSheet = true
-            })
+            // Tab bar — hidden when a pushed screen requests it (e.g. replay)
+            if !tabBarVis.isHidden {
+                PokerTabBar(selectedTab: $selectedTab, onCreateTap: {
+                    selectedTab = .home
+                    lobbyVM.showCreateSheet = true
+                })
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.25), value: tabBarVis.isHidden)
         .ignoresSafeArea(.keyboard)
     }
 }

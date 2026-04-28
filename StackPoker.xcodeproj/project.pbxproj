@@ -49,6 +49,16 @@
 		36C91D552F7F5B8B00697E42 /* SPTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */; };
 		36C91D562F7F5B8B00697E43 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D572F7F5B8B00697E43 /* SoundManager.swift */; };
 		36C91E012F80000000697E42 /* Sounds in Resources */ = {isa = PBXBuildFile; fileRef = 36C91E002F80000000697E42 /* Sounds */; };
+		36C91E302F80000100697E42 /* RecordedHand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E202F80000100697E42 /* RecordedHand.swift */; };
+		36C91E312F80000100697E42 /* HandAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E212F80000100697E42 /* HandAnalysis.swift */; };
+		36C91E322F80000100697E42 /* HandHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E222F80000100697E42 /* HandHistoryStore.swift */; };
+		36C91E332F80000100697E42 /* HandRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E232F80000100697E42 /* HandRecorder.swift */; };
+		36C91E342F80000100697E42 /* HandAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E242F80000100697E42 /* HandAnalyzer.swift */; };
+		36C91E352F80000100697E42 /* ReplayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E252F80000100697E42 /* ReplayViewModel.swift */; };
+		36C91E362F80000100697E42 /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E262F80000100697E42 /* HistoryListView.swift */; };
+		36C91E372F80000100697E42 /* HandReplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E272F80000100697E42 /* HandReplayView.swift */; };
+		36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E282F80000100697E42 /* ReplayTableView.swift */; };
+		36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000200697E42 /* ReplayNarrator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -114,6 +124,16 @@
 		36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPComponents.swift; sourceTree = "<group>"; };
 		36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPTokens.swift; sourceTree = "<group>"; };
 		36C91E002F80000000697E42 /* Sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StackPoker/Sounds; sourceTree = "<group>"; };
+		36C91E202F80000100697E42 /* RecordedHand.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecordedHand.swift; sourceTree = "<group>"; };
+		36C91E212F80000100697E42 /* HandAnalysis.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandAnalysis.swift; sourceTree = "<group>"; };
+		36C91E222F80000100697E42 /* HandHistoryStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandHistoryStore.swift; sourceTree = "<group>"; };
+		36C91E232F80000100697E42 /* HandRecorder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandRecorder.swift; sourceTree = "<group>"; };
+		36C91E242F80000100697E42 /* HandAnalyzer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandAnalyzer.swift; sourceTree = "<group>"; };
+		36C91E252F80000100697E42 /* ReplayViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayViewModel.swift; sourceTree = "<group>"; };
+		36C91E262F80000100697E42 /* HistoryListView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
+		36C91E272F80000100697E42 /* HandReplayView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandReplayView.swift; sourceTree = "<group>"; };
+		36C91E282F80000100697E42 /* ReplayTableView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayTableView.swift; sourceTree = "<group>"; };
+		36C91E292F80000200697E42 /* ReplayNarrator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayNarrator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -451,8 +471,58 @@
 				36C91D152F7F5B8A00697E42 /* Game */,
 				36C91D222F7F5B8A00697E42 /* Lobby */,
 				36C91D292F7F5B8A00697E42 /* Profile */,
+				36C91E102F80000100697E42 /* Review */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		36C91E102F80000100697E42 /* Review */ = {
+			isa = PBXGroup;
+			children = (
+				36C91E112F80000100697E42 /* Models */,
+				36C91E122F80000100697E42 /* Services */,
+				36C91E132F80000100697E42 /* ViewModels */,
+				36C91E142F80000100697E42 /* Views */,
+			);
+			path = Review;
+			sourceTree = "<group>";
+		};
+		36C91E112F80000100697E42 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				36C91E212F80000100697E42 /* HandAnalysis.swift */,
+				36C91E202F80000100697E42 /* RecordedHand.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		36C91E122F80000100697E42 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				36C91E242F80000100697E42 /* HandAnalyzer.swift */,
+				36C91E222F80000100697E42 /* HandHistoryStore.swift */,
+				36C91E232F80000100697E42 /* HandRecorder.swift */,
+				36C91E292F80000200697E42 /* ReplayNarrator.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		36C91E132F80000100697E42 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				36C91E252F80000100697E42 /* ReplayViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		36C91E142F80000100697E42 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				36C91E272F80000100697E42 /* HandReplayView.swift */,
+				36C91E262F80000100697E42 /* HistoryListView.swift */,
+				36C91E282F80000100697E42 /* ReplayTableView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		36C91D2B2F7F5B8B00697E42 /* {Components,Tokens} */ = {
@@ -655,6 +725,16 @@
 				36C91D4A2F7F5B8B00697E42 /* FriendsViewModel.swift in Sources */,
 				36C91D4D2F7F5B8B00697E42 /* FriendsSheet.swift in Sources */,
 				36C91D332F7F5B8B00697E42 /* StackPokerApp.swift in Sources */,
+				36C91E302F80000100697E42 /* RecordedHand.swift in Sources */,
+				36C91E312F80000100697E42 /* HandAnalysis.swift in Sources */,
+				36C91E322F80000100697E42 /* HandHistoryStore.swift in Sources */,
+				36C91E332F80000100697E42 /* HandRecorder.swift in Sources */,
+				36C91E342F80000100697E42 /* HandAnalyzer.swift in Sources */,
+				36C91E352F80000100697E42 /* ReplayViewModel.swift in Sources */,
+				36C91E362F80000100697E42 /* HistoryListView.swift in Sources */,
+				36C91E372F80000100697E42 /* HandReplayView.swift in Sources */,
+				36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */,
+				36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

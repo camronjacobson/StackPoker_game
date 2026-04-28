@@ -1,6 +1,25 @@
 import SwiftUI
 import Combine
 
+// ─── Table-scoped client preferences ──────────────────────────────────────────
+// Server-side, all tables allow bots. The "allow bots?" choice is local —
+// it's the creator opting in/out at create time. Stored in UserDefaults so
+// GameView/PokerTableView can hide bot UI for tables created with the toggle
+// off. For tables we joined (no preference recorded), default to true so we
+// preserve existing behavior.
+enum TablePreferences {
+  static func setBotsAllowed(_ allowed: Bool, forTableId id: String) {
+    UserDefaults.standard.set(allowed, forKey: "botsAllowed_\(id)")
+  }
+
+  static func botsAllowed(forTableId id: String) -> Bool {
+    if let raw = UserDefaults.standard.object(forKey: "botsAllowed_\(id)") as? Bool {
+      return raw
+    }
+    return true
+  }
+}
+
 @MainActor
 final class LobbyViewModel: ObservableObject {
 
@@ -36,8 +55,15 @@ final class LobbyViewModel: ObservableObject {
   @Published var customMinBuyIn   = ""
   @Published var customMaxBuyIn   = ""
   @Published var newMaxPlayers    = 6
-  @Published var newIsPrivate     = true
+  // Default to public so other users can see the table in the lobby list.
+  // Backend's `listTables` filters out isPrivate=true tables by design — they
+  // only show up to invitees. Players who want a private table can flip the
+  // toggle in CreateTableSheet.
+  @Published var newIsPrivate     = false
   @Published var newGameType      = "TEXAS_HOLDEM"   // or "PLO"
+  // Opt-in bot at creation. Off by default so a fresh table waits for real
+  // players unless the creator explicitly wants company.
+  @Published var addBotOnCreate   = false
 
   // ─── Game type filter ──────────────────────────────────────────────────────
 
@@ -47,6 +73,11 @@ final class LobbyViewModel: ObservableObject {
 
   @Published var pendingInvites: [TableInvite] = []
   @Published var inviteBadgeCount = 0
+
+  // Outgoing-invite state for the lobby's "Invite friends" sheet.
+  @Published var showInviteFriendsSheet = false
+  @Published var invitedFriendIds: Set<String> = []   // friendUserIds we've already sent
+  @Published var inviteToast: String?                 // success/error banner
 
   // ─── Active filter ─────────────────────────────────────────────────────────
 
@@ -71,7 +102,7 @@ final class LobbyViewModel: ObservableObject {
     pollTask?.cancel()
     pollTask = Task {
       while !Task.isCancelled {
-        try? await Task.sleep(nanoseconds: 15_000_000_000) // 15s
+        try? await Task.sleep(nanoseconds: 5_000_000_000) // 5s — snappier so a new table on Phone A shows up on Phone B quickly
         guard !Task.isCancelled else { return }
         await loadTables()
         await loadInvites()
@@ -186,6 +217,23 @@ final class LobbyViewModel: ObservableObject {
         body: JoinTableRequest(buyInAmount: min, seatIndex: nil)
       )
 
+      // Persist the creator's bot preference so the game screen knows whether
+      // to surface bot UI later. We don't have a server-side `allowBots`
+      // field — this lives in UserDefaults keyed by table id and is read by
+      // GameView / PokerTableView via `TablePreferences.botsAllowed(for:)`.
+      TablePreferences.setBotsAllowed(addBotOnCreate, forTableId: table.id)
+
+      // Step 3 (optional): add a bot opponent if the creator opted in. Failure
+      // here is non-fatal — the table is already up, the user can add a bot
+      // manually from the waiting room.
+      if addBotOnCreate {
+        struct AddBotResponse: Decodable { let message: String? }
+        let _: AddBotResponse? = try? await network.request(
+          .addBot(tableId: table.id),
+          method: .POST
+        )
+      }
+
       showCreateSheet = false
       resetCreateForm()
       lastTable   = table
@@ -240,6 +288,55 @@ final class LobbyViewModel: ObservableObject {
     } catch {}
   }
 
+  // ─── Send Invite ───────────────────────────────────────────────────────────
+  // Invite a friend to the user's most-recently-joined table. We use
+  // `lastTable` rather than `joinedTable` so the user can dismiss the game
+  // screen, open the lobby, and still send invites to the table they're in.
+
+  /// True when there's a table we can send invites to.
+  var canSendInvites: Bool { lastTable != nil }
+
+  /// Send an invite for the given friend's userId. Idempotent on the client —
+  /// repeat taps are no-ops once an invite has been recorded for that friend.
+  func inviteFriend(userId: String, username: String) async {
+    guard let tableId = lastTable?.id else {
+      inviteToast = "Create or join a table first to invite friends"
+      return
+    }
+    guard !invitedFriendIds.contains(userId) else { return }
+
+    struct InviteBody: Encodable { let recipientId: String }
+    struct InviteResponse: Decodable { let message: String? }
+
+    do {
+      let _: InviteResponse = try await network.request(
+        .sendInvite(tableId: tableId),
+        method: .POST,
+        body: InviteBody(recipientId: userId)
+      )
+      invitedFriendIds.insert(userId)
+      inviteToast = "Invite sent to \(username)"
+    } catch let err as NetworkError {
+      // Server already has logic for "INVITE_EXISTS"; surface that as a soft
+      // success so the UI still flips to "Invited".
+      if case .serverError(let code, _) = err, code == "INVITE_EXISTS" {
+        invitedFriendIds.insert(userId)
+        inviteToast = "Already invited \(username)"
+      } else {
+        inviteToast = err.localizedDescription
+      }
+    } catch {
+      inviteToast = "Couldn't send invite. Try again."
+    }
+  }
+
+  /// Called when the invite sheet opens — clears stale state so a new table
+  /// session starts fresh (different table = different "already invited" set).
+  func resetInviteSheet() {
+    invitedFriendIds.removeAll()
+    inviteToast = nil
+  }
+
   // ─── Rejoin ────────────────────────────────────────────────────────────────
 
   func rejoinTable() {
@@ -276,8 +373,9 @@ final class LobbyViewModel: ObservableObject {
     customMinBuyIn = ""
     customMaxBuyIn = ""
     newMaxPlayers = 6
-    newIsPrivate = true
+    newIsPrivate = false
     newGameType = "TEXAS_HOLDEM"
+    addBotOnCreate = false
     createError = nil
   }
 }
