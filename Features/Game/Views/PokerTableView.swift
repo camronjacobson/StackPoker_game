@@ -472,8 +472,12 @@ struct PokerTableView: View {
                 let seatPt = positions[idx]
                 let dx = l.tableCenter.x - seatPt.x
                 let dy = l.tableCenter.y - seatPt.y
-                let bx = seatPt.x + dx * 0.50
-                let by = seatPt.y + dy * 0.50
+                // Sit blind markers right in front of the player's seat
+                // (rail ratio 0.30) — not halfway to center where they
+                // would crowd the community cards. The dealer button is
+                // still at 0.50 so the three markers stagger naturally.
+                let bx = seatPt.x + dx * 0.30
+                let by = seatPt.y + dy * 0.30
                 // SB → blue, BB → red. Standard live-poker color coding.
                 let tint = seat.isSmallBlind
                     ? Color(hex: "#3B7DD8")
@@ -628,11 +632,19 @@ private func pokerChipIcon(diameter: CGFloat, amount: Int = 0) -> some View {
 
 // ─── Poker Chip ──────────────────────────────────────────────────────────────
 // Reusable chip view used for the dealer button (D) and blind markers (SB/BB).
-// Designed to look like a real ceramic / clay chip rather than a flat badge:
-//   • Tinted outer rim with radial sheen for a subtle 3D feel.
-//   • 6 white edge spots evenly spaced around the rim.
-//   • Recessed center inset (top→bottom shading) holding the letters.
-//   • Drop shadow so the chip reads as resting on the felt.
+// Built up in layers to mimic a real ceramic / clay-composite poker chip:
+//   1. Soft cast shadow on the felt.
+//   2. Outer rim disk in the chip's tint, with a subtle 3D dome via a radial
+//      highlight (upper-left) and a darker bottom from a vertical shade.
+//   3. Eight inlaid white edge spots evenly spaced around the rim, each with
+//      its own thin dark border + tiny inner gradient for an inlay feel.
+//   4. Thin dark separator ring between the rim and the center face.
+//   5. Outer center band — a slightly different tone of the tint so the
+//      center reads as multi-layer instead of flat.
+//   6. Center face — domed inset with its own radial highlight.
+//   7. Thin inner detail ring on the face (typical of casino chips).
+//   8. Bold rounded text with a soft emboss shadow.
+//   9. A short top gloss arc suggesting a glossy ceramic finish.
 
 private struct PokerChip: View {
     let text:      String
@@ -642,54 +654,25 @@ private struct PokerChip: View {
 
     var body: some View {
         ZStack {
-            // Outer rim — tinted disk with off-center radial highlight.
+            // ── 1. Cast shadow on the felt ───────────────────────────────
+            Circle()
+                .fill(Color.black.opacity(0.55))
+                .frame(width: size * 1.04, height: size * 1.04)
+                .blur(radius: 3)
+                .offset(y: 2)
+                .opacity(0.85)
+
+            // ── 2. Outer rim — tinted disk with 3D shading ───────────────
             Circle()
                 .fill(tint)
                 .overlay(
-                    RadialGradient(
-                        colors: [
-                            Color.white.opacity(0.35),
-                            Color.clear,
-                            Color.black.opacity(0.22)
-                        ],
-                        center: UnitPoint(x: 0.32, y: 0.30),
-                        startRadius: 0,
-                        endRadius: size * 0.72
-                    )
-                    .clipShape(Circle())
-                )
-                .overlay(
-                    Circle()
-                        .strokeBorder(Color.black.opacity(0.45), lineWidth: 0.6)
-                )
-
-            // 6 white edge spots evenly spaced around the rim.
-            ForEach(0..<6, id: \.self) { i in
-                Capsule()
-                    .fill(Color.white.opacity(0.92))
-                    .frame(width: size * 0.16, height: size * 0.26)
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.black.opacity(0.20), lineWidth: 0.4)
-                    )
-                    .offset(y: -size * 0.37)
-                    .rotationEffect(.degrees(Double(i) * 60))
-            }
-
-            // Thin dark separator between rim and center inset.
-            Circle()
-                .strokeBorder(Color.black.opacity(0.45), lineWidth: 0.6)
-                .frame(width: size * 0.70, height: size * 0.70)
-
-            // Center inset disk — same tint with a top→bottom shade gradient
-            // so it reads as recessed.
-            Circle()
-                .fill(tint)
-                .overlay(
+                    // Top-to-bottom shade: chip catches light up top, falls
+                    // off into shadow at the bottom edge.
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.28),
-                            Color.black.opacity(0.22)
+                            Color.white.opacity(0.18),
+                            Color.clear,
+                            Color.black.opacity(0.28)
                         ],
                         startPoint: .top,
                         endPoint:   .bottom
@@ -697,22 +680,130 @@ private struct PokerChip: View {
                     .clipShape(Circle())
                 )
                 .overlay(
-                    Circle()
-                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                    // Off-center radial sheen — sells the dome.
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.45),
+                            Color.clear
+                        ],
+                        center: UnitPoint(x: 0.30, y: 0.26),
+                        startRadius: 0,
+                        endRadius: size * 0.55
+                    )
+                    .clipShape(Circle())
+                    .blendMode(.softLight)
                 )
-                .frame(width: size * 0.62, height: size * 0.62)
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.black.opacity(0.55), lineWidth: 0.7)
+                )
 
-            // Letters in the center inset.
+            // ── 3. Eight inlaid white edge spots ─────────────────────────
+            ForEach(0..<8, id: \.self) { i in
+                RoundedRectangle(cornerRadius: size * 0.04, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white,
+                                Color(white: 0.86)
+                            ],
+                            startPoint: .top,
+                            endPoint:   .bottom
+                        )
+                    )
+                    .frame(width: size * 0.16, height: size * 0.30)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: size * 0.04,
+                                         style: .continuous)
+                            .strokeBorder(Color.black.opacity(0.30),
+                                          lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.35),
+                            radius: 0.6, x: 0, y: 0.5)
+                    .offset(y: -size * 0.36)
+                    .rotationEffect(.degrees(Double(i) * 45))
+            }
+
+            // ── 4. Dark separator ring ───────────────────────────────────
+            Circle()
+                .strokeBorder(Color.black.opacity(0.65), lineWidth: 0.8)
+                .frame(width: size * 0.70, height: size * 0.70)
+
+            // ── 5. Outer center band — slightly lighter tone of the tint
+            //       so the chip reads as having a stepped center.
+            Circle()
+                .fill(tint)
+                .overlay(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.22),
+                            Color.black.opacity(0.10)
+                        ],
+                        startPoint: .top,
+                        endPoint:   .bottom
+                    )
+                    .clipShape(Circle())
+                )
+                .frame(width: size * 0.68, height: size * 0.68)
+
+            // ── 6. Center face — domed inset ─────────────────────────────
+            Circle()
+                .fill(tint)
+                .overlay(
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.40),
+                            Color.clear,
+                            Color.black.opacity(0.20)
+                        ],
+                        center: UnitPoint(x: 0.32, y: 0.28),
+                        startRadius: 0,
+                        endRadius: size * 0.32
+                    )
+                    .clipShape(Circle())
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
+                )
+                .frame(width: size * 0.58, height: size * 0.58)
+
+            // ── 7. Thin inner detail ring ────────────────────────────────
+            Circle()
+                .strokeBorder(Color.black.opacity(0.20), lineWidth: 0.4)
+                .frame(width: size * 0.46, height: size * 0.46)
+
+            // ── 8. Center text with subtle emboss ────────────────────────
             Text(text)
-                .font(.system(size: size * 0.40,
+                .font(.system(size: size * 0.42,
                               weight: .black,
                               design: .rounded))
                 .foregroundStyle(textColor)
-                .shadow(color: .black.opacity(0.35), radius: 0.5, y: 0.5)
+                .shadow(color: .black.opacity(0.45), radius: 0.6, y: 0.6)
+
+            // ── 9. Top gloss arc — short highlight along the upper rim
+            //       to suggest a glossy ceramic finish.
+            Circle()
+                .trim(from: 0.58, to: 0.72)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.55),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint:   .trailing
+                    ),
+                    style: StrokeStyle(lineWidth: size * 0.045,
+                                       lineCap: .round)
+                )
+                .frame(width: size * 0.92, height: size * 0.92)
+                .blendMode(.plusLighter)
+                .allowsHitTesting(false)
         }
         .frame(width: size, height: size)
         .compositingGroup()
-        .shadow(color: .black.opacity(0.55), radius: 2.5, x: 0, y: 1.5)
     }
 }
 

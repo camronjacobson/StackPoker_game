@@ -308,15 +308,17 @@ struct GameView: View {
                         .padding(.top, 2)
                 }
             }
-            // When it's my turn: shrink the fanned hole cards, nudge them
-            // slightly right, and push the whole overlay behind the seat (via
-            // zIndex on the containing ZStack) so the turn-timer ring around
-            // my avatar draws cleanly in front of the cards. The y-offset
-            // drops the shrunken stack just enough to clear the stack-amount
-            // chip pill below the avatar, which the cards used to ride over.
-            .scaleEffect(vm.isMyTurn ? 0.48 : 1.0, anchor: .bottom)
+            // Two display modes:
+            //   • Off-hand (not my turn): cards sit centered above the action
+            //     bar at a slightly reduced scale so they don't dominate the
+            //     screen — the table stays the focus.
+            //   • On-turn: cards shrink and tuck off to the right of the seat
+            //     so the avatar + timer ring read cleanly. The y-offset
+            //     drops the on-turn stack just enough to clear the stack
+            //     pill below the avatar.
+            .scaleEffect(vm.isMyTurn ? 0.65 : 0.90, anchor: .bottom)
             .offset(x: vm.isMyTurn ? 120 : 0,
-                    y: vm.isMyTurn ? 22  : 0)
+                    y: vm.isMyTurn ? 32  : 0)
             .transition(.asymmetric(
                 insertion: .move(edge: .bottom).combined(with: .opacity),
                 // Fold: slide toward the muck (off to the right) while rotating
