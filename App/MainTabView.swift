@@ -35,7 +35,7 @@ struct MainTabView: View {
         var label: String {
             switch self {
             case .home:    return "Home"
-            case .history: return "History"
+            case .history: return "Review"
             case .create:  return ""
             case .alerts:  return "Alerts"
             case .friends: return "Friends"
@@ -51,7 +51,10 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .home:    LobbyView().environmentObject(lobbyVM)
-                case .history: HistoryListView()
+                // Review-feature overhaul (PR 3): the History tab now lands
+                // on a coach-style dashboard instead of the raw list. The
+                // dashboard pushes HistoryListView for "See all hands".
+                case .history: ReviewDashboardView()
                 case .create:  LobbyView().environmentObject(lobbyVM) // Create triggers sheet, not a tab
                 case .alerts:  AlertsPlaceholderView()
                 case .friends: FriendsTabView()

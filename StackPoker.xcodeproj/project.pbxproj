@@ -56,6 +56,8 @@
 		36C91E342F80000100697E42 /* HandAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E242F80000100697E42 /* HandAnalyzer.swift */; };
 		36C91E352F80000100697E42 /* ReplayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E252F80000100697E42 /* ReplayViewModel.swift */; };
 		36C91E362F80000100697E42 /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E262F80000100697E42 /* HistoryListView.swift */; };
+		36C91E392F80000100697E42 /* ReviewDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000100697E42 /* ReviewDashboardView.swift */; };
+		36C91E3A2F80000100697E42 /* EquityStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2A2F80000100697E42 /* EquityStripView.swift */; };
 		36C91E372F80000100697E42 /* HandReplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E272F80000100697E42 /* HandReplayView.swift */; };
 		36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E282F80000100697E42 /* ReplayTableView.swift */; };
 		36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000200697E42 /* ReplayNarrator.swift */; };
@@ -131,6 +133,8 @@
 		36C91E242F80000100697E42 /* HandAnalyzer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandAnalyzer.swift; sourceTree = "<group>"; };
 		36C91E252F80000100697E42 /* ReplayViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayViewModel.swift; sourceTree = "<group>"; };
 		36C91E262F80000100697E42 /* HistoryListView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
+		36C91E292F80000100697E42 /* ReviewDashboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReviewDashboardView.swift; sourceTree = "<group>"; };
+		36C91E2A2F80000100697E42 /* EquityStripView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EquityStripView.swift; sourceTree = "<group>"; };
 		36C91E272F80000100697E42 /* HandReplayView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandReplayView.swift; sourceTree = "<group>"; };
 		36C91E282F80000100697E42 /* ReplayTableView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayTableView.swift; sourceTree = "<group>"; };
 		36C91E292F80000200697E42 /* ReplayNarrator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayNarrator.swift; sourceTree = "<group>"; };
@@ -521,6 +525,8 @@
 				36C91E272F80000100697E42 /* HandReplayView.swift */,
 				36C91E262F80000100697E42 /* HistoryListView.swift */,
 				36C91E282F80000100697E42 /* ReplayTableView.swift */,
+				36C91E292F80000100697E42 /* ReviewDashboardView.swift */,
+				36C91E2A2F80000100697E42 /* EquityStripView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -732,6 +738,8 @@
 				36C91E342F80000100697E42 /* HandAnalyzer.swift in Sources */,
 				36C91E352F80000100697E42 /* ReplayViewModel.swift in Sources */,
 				36C91E362F80000100697E42 /* HistoryListView.swift in Sources */,
+				36C91E392F80000100697E42 /* ReviewDashboardView.swift in Sources */,
+				36C91E3A2F80000100697E42 /* EquityStripView.swift in Sources */,
 				36C91E372F80000100697E42 /* HandReplayView.swift in Sources */,
 				36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */,
 				36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */,

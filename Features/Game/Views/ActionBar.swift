@@ -15,6 +15,49 @@ struct ActionBar: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
+                // ── +15s extension button ────────────────────────────────
+                // Floats above the action row, right-aligned. Replaces the
+                // longer base decision time we used to give every player —
+                // now you get a shorter clock by default plus one optional
+                // +15s on demand. Disappears once used (gates re-tap so the
+                // server doesn't get spammed).
+                HStack {
+                    Spacer()
+                    if !vm.turnExtensionUsed {
+                        Button {
+                            vm.requestTimeExtension()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("15s")
+                                    .font(.system(size: 12, weight: .heavy,
+                                                  design: .rounded))
+                            }
+                            .foregroundStyle(Color(hex: "#F5C842"))
+                            .padding(.horizontal, 12)
+                            .frame(height: 30)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: "#1A2744"))
+                                    .overlay(
+                                        Capsule().strokeBorder(
+                                            Color(hex: "#F5C842").opacity(0.5),
+                                            lineWidth: 1
+                                        )
+                                    )
+                            )
+                            .shadow(color: Color(hex: "#F5C842").opacity(0.25),
+                                    radius: 6)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 4)
+                .animation(.spring(response: 0.3), value: vm.turnExtensionUsed)
+
                 // Action buttons — full-width pill row pinned to bottom of screen
                 HStack(spacing: 10) {
                     PokerActionButton(style: .fold) { vm.fold() }
@@ -179,19 +222,32 @@ struct RaiseSliderView: View {
             }
 
             // Slider
+            // SwiftUI's Slider(in:step:) calls Swift.stride internally and
+            // crashes with "max stride must be positive" any time the range
+            // can't fit even one step. That happens in three legitimate game
+            // states: minRaise == maxRaise (short-stack: only an all-in is
+            // legal), bigBlind > (max - min) (step bigger than the window),
+            // or a transient frame where min/max haven't been computed yet.
+            // We derive lo/hi/step from one consistent floor and pad hi up
+            // to at least lo + step so the slider always renders.
+            let bounds = sliderBounds
             Slider(
                 value: Binding<Double>(
-                    get: { Double(vm.raiseAmount) },
+                    get: { Double(min(max(vm.raiseAmount, Int(bounds.lo)), Int(bounds.hi))) },
                     set: { new in
                         vm.raiseAmount = Int(new)
                         UISelectionFeedbackGenerator().selectionChanged()
                     }
                 ),
-                in: Double(max(1, vm.minRaise))...Double(max(vm.minRaise + 1, vm.maxRaise)),
-                step: Double(max(1, vm.gameState?.bigBlind ?? 10))
+                in: bounds.lo...bounds.hi,
+                step: bounds.step
             )
             .tint(Color(hex: "#F5C842"))
             .padding(.horizontal, 6)
+            // Disable when the legal range collapsed to a single value — the
+            // user can still confirm the raise via the button below; dragging
+            // a one-tick slider would feel broken.
+            .disabled(bounds.lo >= bounds.hi - bounds.step / 2)
 
             // Confirm Raise
             Button { vm.raise() } label: {
@@ -217,6 +273,21 @@ struct RaiseSliderView: View {
         )
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
+    }
+
+    /// Consistent (lo, hi, step) tuple for the raise Slider. Computed once
+    /// per render so the bounds and step are coherent — derived from a
+    /// single floor (`lo`) and padded so `hi >= lo + step` always holds.
+    /// This is what fixes the "max stride must be positive" crash that
+    /// SwiftUI's Slider throws when the range can't fit one step.
+    private var sliderBounds: (lo: Double, hi: Double, step: Double) {
+        let step = max(1, vm.gameState?.bigBlind ?? 10)
+        let lo   = max(1, vm.minRaise)
+        // Pad hi up to at least lo + step so Slider always has a stride.
+        // Using max(vm.maxRaise, lo + step) means a fully collapsed range
+        // (short-stacks where only an all-in is legal) still renders.
+        let hi   = max(vm.maxRaise, lo + step)
+        return (Double(lo), Double(hi), Double(step))
     }
 
     private struct QuickAmount { let label: String; let amount: Int }

@@ -36,7 +36,18 @@ final class GameViewModel: ObservableObject {
 
     // Timer
     @Published var turnTimeRemaining: Double = 1.0  // 0..1 progress
-    @Published var turnSecondsLeft:   Int    = 30
+    @Published var turnSecondsLeft:   Int    = 20
+
+    /// True after the local player has used their per-turn +15s extension.
+    /// Reset when the active player changes (i.e. each new turn). Drives
+    /// the +15s button visibility in ActionBar so a player can't spam.
+    @Published private(set) var turnExtensionUsed: Bool = false
+
+    /// Tracks the previous active player id so we can detect turn-change
+    /// transitions inside `updateTurnTimer` and reset `turnExtensionUsed`.
+    /// Decoupled from `gameState?.activePlayerId` because that gets
+    /// reassigned inside `withAnimation` before the timer runs.
+    private var lastActivePlayerId: String?
 
     // Haptics
     private let heavyImpact  = UIImpactFeedbackGenerator(style: .heavy)
@@ -138,7 +149,12 @@ final class GameViewModel: ObservableObject {
                 // Persist to local hand history for the Review feature.
                 HandRecorder.shared.finalize(winners: payouts)
                 Task {
-                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    // Hide the winner-celebration UI 2s sooner than before
+                    // (was 4s) so the next deal feels snappy. Note: the
+                    // *server* still controls when the next hand actually
+                    // starts dealing — if next-hand pacing still feels slow,
+                    // shorten the matching delay in the backend hand loop.
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
                     withAnimation { self.showWinners = false }
                 }
             }
@@ -255,10 +271,21 @@ final class GameViewModel: ObservableObject {
     private func updateTurnTimer(_ state: ClientGameState) {
         turnTimerTask?.cancel()
 
+        // Reset the per-turn +15s allowance whenever the active player
+        // changes. We do this before the early-return so even hands that end
+        // (activePlayerId becomes nil) clear the flag for the next turn.
+        if state.activePlayerId != lastActivePlayerId {
+            lastActivePlayerId = state.activePlayerId
+            turnExtensionUsed  = false
+        }
+
         guard state.activePlayerId != nil,
               state.actionDeadline > 0 else {
             turnTimeRemaining = 1.0
-            turnSecondsLeft   = 30
+            // Fallback only — real value is server-authoritative via
+            // state.turnDuration. The matching shorter base TURN_DURATION
+            // belongs in the backend; this just keeps offline/test UIs sane.
+            turnSecondsLeft   = 20
             return
         }
 
@@ -266,11 +293,11 @@ final class GameViewModel: ObservableObject {
         // Authoritative turn span from the server (base duration + time bank).
         // Fallback: if an older server omits turnDuration, measure the span
         // ourselves from the first deadline we see so the ring still animates
-        // proportionally instead of pinning at 1.0 for the first 30 seconds.
+        // proportionally instead of pinning at 1.0 for the first N seconds.
         let total: Double = {
             if let ms = state.turnDuration, ms > 0 { return ms / 1000 }
             let measured = deadline.timeIntervalSinceNow
-            return measured > 0 ? measured : 30
+            return measured > 0 ? measured : 20
         }()
 
         lastWarningSecond = -1
@@ -341,6 +368,19 @@ final class GameViewModel: ObservableObject {
             self.haptic(.heavy)
         }
         sendAction(.allIn)
+    }
+
+    /// Asks the server to add 15s to the current decision window. Limited
+    /// to once per turn — `turnExtensionUsed` flips immediately so the +15s
+    /// button can disable on tap. The visible countdown updates when the
+    /// server echoes the new `actionDeadline` (typically <200ms RTT). We
+    /// intentionally don't bump `turnSecondsLeft` locally to avoid drift
+    /// between the optimistic value and the next authoritative tick.
+    func requestTimeExtension() {
+        guard isMyTurn, !turnExtensionUsed else { return }
+        turnExtensionUsed = true
+        haptic(.medium)
+        socket.requestTimeExtension(tableId: tableId)
     }
 
     func sendChat() {

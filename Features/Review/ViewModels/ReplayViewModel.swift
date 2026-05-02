@@ -56,6 +56,64 @@ final class ReplayViewModel: ObservableObject {
         totalFrames <= 1 ? 1 : Double(frameIndex) / Double(totalFrames - 1)
     }
 
+    // ─── Equity / strength / decision (PR 5) ──────────────────────────────────
+    // Three derived values consumed by `EquityStripView`. Recomputed on every
+    // `currentFrame` read — cheap (O(seats + analyses) at worst) and pure, so
+    // we don't bother caching. Animation is driven by `.animation(...)` on
+    // the consumer view watching these values.
+
+    /// Hero's rough win probability at the *current* frame, on a 0…1 scale.
+    /// Postflop reuses `HandAnalyzer.estimatedEquity`; preflop is bucketed
+    /// off the Chen score because we don't run a full preflop equity solver.
+    /// The arc gauge in EquityStripView is calibrated for these buckets, so
+    /// any future replacement (Monte Carlo, range-vs-range solver) just
+    /// needs to keep the 0…1 contract.
+    var currentEquity: Double {
+        let frame = currentFrame
+        let hole  = hand.myHoleCards
+        // Preflop OR not enough board for a postflop strength call.
+        if frame.street == "PREFLOP" || frame.communityCards.count < 3 {
+            switch HandAnalyzer.classify(chen: HandAnalyzer.chenScore(hole)) {
+            case .premium:  return 0.72
+            case .strong:   return 0.58
+            case .marginal: return 0.48
+            case .weak:     return 0.38
+            }
+        }
+        let strength = HandAnalyzer.postflopStrength(hole: hole, board: frame.communityCards)
+        return HandAnalyzer.estimatedEquity(strength: strength, street: frame.street)
+    }
+
+    /// Short, human-readable name for the hero's current holding. On preflop
+    /// frames we return the Chen-bucket label ("Premium" / "Strong" / …);
+    /// postflop we return the pokersolver hand name ("Top Pair", "Flush", …).
+    var currentStrengthLabel: String {
+        let frame = currentFrame
+        if frame.street == "PREFLOP" || frame.communityCards.count < 3 {
+            return HandAnalyzer.classify(chen: HandAnalyzer.chenScore(hand.myHoleCards)).label
+        }
+        return HandAnalyzer.handStrengthLabel(hole: hand.myHoleCards, board: frame.communityCards)
+    }
+
+    /// Bundles the hero's most recent decision visible at the current frame
+    /// (its analysis verdict + the raw action that triggered it). Drives the
+    /// "You did X" left card in the side-by-side decision compare. Returns
+    /// nil before the hero has acted at all in this hand.
+    var currentHeroDecision: HeroDecision? {
+        // Analyses are produced in chronological order by HandAnalyzer.
+        // Walk from newest backwards to find the latest hero decision at or
+        // before the current frame.
+        guard let a = analyses
+            .filter({ $0.frameIndex <= frameIndex && $0.yourMove != nil })
+            .last
+        else { return nil }
+        // The frame at that index always has the matching lastAction (the
+        // analyzer keys off it). Defend defensively anyway.
+        let f = hand.frames[a.frameIndex]
+        guard let action = f.lastAction, action.playerId == hand.userId else { return nil }
+        return HeroDecision(analysis: a, action: action)
+    }
+
     // ─── Controls ─────────────────────────────────────────────────────────────
 
     func stepBack() {
@@ -124,6 +182,49 @@ final class ReplayViewModel: ObservableObject {
     }
 
     // ─── Internal ─────────────────────────────────────────────────────────────
+
+    /// Lightweight value type that pairs the analyzer's verdict for a hero
+    /// decision with the raw `PFAction` that triggered it. Lives next to the
+    /// VM so the side-by-side decision view can stay a pure renderer (no
+    /// reaching into `analyses` or `frames` directly).
+    struct HeroDecision {
+        let analysis: FrameAnalysis
+        let action:   PFAction
+
+        /// Short verb form for the action, suitable for a one-line button-
+        /// like card. Includes the amount on call/raise so the user can see
+        /// *exactly* what they put in, not just "called".
+        var actionLabel: String {
+            switch action.action {
+            case "FOLD":   return "Fold"
+            case "CHECK":  return "Check"
+            case "CALL":   return action.amount.map { "Call \(formatChips($0))" } ?? "Call"
+            case "RAISE":  return action.amount.map { "Raise to \(formatChips($0))" } ?? "Raise"
+            case "ALL_IN": return action.amount.map { "All-In \(formatChips($0))" } ?? "All-In"
+            default:       return action.action.capitalized
+            }
+        }
+
+        /// Best-effort extraction of a recommended action verb from the
+        /// freeform `recommendation` text. We can't reliably reverse-engineer
+        /// every recommendation phrase, so we look for the most common verbs
+        /// in a deliberate order (specific → general) and fall back to nil.
+        /// `nil` tells the view to render a "See tip below" hint instead of
+        /// guessing a verb that might mismatch the actual advice.
+        var suggestedActionLabel: String? {
+            guard let rec = analysis.recommendation?.lowercased() else { return nil }
+            // Order matters — "fold" is unambiguous, "raise" before "bet"
+            // because "raise" implies "bet" by default, and we'd rather
+            // surface the more aggressive verb.
+            if rec.contains("fold") { return "Fold" }
+            if rec.contains("3-bet") || rec.contains("re-raise") { return "Re-raise" }
+            if rec.contains("raise") { return "Raise" }
+            if rec.contains("bet for value") || rec.contains("bet ") || rec.contains("lead") { return "Bet" }
+            if rec.contains("call") { return "Call" }
+            if rec.contains("check") { return "Check" }
+            return nil
+        }
+    }
 
     private func recomputeVisibleAnalyses() {
         // Show every analysis up to and including the current frame, so the

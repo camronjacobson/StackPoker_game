@@ -70,12 +70,18 @@ struct PlayingCardView: View {
 
     // ─── Suit colors (for coloredBackground mode) ─────────────────────────────
 
+    // True four-color deck: hearts red, diamonds blue, clubs green, spades
+    // black. Splitting diamonds out to blue is the small change that makes
+    // hand-strength reading instant — hearts and diamonds are no longer
+    // both "the red one", which matters most when you're checking for a
+    // flush at a glance and your hole cards live in a colored frame.
     private func suitFillColor(_ card: PokerCard) -> Color {
         switch card.suit {
-        case "H", "D": return Color(hex: "#D63838")
-        case "C":      return Color(hex: "#2D8B3E")
-        case "S":      return Color(hex: "#1A1A1A")
-        default:       return Color(hex: "#1A1A1A")
+        case "H": return Color(hex: "#D63838")  // hearts   — red
+        case "D": return Color(hex: "#2E6FD6")  // diamonds — blue
+        case "C": return Color(hex: "#2D8B3E")  // clubs    — green
+        case "S": return Color(hex: "#1A1A1A")  // spades   — black
+        default:  return Color(hex: "#1A1A1A")
         }
     }
 
@@ -196,6 +202,7 @@ struct FlippableCardView: View {
     let size:      PlayingCardView.CardSize
     let dealDelay: Double   // seconds before the card appears
     let flipDelay: Double   // seconds after appearing before the flip
+    var colored:   Bool = true   // 4-color front (default matches HoleCardsView)
 
     @State private var appeared  = false
     @State private var showFront = false
@@ -204,7 +211,8 @@ struct FlippableCardView: View {
     var body: some View {
         Group {
             if showFront {
-                PlayingCardView(card: card, size: size)
+                PlayingCardView(card: card, size: size,
+                                coloredBackground: colored)
             } else {
                 PlayingCardView(card: nil, size: size, isFaceDown: true)
             }
@@ -241,6 +249,10 @@ struct HoleCardsView: View {
     var isHidden:  Bool = false
     var size:      PlayingCardView.CardSize = .medium
     var animate:   Bool = false  // use deal animation for local player
+    // Defaults to true so hole cards inherit the same 4-color (red /
+    // blue / green / black) palette as the community board. Callers
+    // that want the legacy white front (e.g. tutorials) can opt out.
+    var colored:   Bool = true
 
     var body: some View {
         HStack(spacing: size == .large ? 4 : -(size == .hero ? 12 : 6)) {
@@ -258,12 +270,14 @@ struct HoleCardsView: View {
                         card:      card,
                         size:      size,
                         dealDelay: Double(idx) * 0.18,
-                        flipDelay: 0.22
+                        flipDelay: 0.22,
+                        colored:   colored
                     )
                 }
             } else {
                 ForEach(cards) { card in
-                    PlayingCardView(card: card, size: size)
+                    PlayingCardView(card: card, size: size,
+                                    coloredBackground: colored)
                         .transition(.asymmetric(
                             insertion: .move(edge: .top).combined(with: .opacity),
                             removal: .opacity

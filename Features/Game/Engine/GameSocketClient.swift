@@ -92,6 +92,16 @@ final class GameSocketClient: ObservableObject {
         sendEvent("table_chat", data: ["tableId": tableId, "message": message])
     }
 
+    /// Requests a +15s extension on the active player's decision timer.
+    /// The server is authoritative — it'll respond with a new
+    /// `actionDeadline` in the next state update. Locally rate-limited to
+    /// once per turn (see `GameViewModel.turnExtensionUsed`). Backend is
+    /// expected to handle a `request_time_extension` event and only honor
+    /// it for the active player.
+    func requestTimeExtension(tableId: String) {
+        sendEvent("request_time_extension", data: ["tableId": tableId])
+    }
+
     func sendPing() {
         sendEvent("ping", data: [:])
     }

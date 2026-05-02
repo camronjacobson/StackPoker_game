@@ -40,8 +40,14 @@ struct TableLayout {
     }
 
     // Community cards
-    var cardWidth: CGFloat { tableWidth * 0.10 }
-    var cardSpacing: CGFloat { tableWidth * 0.016 }
+    // Sized so the 5-card row spans ~80% of the table width, reaching into
+    // the inner betting-line ring (which sits at tableWidth - 60). Total
+    // span = 5 * cardWidth + 4 * cardSpacing = 5*0.145 + 4*0.020 = 0.805.
+    // That keeps the cards comfortably *inside* the inner ring on iPhone
+    // (where the inset is proportionally tightest at ~83%) while still
+    // giving them a commanding visual presence on the felt.
+    var cardWidth: CGFloat { tableWidth * 0.145 }
+    var cardSpacing: CGFloat { tableWidth * 0.020 }
 
     // Center layout positions (all relative to tableCenter).
     // Tuned for the tall pill felt: community cards high, pot stack sits
@@ -141,6 +147,7 @@ struct PokerTableView: View {
                 blindRailChips(layout)
                 betChipsLayer(layout)
                 potFlowLayer(layout)
+                winningHandBanner(layout)
 
                 // ── Seat overlay
                 seatOverlay(layout)
@@ -575,6 +582,53 @@ struct PokerTableView: View {
         return Set(winners.flatMap { $0.bestCards.map { $0.id } })
     }
 
+    // ─── Winning-hand-name banner ───────────────────────────────────────────
+    // Shown the moment the server announces winners. Sits between the
+    // (now-enlarged) community cards and the pot stack so the user reads
+    // *what* won the hand at a glance — "Full House", "Straight", etc.
+    // Multiple winners with different hands (rare but possible across split
+    // pots in mixed games) are joined with a separator. zIndex(50) keeps it
+    // above the pot/chips during pot collection.
+    @ViewBuilder
+    private func winningHandBanner(_ l: TableLayout) -> some View {
+        if let winners = vm.gameState?.winners, !winners.isEmpty {
+            // De-dupe hand names: chopped pots usually share one hand name
+            // ("Two Pair") between both seats — show it once, not twice.
+            let names = winners.map(\.handName)
+            let unique = Array(NSOrderedSet(array: names)) as? [String] ?? names
+            VStack(spacing: 2) {
+                Text("WINNING HAND")
+                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .tracking(1.2)
+                Text(unique.joined(separator: " · "))
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(Color(hex: "#F5C842"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .shadow(color: Color(hex: "#F5C842").opacity(0.5), radius: 6)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.55))
+                    .overlay(
+                        Capsule().strokeBorder(
+                            Color(hex: "#F5C842").opacity(0.4),
+                            lineWidth: 1
+                        )
+                    )
+            )
+            .position(
+                x: l.tableCenter.x,
+                y: l.tableCenter.y - l.tableHeight * 0.02
+            )
+            .transition(.scale(scale: 0.7).combined(with: .opacity))
+            .zIndex(50)
+        }
+    }
+
     private var winnerIds: Set<String> {
         guard let winners = vm.gameState?.winners else { return [] }
         return Set(winners.map { $0.playerId })
@@ -1005,19 +1059,26 @@ struct TargetSeatView: View {
     @State private var allInPulse = false
     @State private var winnerPulse = false
 
+    // Transient action bubble: holds the label/color of this seat's most
+    // recent action for ~1.8s, then clears. Decoupled from `lastAction`
+    // (which the server keeps populated for the rest of the street) so the
+    // bubble reads as a *notification* — pops up, settles, fades — rather
+    // than a sticky tag.
+    @State private var bubble: ActionKind? = nil
+    // Stamp of the lastAction that produced the *currently visible* bubble.
+    // Lets the dismiss-after-delay task no-op if a newer action has already
+    // replaced this one (prevents racing tasks from clearing a fresh bubble).
+    @State private var bubbleStamp: Int = 0
+
     private var plateWidth: CGFloat { avatarSize * 1.55 }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Folded label above avatar
-            if seat.status == .folded {
-                Text("Folded")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color(hex: "#E8A838"))
-                    .padding(.bottom, 3)
-            } else if let action = lastAction,
-                      action.playerId == seat.userId,
-                      let kind = actionBubbleKind(for: action.action) {
+            // Above-avatar label slot — the transient action bubble takes
+            // priority while it's visible. After it dismisses, the
+            // persistent "Folded" tag (if applicable) takes over so the
+            // seat still reads as folded for the rest of the hand.
+            if let kind = bubble {
                 Text(kind.label)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.white)
@@ -1028,6 +1089,11 @@ struct TargetSeatView: View {
                     .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
                     .padding(.bottom, 3)
                     .transition(.scale.combined(with: .opacity))
+            } else if seat.status == .folded {
+                Text("Folded")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color(hex: "#E8A838"))
+                    .padding(.bottom, 3)
             }
 
             ZStack {
@@ -1186,8 +1252,39 @@ struct TargetSeatView: View {
         .onChange(of: isWinner) { _, new in
             if new { startWinnerPulse() } else { winnerPulse = false }
         }
+        // Drive the transient action bubble. We key on `lastAction.timestamp`
+        // (server-authored, monotonically increasing) rather than the action
+        // string, so successive same-action events from the same seat (e.g.
+        // two checks across two streets) still re-trigger a pop. SwiftUI
+        // suppresses initial-render firings, so a player who acted before
+        // this view mounted won't get a stale bubble on join.
+        .onChange(of: lastAction?.timestamp ?? 0) { _, newTs in
+            triggerBubbleIfNeeded(timestamp: newTs)
+        }
         .animation(.spring(response: 0.3), value: seat.status)
         .animation(.spring(response: 0.3), value: isMyTurn)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: bubble?.label)
+    }
+
+    /// Pops the bubble for ~1.8s when this seat is the actor on the latest
+    /// `lastAction`. The `bubbleStamp` guard prevents an older dismiss task
+    /// from clearing a fresh bubble if two actions land within the window.
+    private func triggerBubbleIfNeeded(timestamp: Int) {
+        guard let action = lastAction,
+              action.playerId == seat.userId,
+              timestamp != 0,
+              let kind = actionBubbleKind(for: action.action)
+        else { return }
+        bubbleStamp = timestamp
+        bubble = kind
+        Task {
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            await MainActor.run {
+                if bubbleStamp == timestamp {
+                    bubble = nil
+                }
+            }
+        }
     }
 
     private func startWinnerPulse() {
@@ -1222,12 +1319,23 @@ struct TargetSeatView: View {
         }
     }
 
-    private struct ActionKind { let label: String; let color: Color }
+    /// Equatable so `.animation(_:value:)` can react to bubble label
+    /// changes. Color isn't compared because label-uniqueness is enough —
+    /// every action maps to a single label.
+    private struct ActionKind: Equatable {
+        let label: String
+        let color: Color
+        static func == (l: ActionKind, r: ActionKind) -> Bool { l.label == r.label }
+    }
     private func actionBubbleKind(for raw: String) -> ActionKind? {
         switch raw {
-        case "CHECK":  return ActionKind(label: "Check", color: Color(hex: "#2D8B3E"))
-        case "CALL":   return ActionKind(label: "Call",  color: Color(hex: "#2D8B3E"))
-        case "RAISE":  return ActionKind(label: "Raise", color: Color(hex: "#4A90E2"))
+        // Fold — red, like the Fold button. Skipped for SB/BB posts so the
+        // first actions of each hand don't trigger a fake "fold" bubble on
+        // anyone (SB/BB are auto-posted, not player decisions).
+        case "FOLD":   return ActionKind(label: "Fold",   color: Color(hex: "#C8344A"))
+        case "CHECK":  return ActionKind(label: "Check",  color: Color(hex: "#2D8B3E"))
+        case "CALL":   return ActionKind(label: "Call",   color: Color(hex: "#2D8B3E"))
+        case "RAISE":  return ActionKind(label: "Raise",  color: Color(hex: "#4A90E2"))
         case "ALL_IN": return ActionKind(label: "All In", color: Color(hex: "#F5C842"))
         default:       return nil
         }
@@ -1380,7 +1488,11 @@ private struct OpponentHoleCardsView: View {
             // Once winners are declared, dim cards that aren't part of the
             // winning hand so the gold-bordered ones pop.
             let dim = anyWinnersDeclared && !isWinningCard
-            PlayingCardView(card: card, size: cardSize)
+            // Match the community-card 4-color treatment so when opponent
+            // hole cards flip up at showdown, the whole table reads in the
+            // same suit-tinted palette (red hearts / blue diamonds /
+            // green clubs / black spades).
+            PlayingCardView(card: card, size: cardSize, coloredBackground: true)
                 .overlay(
                     RoundedRectangle(cornerRadius: cardSize.cornerRadius)
                         .strokeBorder(

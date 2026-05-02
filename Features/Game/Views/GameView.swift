@@ -273,7 +273,11 @@ struct GameView: View {
                     ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
                         let isWinningCard = vm.winningCardIds.contains(card.id)
                         let dim = vm.anyWinnersDeclared && !isWinningCard
-                        PlayingCardView(card: card, size: .large)
+                        // 4-color front (red / blue / green / black) so the
+                        // hero's hand reads with the same suit-tinted plates
+                        // as the community board.
+                        PlayingCardView(card: card, size: .large,
+                                        coloredBackground: true)
                             .overlay(
                                 RoundedRectangle(cornerRadius: PlayingCardView.CardSize.large.cornerRadius)
                                     .strokeBorder(
