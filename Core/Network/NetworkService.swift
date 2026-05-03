@@ -18,15 +18,16 @@ enum APIConfig {
     // Debug LAN IP changes whenever your Mac gets a new DHCP lease (network switch,
     // router reboot, etc). If you start seeing "server error" on a real device while
     // running from Xcode, check `ipconfig getifaddr en0` and update the debug host.
-    #if DEBUG
-    private static let host = "http://192.168.0.42:3000"
-    #else
+    // ⚠️ TEMP: pointing DEBUG builds at the Railway prod backend so we can smoke-test
+    // the deployed server from a dev iPhone before TestFlight. Revert this block
+    // (restore the LAN host under #if DEBUG) before resuming local backend work.
+    // Original DEBUG host was: "http://192.168.0.42:3000"
+    private static let host = "https://stackpoker-backend-production.up.railway.app"
+
     // Production backend on Railway. HTTPS terminates at Railway's load balancer, then
     // the request is forwarded to the container over the internal network. The wsURL
     // derivation below correctly turns "https" into "wss" because the substring "http"
     // is replaced with "ws", which extends naturally to the trailing 's'.
-    private static let host = "https://stackpoker-backend-production.up.railway.app"
-    #endif
 
     static let baseURL = host + "/api"
     // ws:// for http hosts (dev), wss:// for https hosts (prod). The replace

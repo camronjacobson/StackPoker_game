@@ -305,6 +305,17 @@ struct CommunityCardsView: View {
     var cardWidth:    CGFloat = 56           // overridable by the table layout
     var cardSpacing:  CGFloat = 6
     var colored:      Bool    = true         // bright per-suit backs (community default)
+    // Server-provided "what would have come" cards. Non-empty only when the
+    // hand ended before the river (fold-out) and phase==ENDED. Length always
+    // equals (5 - cards.count). When non-empty, the empty stroke placeholders
+    // are replaced with face-down PokerCards that flip face-up on tap. Tap on
+    // any one reveals all of them together so the player gets the full
+    // "what if?" view in one gesture.
+    var revealableBoard: [PokerCard] = []
+
+    // Whether the run-out reveal has been triggered for the current hand.
+    // Reset when `revealableBoard` empties (next hand begins or live play).
+    @State private var runOutRevealed: Bool = false
 
     // Per-street stagger: cards dealt together (flop=3) fan in at 0.10s intervals;
     // turn/river singletons still use index 0 so they zip in immediately.
@@ -338,14 +349,115 @@ struct CommunityCardsView: View {
                     deckOffset:    deckOffset(for: idx)
                 )
             }
-            // Placeholder slots — same custom width so the 5-slot row always fits
-            ForEach(cards.count..<5, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: size.cornerRadius)
-                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+            // Placeholder slots. When the server has surfaced a run-out
+            // (hand ended early), swap the dead stroke rectangles for
+            // face-down cards the player can tap to flip — tapping any one
+            // flips all of them so the table's "what could have been" view
+            // arrives in a single gesture.
+            if !revealableBoard.isEmpty &&
+               revealableBoard.count == 5 - cards.count {
+                ForEach(Array(revealableBoard.enumerated()), id: \.element.id) { idx, card in
+                    RunOutPlaceholder(
+                        card:         card,
+                        size:         size,
+                        colored:      colored,
+                        staggerDelay: Double(idx) * 0.08,   // gentle ripple, left → right
+                        isRevealed:   runOutRevealed,
+                        onTap: {
+                            // Trigger the reveal once. SwiftUI animates each
+                            // RunOutPlaceholder's flip individually with its
+                            // own staggerDelay; we just flip the bool.
+                            runOutRevealed = true
+                        }
+                    )
                     .frame(width: cardWidth, height: cardWidth * 1.4)
+                }
+            } else {
+                ForEach(cards.count..<5, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: size.cornerRadius)
+                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                        .frame(width: cardWidth, height: cardWidth * 1.4)
+                }
             }
         }
         .animation(.easeInOut(duration: 0.2), value: cards.count)
+        // Reset the reveal so the next hand starts with face-down placeholders
+        // again. The trigger is the run-out array becoming empty (server
+        // clears it on startHand), which is also exactly when we want the
+        // local @State to forget the previous hand.
+        .onChange(of: revealableBoard.count) { _, count in
+            if count == 0 { runOutRevealed = false }
+        }
+    }
+}
+
+// One run-out placeholder: face-down PokerCard that flips on tap (or when
+// `isRevealed` is set externally — useful so a tap on any sibling can flip
+// the whole row together). Uses the same X-axis-scale flip trick as
+// FlippableCardView/AnimatedCommunityCard so it visually matches the
+// neighbouring board cards.
+private struct RunOutPlaceholder: View {
+    let card:         PokerCard
+    let size:         PlayingCardView.CardSize
+    let colored:      Bool
+    let staggerDelay: Double          // delay added to this card's flip
+    let isRevealed:   Bool             // external trigger from the parent
+    let onTap:        () -> Void
+
+    @State private var showFront    = false
+    @State private var flipScaleX:  CGFloat = 1
+    @State private var hasAnimated  = false
+
+    var body: some View {
+        Group {
+            if showFront {
+                PlayingCardView(card: card, size: size,
+                                coloredBackground: colored)
+            } else {
+                PlayingCardView(card: nil, size: size, isFaceDown: true)
+            }
+        }
+        .scaleEffect(x: flipScaleX, y: 1)
+        // Subtle hint that the card is interactive — slight pulse on the
+        // face-down state. We don't want it to look like a regular community
+        // card the user might mistake for a real result.
+        .overlay(
+            isRevealed ? nil :
+            RoundedRectangle(cornerRadius: size.cornerRadius)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Forward the tap to the parent (which sets `isRevealed=true` for
+            // every sibling). Guarded so a second tap on an already-revealed
+            // card is a no-op rather than re-running the flip.
+            if !isRevealed { onTap() }
+        }
+        .onChange(of: isRevealed) { _, revealed in
+            if revealed && !hasAnimated {
+                hasAnimated = true
+                animateFlip()
+            }
+        }
+        .onChange(of: card.id) { _, _ in
+            // New hand reusing the slot — reset visual state.
+            showFront    = false
+            flipScaleX   = 1
+            hasAnimated  = false
+        }
+    }
+
+    private func animateFlip() {
+        // Squish to 0 (face-down still showing), swap to face-up, expand to 1.
+        // Mirrors FlippableCardView's two-stage flip; staggerDelay creates the
+        // left-to-right ripple across the row when sibling taps flip us all.
+        DispatchQueue.main.asyncAfter(deadline: .now() + staggerDelay) {
+            withAnimation(.easeIn(duration: 0.13)) { flipScaleX = 0 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
+                showFront = true
+                withAnimation(.easeOut(duration: 0.13)) { flipScaleX = 1 }
+            }
+        }
     }
 }
 

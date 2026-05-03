@@ -396,12 +396,21 @@ struct PokerTableView: View {
     // ─── Community board ──────────────────────────────────────────────────────
 
     private func communityBoard(_ l: TableLayout) -> some View {
-        CommunityCardsView(
-            cards:        vm.gameState?.communityCards ?? [],
-            winnersCards: winnerCardIds,
-            cardWidth:    l.cardWidth,
-            cardSpacing:  l.cardSpacing,
-            colored:      true
+        // Surface the run-out preview only while phase==ENDED. The server
+        // already gates this server-side, but double-gating client-side
+        // keeps the UI honest if a stale or out-of-order broadcast lands —
+        // we never want face-down "tap to reveal" placeholders to flash on
+        // the table during a live hand.
+        let runOut: [PokerCard] = (vm.gameState?.phase == .ended)
+            ? (vm.gameState?.revealableBoard ?? [])
+            : []
+        return CommunityCardsView(
+            cards:           vm.gameState?.communityCards ?? [],
+            winnersCards:    winnerCardIds,
+            cardWidth:       l.cardWidth,
+            cardSpacing:     l.cardSpacing,
+            colored:         true,
+            revealableBoard: runOut
         )
         .position(x: l.boardCenter.x, y: l.boardCenter.y)
     }

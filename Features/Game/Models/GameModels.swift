@@ -232,6 +232,13 @@ struct ClientGameState: Decodable {
     let winners:         [WinnerPayout]?
     let legalActions:    [LegalAction]
     let gameType:        String?  // "TEXAS_HOLDEM" or "PLO"
+    // Cards that *would have been* dealt to fill the rest of the board if the
+    // hand had run out instead of ending early on a fold. Server populates
+    // this only when phase==ENDED *and* the board never reached the river;
+    // empty array (or nil from older servers) otherwise. iOS turns these into
+    // face-down tappable placeholders that flip on tap so the player can see
+    // what they would have hit. Optional so old server builds still decode.
+    let revealableBoard: [PokerCard]?
 
     // Convenience
     var mySeat: GameSeat? { nil }   // filled in by ViewModel from userId

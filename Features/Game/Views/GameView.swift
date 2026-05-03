@@ -299,8 +299,15 @@ struct GameView: View {
                 HStack(spacing: vm.isMyTurn ? -22 : 6) {
                     ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
                         let isWinningCard = vm.winningCardIds.contains(card.id)
-                        let dim = vm.anyWinnersDeclared && !isWinningCard
                         let isShown = shownIdx.contains(idx)
+                        // Voluntarily-shown cards override the loser-dim treatment —
+                        // when the player taps to expose a card after winning an
+                        // uncontested pot, `bestCards` is empty so both cards would
+                        // otherwise stay dimmed at 0.55 opacity, making the reveal
+                        // invisible to the user (the white border + scale pop got
+                        // lost behind the dim). Treating shown cards as un-dim
+                        // makes the act of showing unmistakable in any state.
+                        let dim = vm.anyWinnersDeclared && !isWinningCard && !isShown
                         // 4-color front (red / blue / green / black) so the
                         // hero's hand reads with the same suit-tinted plates
                         // as the community board.
