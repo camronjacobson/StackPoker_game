@@ -291,6 +291,46 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    // ─── Daily Bonus ──────────────────────────────────────────────────────────
+    // Calls POST /chips/daily to claim the once-per-24h chip bonus. The backend
+    // is the source of truth — it checks today's chipTransaction history for a
+    // DAILY_BONUS row and rejects the call with code "ALREADY_CLAIMED" if the
+    // user has already redeemed today (the message includes hours-until-reset).
+    //
+    // On success we refresh the profile so chipBalance bound elsewhere in the
+    // UI updates immediately; the caller still gets the bonus amount for any
+    // success animation (e.g. "+1000" pop in DailyBonusCard).
+
+    enum DailyBonusResult {
+        case success(amount: Int)
+        case alreadyClaimed(message: String)
+        case failure(message: String)
+    }
+
+    func claimDailyBonus() async -> DailyBonusResult {
+        do {
+            let response: DailyBonusResponse = try await network.request(
+                .dailyBonus, method: .POST
+            )
+            await refreshProfile()
+            // bonusAmount is a BigInt-as-string from the backend; coerce here
+            // so the caller (DailyBonusCard) can show "+\(amount)" plainly.
+            return .success(amount: Int(response.bonusAmount) ?? 0)
+        } catch let err as NetworkError {
+            // The backend throws { code: "ALREADY_CLAIMED", message: "Come back
+            // in Xh ..." } when today's bonus row already exists. Surface that
+            // distinct case so the UI can switch into its cooldown state with
+            // the server's countdown message instead of a generic error.
+            if case .serverError(let code, let message) = err,
+               code == "ALREADY_CLAIMED" {
+                return .alreadyClaimed(message: message)
+            }
+            return .failure(message: err.localizedDescription)
+        } catch {
+            return .failure(message: "Couldn't claim bonus. Please try again.")
+        }
+    }
+
     // ─── Logout ───────────────────────────────────────────────────────────────
 
     func logout() {

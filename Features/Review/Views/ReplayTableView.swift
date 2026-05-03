@@ -255,6 +255,11 @@ private extension PFSeat {
             status:           PlayerStatus(rawValue: status) ?? .active,
             holeCards:        holeCards?.map(\.live),
             cardCount:        cardCount,
+            // Replay frames don't track voluntary fold-show events — the
+            // recorded hand only captures the authoritative state at each
+            // street boundary. Always nil here so TargetSeatView falls back
+            // to its existing "no partial reveals" behavior.
+            revealedCards:    nil,
             betThisStreet:    betThisStreet,
             totalContributed: totalContributed,
             isDealer:         isDealer,

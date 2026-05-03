@@ -4,6 +4,11 @@ import SwiftUI
 // PurePoker-style action bar: only visible when it's my turn, dark pill
 // buttons with colored text, optional raise slider panel.
 
+// MAP: ActionBar — fold/check/call/raise buttons + +15s + slider (342 lines)
+// - ActionBar (root) ....................... L7
+// - PokerActionButton (single pill) ........ L100
+// - RaiseSliderView (raise amount picker) .. L176
+
 struct ActionBar: View {
     @ObservedObject var vm: GameViewModel
 
@@ -19,44 +24,50 @@ struct ActionBar: View {
                 // Floats above the action row, right-aligned. Replaces the
                 // longer base decision time we used to give every player —
                 // now you get a shorter clock by default plus one optional
-                // +15s on demand. Disappears once used (gates re-tap so the
-                // server doesn't get spammed).
+                // +15s on demand.
+                //
+                // Visibility note: we keep the button MOUNTED at all times
+                // and just fade it out once used, rather than removing it
+                // from the view tree. Removing it shifts the action row /
+                // hole cards upward by ~34pt as SwiftUI reflows the parent
+                // VStack — the user found that movement disorienting.
+                // `.allowsHitTesting(false)` prevents a phantom re-tap on
+                // the now-invisible target.
                 HStack {
                     Spacer()
-                    if !vm.turnExtensionUsed {
-                        Button {
-                            vm.requestTimeExtension()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 12, weight: .bold))
-                                Text("15s")
-                                    .font(.system(size: 12, weight: .heavy,
-                                                  design: .rounded))
-                            }
-                            .foregroundStyle(Color(hex: "#F5C842"))
-                            .padding(.horizontal, 12)
-                            .frame(height: 30)
-                            .background(
-                                Capsule()
-                                    .fill(Color(hex: "#1A2744"))
-                                    .overlay(
-                                        Capsule().strokeBorder(
-                                            Color(hex: "#F5C842").opacity(0.5),
-                                            lineWidth: 1
-                                        )
-                                    )
-                            )
-                            .shadow(color: Color(hex: "#F5C842").opacity(0.25),
-                                    radius: 6)
+                    Button {
+                        vm.requestTimeExtension()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("15s")
+                                .font(.system(size: 12, weight: .heavy,
+                                              design: .rounded))
                         }
-                        .buttonStyle(.plain)
-                        .transition(.scale.combined(with: .opacity))
+                        .foregroundStyle(Color(hex: "#F5C842"))
+                        .padding(.horizontal, 12)
+                        .frame(height: 30)
+                        .background(
+                            Capsule()
+                                .fill(Color(hex: "#1A2744"))
+                                .overlay(
+                                    Capsule().strokeBorder(
+                                        Color(hex: "#F5C842").opacity(0.5),
+                                        lineWidth: 1
+                                    )
+                                )
+                        )
+                        .shadow(color: Color(hex: "#F5C842").opacity(0.25),
+                                radius: 6)
                     }
+                    .buttonStyle(.plain)
+                    .opacity(vm.turnExtensionUsed ? 0 : 1)
+                    .allowsHitTesting(!vm.turnExtensionUsed)
                 }
                 .padding(.horizontal, 14)
                 .padding(.bottom, 4)
-                .animation(.spring(response: 0.3), value: vm.turnExtensionUsed)
+                .animation(.easeOut(duration: 0.2), value: vm.turnExtensionUsed)
 
                 // Action buttons — full-width pill row pinned to bottom of screen
                 HStack(spacing: 10) {
@@ -170,58 +181,61 @@ struct PokerActionButton: View {
 struct RaiseSliderView: View {
     @ObservedObject var vm: GameViewModel
 
+    // Detect "all-in" state: the chosen raise amount equals the maximum legal
+    // raise, which by construction is the player's stack + their existing bet
+    // for the street. When that's true, the action is functionally an all-in
+    // and the confirm label should reflect that — calling it "Raise" hides
+    // an important fact from the user (e.g., they could fold and survive,
+    // versus this commit-everything choice). Computed at render time so it
+    // updates with the slider drag.
+    private var isAllIn: Bool { vm.raiseAmount >= vm.maxRaise && vm.maxRaise > 0 }
+
     var body: some View {
-        VStack(spacing: 12) {
-            // Current raise amount (large centered display)
-            VStack(spacing: 1) {
-                Text("RAISE TO")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .tracking(1.8)
+        VStack(spacing: 14) {
+            // ─── Amount display ────────────────────────────────────────────
+            // Single-line, white. The previous version had a stacked
+            // "RAISE TO" all-caps tracked label above a yellow numeric
+            // display — two competing visual weights for one piece of info.
+            // The label below the number is small and quiet so the number
+            // stays the focus.
+            VStack(spacing: 2) {
                 Text(formatChips(String(vm.raiseAmount)))
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(Color(hex: "#F5C842"))
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
                     .contentTransition(.numericText())
+                Text(isAllIn ? "all in" : "raise to")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
             }
 
-            // Quick amounts row
-            HStack(spacing: 6) {
+            // ─── Quick amounts row ────────────────────────────────────────
+            // Trimmed from 6 pills to 4 (Min, ½, Pot, Max). The dropped
+            // ⅓ and 2× rarely got tapped and crowded the row on narrow
+            // phones (SE, mini). Selected state inverts (white fill, dark
+            // text) — single clear visual instead of the previous four
+            // overlapping yellow accents.
+            HStack(spacing: 8) {
                 ForEach(quickAmounts, id: \.label) { qa in
+                    let selected = vm.raiseAmount == qa.amount
                     Button {
-                        withAnimation(.spring(response: 0.2)) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                             vm.raiseAmount = qa.amount
                         }
                         UISelectionFeedbackGenerator().selectionChanged()
                     } label: {
                         Text(qa.label)
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(
-                                vm.raiseAmount == qa.amount
-                                    ? Color(hex: "#F5C842")
-                                    : .white.opacity(0.7)
-                            )
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                vm.raiseAmount == qa.amount
-                                    ? Color(hex: "#2A3D6A")
-                                    : Color(hex: "#1A2744")
-                            )
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(selected ? Color(hex: "#0D1B2A") : .white.opacity(0.85))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(selected ? Color.white : Color.white.opacity(0.08))
                             .clipShape(Capsule())
-                            .overlay(
-                                Capsule().strokeBorder(
-                                    vm.raiseAmount == qa.amount
-                                        ? Color(hex: "#F5C842").opacity(0.4)
-                                        : Color(hex: "#2A3D6A").opacity(0.4),
-                                    lineWidth: 1
-                                )
-                            )
                     }
                     .buttonStyle(.plain)
                 }
             }
 
-            // Slider
+            // ─── Slider ───────────────────────────────────────────────────
             // SwiftUI's Slider(in:step:) calls Swift.stride internally and
             // crashes with "max stride must be positive" any time the range
             // can't fit even one step. That happens in three legitimate game
@@ -230,6 +244,10 @@ struct RaiseSliderView: View {
             // or a transient frame where min/max haven't been computed yet.
             // We derive lo/hi/step from one consistent floor and pad hi up
             // to at least lo + step so the slider always renders.
+            //
+            // Tint moved from yellow → white. Yellow on a slider track plus
+            // a yellow confirm button below was double-accenting; reserving
+            // yellow for the action button alone makes it pop more, not less.
             let bounds = sliderBounds
             Slider(
                 value: Binding<Double>(
@@ -242,34 +260,39 @@ struct RaiseSliderView: View {
                 in: bounds.lo...bounds.hi,
                 step: bounds.step
             )
-            .tint(Color(hex: "#F5C842"))
-            .padding(.horizontal, 6)
+            .tint(.white)
+            .padding(.horizontal, 4)
             // Disable when the legal range collapsed to a single value — the
-            // user can still confirm the raise via the button below; dragging
-            // a one-tick slider would feel broken.
+            // user can still confirm via the button below; dragging a
+            // one-tick slider would feel broken.
             .disabled(bounds.lo >= bounds.hi - bounds.step / 2)
 
-            // Confirm Raise
+            // ─── Confirm button ───────────────────────────────────────────
+            // Label is dynamic: "All In" when the user has dragged or tapped
+            // to max stack, otherwise "Raise to N" so they see what they're
+            // about to commit. Removed the yellow drop-shadow glow — that
+            // was the single most "video-game-y" element in the old design.
+            // Flat fill, slightly tighter corner radius, weight reduced from
+            // .heavy to .bold so the button feels confident without shouting.
             Button { vm.raise() } label: {
-                Text("Confirm Raise")
-                    .font(.system(size: 15, weight: .heavy))
+                Text(isAllIn ? "All In" : "Raise to \(formatChips(String(vm.raiseAmount)))")
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color(hex: "#0D1B2A"))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 48)
+                    .frame(height: 46)
                     .background(Color(hex: "#F5C842"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(color: Color(hex: "#F5C842").opacity(0.35), radius: 8, y: 3)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        // Background is the same dark navy but the strokeBorder is gone —
+        // the panel reads as a clean shape on the action bar without the
+        // extra hairline that was making it feel boxed-in.
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color(hex: "#0D1B2A").opacity(0.95))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Color(hex: "#2A3D6A"), lineWidth: 1)
-                )
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(hex: "#0D1B2A").opacity(0.96))
         )
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
@@ -292,19 +315,26 @@ struct RaiseSliderView: View {
 
     private struct QuickAmount { let label: String; let amount: Int }
 
+    // Quick-amount presets. Trimmed from six (Min, ⅓, ½, Pot, 2×, Max) to four
+    // because: (a) on a 4-pill row each pill gets ~22% of the bet panel width,
+    // which reads cleanly without truncation even on iPhone SE; (b) the dropped
+    // ⅓-pot and 2×-current-bet were rarely tapped in practice — Min, ½-pot,
+    // Pot, and Max cover the strategic spread of common bet sizes; (c) fewer
+    // pills means each one is more deliberate, less "every option crammed in".
+    // Each candidate is clamped to the legal [lo, hi] range so we never offer
+    // a value the server would reject. Duplicates are de-duped via `seen` —
+    // e.g., when minRaise == pot/2 + cb, the Min and ½-pot pills would render
+    // the same amount, so we keep only the first.
     private var quickAmounts: [QuickAmount] {
         let lo  = max(1, vm.minRaise)
         let hi  = vm.maxRaise
         let pot = vm.gameState?.totalPot ?? 0
         let cb  = vm.gameState?.currentBet ?? 0
-        let two = min(hi, max(lo, cb * 2))
 
         let items: [(String, Int)] = [
             ("Min",  lo),
-            ("⅓",    min(hi, max(lo, pot / 3 + cb))),
             ("½",    min(hi, max(lo, pot / 2 + cb))),
             ("Pot",  min(hi, max(lo, pot + cb))),
-            ("2x",   two),
             ("Max",  hi),
         ]
         var seen = Set<Int>()

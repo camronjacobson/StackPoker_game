@@ -66,6 +66,9 @@ struct UsernameCheckResponse: Decodable {
     let valid: Bool
 }
 
+// Note: DailyBonusResponse is declared in Features/Profile/ViewModels/ChipsViewModel.swift
+// (used by both ChipsViewModel.claimDailyBonus and AuthViewModel.claimDailyBonus).
+
 // ─── User Profile Model ───────────────────────────────────────────────────────
 
 struct UserProfile: Decodable, Identifiable, Equatable {

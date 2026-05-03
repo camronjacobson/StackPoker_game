@@ -1,6 +1,20 @@
 import SwiftUI
 import Combine
 
+// MAP: GameViewModel — central in-game state + action dispatcher (572 lines)
+// - Published state ........................ L21
+// - init() ................................. L97
+// - Lifecycle (start/stop) ................. L106
+// - Subscriptions (socket → state) ......... L122
+// - Game state handler (apply server view) . L198
+// - Turn timer ............................. L306
+// - Player actions (sendAction et al) ...... L362
+//     fold L379, check L384, call L389, raise L395, allIn L400
+// - requestTimeExtension ................... L416
+// - sendChat ............................... L423
+// - showCard (voluntary fold-show) ......... L436
+// - Convenience vars (mySeat, isMyTurn …) .. L543
+
 // Cached subset of TableDetail used by the in-game side menu. The websocket
 // game state doesn't include join code, owner, or buy-in limits — those come
 // from the lobby's REST detail endpoint and are loaded lazily.
@@ -163,10 +177,28 @@ final class GameViewModel: ObservableObject {
         socket.errorSubject
             .receive(on: RunLoop.main)
             .sink { [weak self] err in
-                self?.errorMessage = err.message
+                guard let self else { return }
+                self.errorMessage = err.message
+
+                // CRITICAL: reset the in-flight action debounce. `isSendingAction` is
+                // normally cleared in `handleGameState` when the server broadcasts a
+                // new state — but a *rejected* action sends an `error` event with no
+                // accompanying state broadcast. Without this reset, `isSendingAction`
+                // stays `true` forever and the `guard !isSendingAction else { return }`
+                // in `sendAction` silently no-ops every subsequent button press,
+                // making the table appear frozen until the user reconnects. Discovered
+                // 2026-05-02 after server-side raise validation started rejecting
+                // stale `raiseAmount` values (see fix in `handleGameState`).
+                self.isSendingAction = false
+
+                // Close the raise sheet so the user can retry from a clean state. If
+                // the rejection was due to a stale raiseAmount, the next time they
+                // open the slider it will re-clamp to the current legal range.
+                self.showRaiseSlider = false
+
                 Task {
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    self?.errorMessage = nil
+                    self.errorMessage = nil
                 }
             }
             .store(in: &cancellables)
@@ -206,10 +238,29 @@ final class GameViewModel: ObservableObject {
             haptic(.light)
         }
 
-        // Set raise amount default to min raise
-        if let legal = state.legalActions.first(where: { $0.action == .raise }) {
-            if raiseAmount == 0, let min = legal.minAmount {
-                raiseAmount = min
+        // Sync raiseAmount with the current legal range. Two scenarios:
+        //
+        //   A) First time the raise panel is relevant this session — raiseAmount
+        //      starts at 0, so we default it to the advertised minimum.
+        //
+        //   B) raiseAmount holds a value from a *previous* turn or hand and the
+        //      legal range has shifted (e.g. someone re-raised, so minRaise is
+        //      now higher than what the user previously selected). The slider's
+        //      getter visually clamps to the new range, but the underlying
+        //      @Published `raiseAmount` still holds the stale low value. Tapping
+        //      Confirm would then send a number below the server's accepted
+        //      minimum, the server rejects, and combined with the previous bug
+        //      where `isSendingAction` wasn't reset on error, the UI froze.
+        //
+        //   Always clamping on every state arrival keeps `raiseAmount` honest
+        //   with whatever the server is currently willing to accept.
+        if let legal = state.legalActions.first(where: { $0.action == .raise }),
+           let lo = legal.minAmount,
+           let hi = legal.maxAmount {
+            if raiseAmount == 0 {
+                raiseAmount = lo
+            } else {
+                raiseAmount = min(max(raiseAmount, lo), hi)
             }
         }
 
@@ -388,6 +439,17 @@ final class GameViewModel: ObservableObject {
         guard !msg.isEmpty else { return }
         socket.sendChat(tableId: tableId, message: msg)
         chatInput = ""
+    }
+
+    /// User tapped one of their own hole cards to expose it to everyone.
+    /// We don't gate locally on phase / status — the server is the source
+    /// of truth and will silently no-op if the index is invalid (no hand
+    /// yet, out of range, already shown). The server's broadcast carries
+    /// the new revealedCards back to every client, including this one,
+    /// which drives the flip animation in HoleCardsView.
+    func showCard(at index: Int) {
+        haptic(.light)
+        socket.showCard(tableId: tableId, cardIndex: index)
     }
 
     // True when local player is the only active seat (or table is empty of others)

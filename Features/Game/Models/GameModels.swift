@@ -1,5 +1,19 @@
 import Foundation
 
+// MAP: GameModels — Codable types decoded from server snapshots (445 lines)
+// - PokerCard .............................. L5
+// - PlayerStatus (active/folded/allIn …) ... L47
+// - RevealedCard (voluntary fold-show) ..... L60
+// - GameSeat ............................... L66
+// - PotSlice (main + side pots) ............ L99
+// - PokerAction ............................ L108
+// - LastAction ............................. L145
+// - WinnerPayout ........................... L168
+// - GamePhase .............................. L179
+// - Street ................................. L188
+// - ClientGameState (root snapshot) ........ L200
+// - HandStrength (label, made vs draw) ..... L275
+
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 struct PokerCard: Decodable, Identifiable, Equatable, Hashable {
@@ -53,6 +67,16 @@ enum PlayerStatus: String, Decodable {
     case disconnected = "DISCONNECTED"
 }
 
+// One voluntarily-shown card from a folded or live player. The server emits
+// these so every viewer sees the same exposed card; `index` is the card's
+// original slot in the hand (0 or 1 for Holdem) so the UI can place it back
+// over the right face-down placeholder rather than reflowing.
+struct RevealedCard: Decodable, Identifiable, Equatable, Hashable {
+    let index: Int
+    let card:  PokerCard
+    var id: String { "\(index)-\(card.id)" }
+}
+
 struct GameSeat: Decodable, Identifiable {
     let seatIndex:       Int
     let userId:          String
@@ -63,6 +87,12 @@ struct GameSeat: Decodable, Identifiable {
     let status:          PlayerStatus
     let holeCards:       [PokerCard]?     // nil = hidden
     let cardCount:       Int
+    // Cards this seat has voluntarily exposed (fold-show tap or all-in
+    // showdown auto-reveal). Optional because older server builds don't
+    // emit it — decode falls back to []. Visible to every viewer regardless
+    // of seat ownership; the iOS layer renders these face-up over the
+    // matching face-down slot.
+    let revealedCards:   [RevealedCard]?
     let betThisStreet:   Int
     let totalContributed: Int
     let isDealer:        Bool
@@ -74,6 +104,8 @@ struct GameSeat: Decodable, Identifiable {
     var id: String { userId }
     var isActive: Bool { status == .active }
     var hasCards: Bool { (holeCards?.count ?? cardCount) > 0 }
+    // Convenience for the UI: empty array if server didn't emit the field.
+    var revealed: [RevealedCard] { revealedCards ?? [] }
 }
 
 // ─── Pot ─────────────────────────────────────────────────────────────────────
@@ -262,6 +294,14 @@ enum HandStrength {
             return preflopLabel(hole)
         }
         let all = hole + board
+        // On the river (5 community cards) the hand is final — there are no
+        // more cards to come, so showing "Flush Draw" / "Straight Draw" is
+        // misleading. Past 4 board cards we degrade gracefully to the actual
+        // made hand or "High Card". Draws are still surfaced on the flop
+        // (3) and turn (4), where outs remain and the label is useful.
+        if board.count >= 5 {
+            return madeHandLabel(all) ?? "High Card"
+        }
         return madeHandLabel(all) ?? drawLabel(hole: hole, board: board) ?? "High Card"
     }
 

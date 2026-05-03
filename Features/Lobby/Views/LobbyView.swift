@@ -38,6 +38,11 @@ struct LobbyView: View {
         ScrollView(showsIndicators: false) {
           VStack(spacing: SPSpacing.lg) {
             lobbyHeader
+            // Daily bonus banner — sits right under the header so it's the
+            // first thing the user sees on app open. Self-contained: handles
+            // its own claim/cooldown state and refreshes the chip balance via
+            // AuthViewModel on success.
+            DailyBonusCard()
             featuredCarousel
             filterPills
             activeGamesSection

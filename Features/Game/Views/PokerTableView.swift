@@ -4,6 +4,19 @@ import SwiftUI
 // Pure Poker-style layout: tall pill-shaped blue felt table, flat (no 3D tilt),
 // seats positioned around the rim, chip stacks between seats and pot.
 
+// MAP: PokerTableView — table felt, seats, chips, action bubbles (1734 lines)
+// - TableLayout (geometry/seat positions) .. L9
+// - PokerTableView (root) .................. L108
+// - feltOval (table surface) ............... L193
+// - seatOverlay (positions seats on rim) ... L547
+// - TargetSeatView (single opponent seat) .. L1045
+// - triggerBubbleIfNeeded (action bubbles) . L1286
+// - actionBubbleKind (color/label mapping) . L1353
+// - StackPill (player chip count display) .. L1373
+// - OpponentHoleCardsView (face-down + reveals) L1453
+// - TableTheme (colors) .................... L1646
+// - FeltTexture ............................ L1692
+
 // ─── Table Layout ─────────────────────────────────────────────────────────────
 
 struct TableLayout {
@@ -1187,13 +1200,27 @@ struct TargetSeatView: View {
                 // winning combination are then highlighted in gold while the
                 // rest dim, so the winning hand reads at a glance across the
                 // whole table.
-                if seat.hasCards && seat.status != .folded && !isMe {
+                // Render the small hole-card cluster beside the avatar in
+                // three cases:
+                //   1. The opponent is still in the hand (face-down → flips
+                //      face-up at showdown). Existing behavior.
+                //   2. The opponent folded but voluntarily tapped to show
+                //      one or both cards — keep the cluster mounted so the
+                //      reveal has a place to render.
+                // `seat.cardCount` covers both: it reflects holeCards.length
+                // for live seats and mucked.length for folded seats, so
+                // `hasCards` is still the correct mount predicate. The
+                // status check just excludes folded-with-no-reveal so we
+                // don't draw face-down cards in front of a folded seat.
+                let hasShown = !seat.revealed.isEmpty
+                if !isMe && seat.hasCards && (seat.status != .folded || hasShown) {
                     OpponentHoleCardsView(
                         revealedCards:      seat.holeCards,
                         cardCount:          seat.cardCount,
                         isWinner:           isWinner,
                         anyWinnersDeclared: anyWinnersDeclared,
-                        winningCardIds:     winningCardIds
+                        winningCardIds:     winningCardIds,
+                        partialReveals:     seat.revealed
                     )
                     .offset(x: -avatarSize * 0.52, y: -avatarSize * 0.15)
                     .zIndex(8)
@@ -1273,8 +1300,17 @@ struct TargetSeatView: View {
         guard let action = lastAction,
               action.playerId == seat.userId,
               timestamp != 0,
-              let kind = actionBubbleKind(for: action.action)
+              let baseKind = actionBubbleKind(for: action.action)
         else { return }
+        // Special-case "raise to max" → render as red "All In" instead of
+        // the blue Raise bubble. The slider's max button sends action=RAISE
+        // with the player's full stack as the amount, so the server still
+        // sees a RAISE, but the actor's seat status flips to ALL_IN on the
+        // next state broadcast. We treat that combination as an all-in
+        // visually so the table reads it correctly.
+        let kind: ActionKind = (action.action == "RAISE" && seat.status == .allIn)
+            ? ActionKind(label: "All In", color: Color(hex: "#C8344A"))
+            : baseKind
         bubbleStamp = timestamp
         bubble = kind
         Task {
@@ -1433,6 +1469,11 @@ private struct OpponentHoleCardsView: View {
     let isWinner:           Bool
     let anyWinnersDeclared: Bool
     let winningCardIds:     Set<String>
+    // Voluntary tap-to-show reveals from the seat's owner — partial (one or
+    // both indices) and may arrive at any time during/after the hand,
+    // including after they've folded. We render face-up specifically at
+    // the matching slot index, leaving any non-shown slots face-down.
+    var partialReveals:     [RevealedCard] = []
 
     @State private var revealed:   Bool    = false
     @State private var flipScaleX: CGFloat = 1
@@ -1440,6 +1481,12 @@ private struct OpponentHoleCardsView: View {
     @State private var glowPulse:  Bool    = false
 
     private var hasReveal: Bool { (revealedCards?.count ?? 0) > 0 }
+    // Lookup helper — slot i → voluntarily-shown card if any. Used by
+    // `cardSlot` to override the face-down placeholder when the owner has
+    // tapped that slot.
+    private func revealedAt(_ i: Int) -> PokerCard? {
+        partialReveals.first(where: { $0.index == i })?.card
+    }
     private let cardSize: PlayingCardView.CardSize = .custom(22)
 
     var body: some View {
@@ -1482,7 +1529,22 @@ private struct OpponentHoleCardsView: View {
 
     @ViewBuilder
     private func cardSlot(at i: Int) -> some View {
-        if revealed, let cards = revealedCards, i < cards.count {
+        // Voluntarily-shown card at this slot wins over showdown-revealed —
+        // both populate the same visual position, but partial reveals can
+        // arrive earlier (mid-hand fold-show) and should display the moment
+        // the server broadcasts them, not wait for the showdown flip
+        // sequence.
+        if let shown = revealedAt(i) {
+            // Soft white glow ring marks the card as voluntarily shown so
+            // it's distinguishable from a normal showdown reveal.
+            PlayingCardView(card: shown, size: cardSize, coloredBackground: true)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cardSize.cornerRadius)
+                        .strokeBorder(Color.white.opacity(0.85), lineWidth: 1.4)
+                )
+                .shadow(color: Color.white.opacity(0.45), radius: 6)
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+        } else if revealed, let cards = revealedCards, i < cards.count {
             let card = cards[i]
             let isWinningCard = winningCardIds.contains(card.id)
             // Once winners are declared, dim cards that aren't part of the

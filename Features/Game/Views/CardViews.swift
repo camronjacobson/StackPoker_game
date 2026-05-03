@@ -1,5 +1,14 @@
 import SwiftUI
 
+// MAP: CardViews — reusable card SwiftUI components (446 lines)
+// - PlayingCardView (single card face) ..... L5
+// - CardSize (small/medium/large) .......... L14
+// - FlippableCardView (3D flip) ............ L200
+// - HoleCardsView (own pair) ............... L246
+// - CommunityCardsView (board row) ......... L293
+// - AnimatedCommunityCard (street reveal) .. L346
+// - ChipStackView .......................... L402
+
 // ─── Playing Card ─────────────────────────────────────────────────────────────
 
 struct PlayingCardView: View {

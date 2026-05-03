@@ -15,6 +15,7 @@ final class TabBarVisibility: ObservableObject {
 
 struct MainTabView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var subscription: SubscriptionManager
     @StateObject private var lobbyVM = LobbyViewModel()
     @StateObject private var tabBarVis = TabBarVisibility.shared
     @State private var selectedTab: AppTab = .home
@@ -54,7 +55,23 @@ struct MainTabView: View {
                 // Review-feature overhaul (PR 3): the History tab now lands
                 // on a coach-style dashboard instead of the raw list. The
                 // dashboard pushes HistoryListView for "See all hands".
-                case .history: ReviewDashboardView()
+                //
+                // Premium gate: Review is the headline premium feature, so
+                // we render the paywall in this tab slot when the user
+                // doesn't have an active trial or subscription. We use a
+                // tab-replacement paywall (vs. modal) so dismissing is a
+                // simple tap on a different tab, which feels less pushy.
+                // While trial is active, a thin gold banner sits above the
+                // dashboard counting down the remaining time.
+                case .history:
+                    if subscription.isPremiumActive {
+                        VStack(spacing: 0) {
+                            TrialBanner()
+                            ReviewDashboardView()
+                        }
+                    } else {
+                        PaywallView()
+                    }
                 case .create:  LobbyView().environmentObject(lobbyVM) // Create triggers sheet, not a tab
                 case .alerts:  AlertsPlaceholderView()
                 case .friends: FriendsTabView()

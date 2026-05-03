@@ -6,6 +6,18 @@ import Combine
 // Connects to: {WS_BASE}/socket.io/?EIO=4&transport=websocket&token=TOKEN
 // Events format (send/receive): 42["event_name", {...payload...}]
 
+// MAP: GameSocketClient — Socket.IO/Engine.IO client (266 lines)
+// - connect ................................ L39
+// - disconnect ............................. L59
+// - joinTable / leaveTable ................. L70 / L78
+// - sendAction / sendChat .................. L85 / L91
+// - showCard (voluntary fold-show) ......... L102
+// - requestTimeExtension / sendPing ........ L112 / L116
+// - sendEvent (raw 42[…] frame) ............ L123
+// - startReceiving / parseSocketEvent ...... L136 / L188
+// - handleDisconnect / scheduleReconnect ... L242 / L251
+// - startPing (keep-alive) ................. L260
+
 final class GameSocketClient: ObservableObject {
 
     static let shared = GameSocketClient()
@@ -90,6 +102,17 @@ final class GameSocketClient: ObservableObject {
 
     func sendChat(tableId: String, message: String) {
         sendEvent("table_chat", data: ["tableId": tableId, "message": message])
+    }
+
+    /// Tap-to-show: tells the server the user wants to expose their hole
+    /// card at `cardIndex` to the rest of the table. Server validates the
+    /// index and re-broadcasts a fresh ClientGameState; the new state
+    /// carries the card under `revealedCards` for every viewer's seat,
+    /// including the sender, so we render the reveal off the broadcast
+    /// rather than optimistically. Idempotent on the server side — a
+    /// duplicate tap is a no-op.
+    func showCard(tableId: String, cardIndex: Int) {
+        sendEvent("show_cards", data: ["tableId": tableId, "cardIndex": cardIndex])
     }
 
     /// Requests a +15s extension on the active player's decision timer.

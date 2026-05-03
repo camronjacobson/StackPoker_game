@@ -3,6 +3,19 @@ import SwiftUI
 // ─── Game View ────────────────────────────────────────────────────────────────
 // Full-screen poker table. Replaces the placeholder from Phase 2.
 
+// MAP: GameView — top-level in-game scene, owns layouts + overlays (1283 lines)
+// - GameView (root) ........................ L6
+// - portraitLayout ......................... L131
+// - landscapeLayout ........................ L150
+// - Top bar (back/menu/info) ............... L185
+// - localPlayerOverlay (my cards + tap-show) L259
+// - tableArea (felt + seats) ............... L393
+// - ChatOverlay ............................ L501
+// - WinnerCelebrationOverlay ............... L575
+// - FoldTossModifier (fold animation) ...... L747
+// - TableSideMenu .......................... L764
+// - TopUpSheet ............................. L1099
+
 struct GameView: View {
     @StateObject var vm: GameViewModel
     @Environment(\.dismiss) var dismiss
@@ -259,10 +272,24 @@ struct GameView: View {
     @ViewBuilder
     private var localPlayerOverlay: some View {
         let cards = vm.myCards
+        // Mounted whenever the local player has cards in this hand. We used
+        // to gate on `status != .folded`, but with tap-to-show the player
+        // needs to keep seeing their own cards after folding so they can
+        // optionally expose them to the table. The `mucked` field on the
+        // server preserves the values; `myCards` resolves through it for
+        // the seat owner. Sitting-out and waiting phases still hide.
         let showing = !cards.isEmpty &&
                       vm.gameState?.phase != .waiting &&
-                      vm.mySeat?.status != .folded &&
                       vm.mySeat?.status != .sittingOut
+        let isFolded = vm.mySeat?.status == .folded
+        // Once the player can voluntarily show — i.e. they've folded, or
+        // the hand has produced winners — make each card tappable. Before
+        // that, taps would do nothing on the server (handNumber gate plus
+        // the index isn't actually exposed yet anyway), so we only enable
+        // the tap target when it has a real effect, to keep accidental
+        // taps mid-hand from broadcasting cards.
+        let canShow = isFolded || vm.anyWinnersDeclared
+        let shownIdx = Set((vm.mySeat?.revealed ?? []).map(\.index))
         if showing {
             VStack(spacing: 4) {
                 // Fanned hole cards. When it's my turn the cards tighten into
@@ -273,6 +300,7 @@ struct GameView: View {
                     ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
                         let isWinningCard = vm.winningCardIds.contains(card.id)
                         let dim = vm.anyWinnersDeclared && !isWinningCard
+                        let isShown = shownIdx.contains(idx)
                         // 4-color front (red / blue / green / black) so the
                         // hero's hand reads with the same suit-tinted plates
                         // as the community board.
@@ -281,28 +309,61 @@ struct GameView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: PlayingCardView.CardSize.large.cornerRadius)
                                     .strokeBorder(
-                                        isWinningCard ? Color(hex: "#F5C842") : Color.clear,
-                                        lineWidth: 2.5
+                                        isWinningCard ? Color(hex: "#F5C842")
+                                            : (isShown ? Color.white.opacity(0.9) : Color.clear),
+                                        lineWidth: isShown ? 2.0 : 2.5
                                     )
                             )
                             .saturation(dim ? 0.5 : 1.0)
-                            .opacity(dim ? 0.55 : 1.0)
+                            // Folded cards drop slightly in opacity to read as
+                            // "out of the hand", but still legible enough to
+                            // pick a card for tap-to-show. Already-shown cards
+                            // pop back to full opacity to highlight the
+                            // reveal.
+                            .opacity(dim ? 0.55 : (isFolded && !isShown ? 0.7 : 1.0))
                             .shadow(
-                                color: isWinningCard ? Color(hex: "#F5C842").opacity(0.7) : .clear,
-                                radius: 10
+                                color: isWinningCard ? Color(hex: "#F5C842").opacity(0.7)
+                                     : (isShown ? Color.white.opacity(0.55) : .clear),
+                                radius: isShown ? 10 : 10
                             )
+                            // Soft scale pulse on reveal so the act of showing
+                            // is unmistakable. Re-keys on `isShown` so it
+                            // animates only when the server confirms the new
+                            // revealedCards entry.
+                            .scaleEffect(isShown ? 1.06 : 1.0)
+                            .animation(.spring(response: 0.32, dampingFraction: 0.6),
+                                       value: isShown)
                             .rotationEffect(.degrees(
                                 vm.isMyTurn
                                     ? (idx == 0 ? -10 : 6)
                                     : (idx == 0 ? -4  : 4)
                             ))
                             .zIndex(Double(idx))   // right card (idx=1) on top
+                            // Tap-to-show. Disabled until canShow so we don't
+                            // emit show_cards mid-hand (server would no-op,
+                            // but we save the round-trip). Already-shown
+                            // cards stop accepting taps too.
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                guard canShow, !isShown else { return }
+                                vm.showCard(at: idx)
+                            }
                     }
                 }
                 .shadow(color: .black.opacity(0.6), radius: 8, y: 4)
 
-                // Subtle hand-strength label
-                if let label = HandStrength.label(
+                // Subtle hand-strength label — hidden once folded; replaced
+                // by the tap-to-show prompt the moment the player can act
+                // on it. Winners-declared also swaps to the prompt so the
+                // pre-fold winner can optionally expose their cards in a
+                // fold-win.
+                if canShow && shownIdx.count < cards.count {
+                    Text("TAP A CARD TO SHOW")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .tracking(1.4)
+                        .foregroundStyle(Color.white.opacity(0.65))
+                        .padding(.top, 2)
+                } else if let label = HandStrength.label(
                     hole: cards,
                     board: vm.gameState?.communityCards ?? []
                 ) {
@@ -313,15 +374,17 @@ struct GameView: View {
                 }
             }
             // Two display modes:
-            //   • Off-hand (not my turn): cards sit centered above the action
+            //   • In-hand (not my turn): cards sit centered above the action
             //     bar at a slightly reduced scale so they don't dominate the
             //     screen — the table stays the focus.
-            //   • On-turn: cards shrink and tuck off to the right of the seat
-            //     so the avatar + timer ring read cleanly. The y-offset
-            //     drops the on-turn stack just enough to clear the stack
-            //     pill below the avatar.
-            .scaleEffect(vm.isMyTurn ? 0.65 : 0.90, anchor: .bottom)
-            .offset(x: vm.isMyTurn ? 120 : 0,
+            //   • On-turn / "off-hand" (my turn): cards shrink and tuck off
+            //     to the side so the avatar + timer ring read cleanly. We
+            //     keep them readable by sizing up a touch from the original
+            //     0.65, and pull them leftward of where they used to sit
+            //     so they don't overlap the +15s extension button on the
+            //     action bar (the old x:120 dropped them right on top of it).
+            .scaleEffect(vm.isMyTurn ? 0.85 : 0.90, anchor: .bottom)
+            .offset(x: vm.isMyTurn ? 70  : 0,
                     y: vm.isMyTurn ? 32  : 0)
             .transition(.asymmetric(
                 insertion: .move(edge: .bottom).combined(with: .opacity),

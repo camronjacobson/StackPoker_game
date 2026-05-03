@@ -49,6 +49,7 @@
 		36C91D552F7F5B8B00697E42 /* SPTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */; };
 		36C91D562F7F5B8B00697E43 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D572F7F5B8B00697E43 /* SoundManager.swift */; };
 		36C91E012F80000000697E42 /* Sounds in Resources */ = {isa = PBXBuildFile; fileRef = 36C91E002F80000000697E42 /* Sounds */; };
+		36C91F212F80000000697E42 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36C91F202F80000000697E42 /* Assets.xcassets */; };
 		36C91E302F80000100697E42 /* RecordedHand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E202F80000100697E42 /* RecordedHand.swift */; };
 		36C91E312F80000100697E42 /* HandAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E212F80000100697E42 /* HandAnalysis.swift */; };
 		36C91E322F80000100697E42 /* HandHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E222F80000100697E42 /* HandHistoryStore.swift */; };
@@ -58,6 +59,9 @@
 		36C91E362F80000100697E42 /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E262F80000100697E42 /* HistoryListView.swift */; };
 		36C91E392F80000100697E42 /* ReviewDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000100697E42 /* ReviewDashboardView.swift */; };
 		36C91E3A2F80000100697E42 /* EquityStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2A2F80000100697E42 /* EquityStripView.swift */; };
+		36C91E3B2F80000100697E42 /* DailyBonusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2B2F80000100697E42 /* DailyBonusCard.swift */; };
+		36C91F052F80000100697E42 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91F032F80000100697E42 /* SubscriptionManager.swift */; };
+		36C91F062F80000100697E42 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91F042F80000100697E42 /* PaywallView.swift */; };
 		36C91E372F80000100697E42 /* HandReplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E272F80000100697E42 /* HandReplayView.swift */; };
 		36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E282F80000100697E42 /* ReplayTableView.swift */; };
 		36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000200697E42 /* ReplayNarrator.swift */; };
@@ -126,6 +130,7 @@
 		36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPComponents.swift; sourceTree = "<group>"; };
 		36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPTokens.swift; sourceTree = "<group>"; };
 		36C91E002F80000000697E42 /* Sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StackPoker/Sounds; sourceTree = "<group>"; };
+		36C91F202F80000000697E42 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = StackPoker/Assets.xcassets; sourceTree = "<group>"; };
 		36C91E202F80000100697E42 /* RecordedHand.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecordedHand.swift; sourceTree = "<group>"; };
 		36C91E212F80000100697E42 /* HandAnalysis.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandAnalysis.swift; sourceTree = "<group>"; };
 		36C91E222F80000100697E42 /* HandHistoryStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandHistoryStore.swift; sourceTree = "<group>"; };
@@ -135,6 +140,9 @@
 		36C91E262F80000100697E42 /* HistoryListView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
 		36C91E292F80000100697E42 /* ReviewDashboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReviewDashboardView.swift; sourceTree = "<group>"; };
 		36C91E2A2F80000100697E42 /* EquityStripView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EquityStripView.swift; sourceTree = "<group>"; };
+		36C91E2B2F80000100697E42 /* DailyBonusCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyBonusCard.swift; sourceTree = "<group>"; };
+		36C91F032F80000100697E42 /* SubscriptionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		36C91F042F80000100697E42 /* PaywallView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		36C91E272F80000100697E42 /* HandReplayView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandReplayView.swift; sourceTree = "<group>"; };
 		36C91E282F80000100697E42 /* ReplayTableView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayTableView.swift; sourceTree = "<group>"; };
 		36C91E292F80000200697E42 /* ReplayNarrator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayNarrator.swift; sourceTree = "<group>"; };
@@ -173,6 +181,7 @@
 				36C91D302F7F5B8B00697E42 /* DesignSystem */,
 				36C91D2A2F7F5B8A00697E42 /* Features */,
 				36C91E002F80000000697E42 /* Sounds */,
+				36C91F202F80000000697E42 /* Assets.xcassets */,
 				36C91CD02F7F592A00697E42 /* StackPokerTests */,
 				36C91CDA2F7F592A00697E42 /* StackPokerUITests */,
 				36C91CBE2F7F592800697E42 /* Products */,
@@ -418,6 +427,7 @@
 				36C91D1E2F7F5B8A00697E42 /* LobbySheets.swift */,
 				36C91D1F2F7F5B8A00697E42 /* LobbyView.swift */,
 				36C91D202F7F5B8A00697E42 /* TableCardView.swift */,
+				36C91E2B2F80000100697E42 /* DailyBonusCard.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -476,8 +486,34 @@
 				36C91D222F7F5B8A00697E42 /* Lobby */,
 				36C91D292F7F5B8A00697E42 /* Profile */,
 				36C91E102F80000100697E42 /* Review */,
+				36C91F002F80000100697E42 /* Subscription */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		36C91F002F80000100697E42 /* Subscription */ = {
+			isa = PBXGroup;
+			children = (
+				36C91F012F80000100697E42 /* ViewModels */,
+				36C91F022F80000100697E42 /* Views */,
+			);
+			path = Subscription;
+			sourceTree = "<group>";
+		};
+		36C91F012F80000100697E42 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				36C91F032F80000100697E42 /* SubscriptionManager.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		36C91F022F80000100697E42 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				36C91F042F80000100697E42 /* PaywallView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		36C91E102F80000100697E42 /* Review */ = {
@@ -669,6 +705,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				36C91E012F80000000697E42 /* Sounds in Resources */,
+				36C91F212F80000000697E42 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -740,6 +777,9 @@
 				36C91E362F80000100697E42 /* HistoryListView.swift in Sources */,
 				36C91E392F80000100697E42 /* ReviewDashboardView.swift in Sources */,
 				36C91E3A2F80000100697E42 /* EquityStripView.swift in Sources */,
+				36C91E3B2F80000100697E42 /* DailyBonusCard.swift in Sources */,
+				36C91F052F80000100697E42 /* SubscriptionManager.swift in Sources */,
+				36C91F062F80000100697E42 /* PaywallView.swift in Sources */,
 				36C91E372F80000100697E42 /* HandReplayView.swift in Sources */,
 				36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */,
 				36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */,

@@ -3,6 +3,10 @@ import SwiftUI
 // ─── Player Seat View ─────────────────────────────────────────────────────────
 // Renders a single player seat on the circular table.
 
+// MAP: PlayerSeatView — single seat avatar/name/turn-ring (164 lines)
+// - PlayerSeatView (root) .................. L6
+// - BlindBadge (D / SB / BB chip) .......... L152
+
 struct PlayerSeatView: View {
     let seat:          GameSeat
     let isMyTurn:      Bool

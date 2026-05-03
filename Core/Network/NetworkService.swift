@@ -4,13 +4,33 @@ import Combine
 // ─── API Configuration ────────────────────────────────────────────────────────
 
 enum APIConfig {
-    // Toggle between local and production:
-    //   Local (simulator): "http://localhost:3000"
-    //   Local (real device on Wi-Fi): "http://192.168.0.55:3000"
-    //   Production: "https://your-app.up.railway.app"
-    private static let host = "http://192.168.0.55:3000"
+    // Build-configuration-driven host selection. Debug builds (Xcode Run, simulator,
+    // device-attached-to-Xcode) hit the local backend on your LAN. Release builds
+    // (Archive, TestFlight, App Store) hit the deployed Railway instance.
+    //
+    // Why a compile-time #if rather than a runtime flag:
+    //   - Apple won't ship a build that points at a LAN IP — App Transport Security
+    //     blocks plain http://192.168.x.x by default and adding an exception just to
+    //     ship would be a footgun.
+    //   - A compile-time switch means the production binary literally cannot fall back
+    //     to the dev host. No way to accidentally hit your laptop from TestFlight.
+    //
+    // Debug LAN IP changes whenever your Mac gets a new DHCP lease (network switch,
+    // router reboot, etc). If you start seeing "server error" on a real device while
+    // running from Xcode, check `ipconfig getifaddr en0` and update the debug host.
+    #if DEBUG
+    private static let host = "http://192.168.0.42:3000"
+    #else
+    // Production backend on Railway. HTTPS terminates at Railway's load balancer, then
+    // the request is forwarded to the container over the internal network. The wsURL
+    // derivation below correctly turns "https" into "wss" because the substring "http"
+    // is replaced with "ws", which extends naturally to the trailing 's'.
+    private static let host = "https://stackpoker-backend-production.up.railway.app"
+    #endif
 
     static let baseURL = host + "/api"
+    // ws:// for http hosts (dev), wss:// for https hosts (prod). The replace
+    // works for both because "https" contains "http".
     static let wsURL   = host.replacingOccurrences(of: "http", with: "ws")
 
     static let timeout: TimeInterval = 15
