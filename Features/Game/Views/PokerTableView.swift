@@ -88,6 +88,19 @@ struct TableLayout {
     // Seats
     var seatAvatarSize: CGFloat { isLandscape ? 52 : 56 }
 
+    // ── Forced perspective ───────────────────────────────────────────────────
+    // The felt is rendered as a trapezoid (wider at the bottom, near the
+    // viewer; narrower at the top, "deeper into the screen"). `topRatio` is
+    // the proportion of the bottom width that the top measures. Landscape
+    // uses 1.0 (symmetric oval) so a rotated device still shows the classic
+    // shape — perspective only kicks in when the device is held upright.
+    //
+    // Items on the felt (cards, pot, pills, brand mark) are still placed at
+    // tableCenter and sized off `tableWidth`, so they keep the dimensions
+    // they had before the perspective change. Only seats and the felt rim
+    // itself follow the trapezoidal warp.
+    var topRatio: CGFloat { isLandscape ? 1.0 : 0.84 }
+
     func seatPositions(count: Int) -> [CGPoint] {
         let cx = tableCenter.x
         let cy = tableCenter.y
@@ -109,10 +122,147 @@ struct TableLayout {
             default: return [90, 270]
             }
         }()
+        let tr = topRatio
         return angles.map { deg in
             let rad = deg * .pi / 180
-            return CGPoint(x: cx + rx * cos(rad), y: cy + ry * sin(rad))
+            // depth: 0 at the top of the rim (sin = -1), 1 at the bottom (sin = 1).
+            // xScale linearly interpolates between topRatio (top, narrowest) and
+            // 1.0 (bottom, full width). Top seats squeeze toward the centerline
+            // so they hug the narrower top arc; bottom seats stay on the wider
+            // rim, preserving the "near-the-viewer" feeling.
+            let depth  = (sin(rad) + 1) / 2
+            let xScale = tr + (1.0 - tr) * depth
+            return CGPoint(x: cx + rx * cos(rad) * xScale,
+                           y: cy + ry * sin(rad))
         }
+    }
+}
+
+// ─── Table Perspective Shape ──────────────────────────────────────────────────
+// Forced-perspective table silhouette: a smaller circle at the top (further
+// from the viewer) joined by two *external common tangent* lines to a larger
+// circle at the bottom (close to the viewer). Because the side lines are
+// tangent to both arcs at the meeting points, the join is C¹-continuous —
+// the eye reads it as a single smooth curve instead of a stadium with two
+// kinks where unequal-radius arcs meet straight lines.
+//
+// Earlier version connected unequal arcs with vertical lines, which produced
+// visible angle breaks at the top of each side. That broke the illusion: a
+// real round table photographed in perspective has no such breaks. Switching
+// to common tangents was the only way to get a clean smooth pill.
+//
+// `topRatio` = top-circle width ÷ bottom-circle width.
+//   1.00 → symmetric stadium (no perspective)
+//   0.85 → subtle perspective, reads as "round table tilted slightly back"
+//   0.65 → strong perspective, can look squished on phone-sized rects
+struct TablePerspectiveShape: Shape {
+    var topRatio: CGFloat = 0.84
+
+    // Animatable so a future tween of `topRatio` (e.g. animated reveal of the
+    // table on hand start) interpolates smoothly instead of snapping.
+    var animatableData: CGFloat {
+        get { topRatio }
+        set { topRatio = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        let botW = rect.width
+        let topW = rect.width * topRatio
+        let rBot = botW / 2
+        let rTop = topW / 2
+        let midX = rect.midX
+        let yTopC = rect.minY + rTop          // top circle is tangent to rect.minY
+        let yBotC = rect.maxY - rBot          // bottom circle is tangent to rect.maxY
+        let d     = yBotC - yTopC             // distance between circle centers
+
+        // Defensive: if the rect collapses (very short / very wide) so that
+        // the two circles can't even sit clear of each other, fall back to a
+        // rounded rect so we never produce garbage geometry.
+        guard d > 0.001, rBot >= rTop else {
+            path.addRoundedRect(in: rect, cornerSize: CGSize(width: rBot, height: rBot))
+            return path
+        }
+
+        // External common tangent angle. For two stacked circles with the
+        // smaller on top and the larger on bottom, the right-side external
+        // tangent slopes outward going down at angle β from vertical, where
+        // sin β = (rBot − rTop) / d. Both tangent points sit *above* their
+        // circle's horizontal equator — that's the geometric property that
+        // makes the join smooth: the radius at the tangent point is
+        // perpendicular to the tangent line, so the arc and the line share
+        // a common tangent direction at the meeting point. No kink.
+        let sinB = max(-1.0, min(1.0, (rBot - rTop) / d))
+        let beta = asin(sinB)
+        let bDeg = beta * 180.0 / .pi
+        let cosB = cos(beta)
+
+        // SwiftUI angle convention on a y-down canvas:
+        //   0° → right, 90° → screen-bottom, 180° → left, 270° → screen-top.
+        // `clockwise: false` traces increasing angle (visually clockwise on
+        // screen because y is flipped relative to math convention).
+
+        // Tangent meeting points. Note y = center.y − r·sin β (smaller y on
+        // screen = above the circle's equator).
+        let topLeft  = CGPoint(x: midX - rTop * cosB, y: yTopC - rTop * sinB)
+        let botRight = CGPoint(x: midX + rBot * cosB, y: yBotC - rBot * sinB)
+
+        // Trace: topLeft → over-the-top arc → topRight → tangent line down
+        // to botRight → around-the-bottom arc → botLeft → tangent line back
+        // up to topLeft. Top arc spans <180° (tangent points above equator);
+        // bottom arc spans >180° (mirrors the same property on the larger
+        // circle). The two tangent lines fill the rest.
+        path.move(to: topLeft)
+        path.addArc(center: CGPoint(x: midX, y: yTopC),
+                    radius: rTop,
+                    startAngle: .degrees(180 + bDeg),
+                    endAngle:   .degrees(360 - bDeg),
+                    clockwise:  false)
+        path.addLine(to: botRight)
+        path.addArc(center: CGPoint(x: midX, y: yBotC),
+                    radius: rBot,
+                    // -bDeg ≡ 360 - bDeg; using the negative form keeps
+                    // start < end so the CCW (increasing-angle) trace stays
+                    // monotonic and SwiftUI doesn't need to wrap modulo 360.
+                    startAngle: .degrees(-bDeg),
+                    endAngle:   .degrees(180 + bDeg),
+                    clockwise:  false)
+        path.addLine(to: topLeft)
+        path.closeSubpath()
+        return path
+    }
+}
+
+// ─── Surface tilt modifier ────────────────────────────────────────────────────
+// Rotates a flat 2D view backward around its horizontal axis so it visually
+// "lies on" the trapezoidal felt instead of looking pasted on flat. Applied
+// per-item (chip, card, etc.) around each item's own center, so a chip's
+// position on the felt stays put — only its visual is foreshortened.
+//
+// Why per-item rather than tilting the whole content layer:
+//   - A layer-level tilt would compress chip *positions* vertically, which
+//     would no longer line up with the seat ring and pot center.
+//   - Per-item tilt keeps positions in the original 2D coords (which already
+//     follow the trapezoidal seat warp) and only foreshortens each glyph in
+//     place. Result: chips read as ellipses, cards as trapezoids, everything
+//     still anchored exactly where the layout said.
+//
+// 26° was chosen by eye to approximately match the table's `topRatio = 0.84`
+// foreshortening — strong enough to read as 3D, gentle enough that card
+// pips and chip text remain legible.
+private extension View {
+    func tableSurfaceTilt(_ degrees: Double = 26) -> some View {
+        rotation3DEffect(
+            .degrees(degrees),
+            axis: (x: 1, y: 0, z: 0),
+            anchor: .center,
+            // Lower perspective than the default = milder "bigger at bottom,
+            // smaller at top" within each glyph. We want consistent
+            // foreshortening across small icons, not a wide-angle camera
+            // distortion per chip.
+            perspective: 0.55
+        )
     }
 }
 
@@ -153,13 +303,17 @@ struct PokerTableView: View {
                 brandMark(layout)
                 potCluster(layout)
                 communityBoard(layout)
-                gamePill(layout)
-                blindsLabel(layout)
-                hostedByLabel(layout)
+                // Replaces the previous trio (gamePill / blindsLabel /
+                // hostedByLabel). Game type + blinds in a single low-key
+                // pill keeps the bottom of the felt readable instead of
+                // stacking three separate text rows on top of each other.
+                tableInfoPill(layout)
                 dealerRailButton(layout)
                 blindRailChips(layout)
                 betChipsLayer(layout)
-                potFlowLayer(layout)
+                // potFlowLayer removed — the pot stack itself now slides to
+                // the winner via potCluster's AwardingPotStack. Keeping the
+                // old separate flying-chip layer would double up animations.
                 winningHandBanner(layout)
 
                 // ── Seat overlay
@@ -167,7 +321,11 @@ struct PokerTableView: View {
             }
             .animation(.easeInOut(duration: 0.3), value: vm.gameState?.communityCards.count)
             .animation(.easeInOut(duration: 0.3), value: vm.gameState?.totalPot)
-            .animation(.spring(response: 0.5, dampingFraction: 0.82), value: betsSignature)
+            // Slightly slower spring with lighter damping = chips have
+            // "weight" as they migrate to the pot. Response 0.65 gives a
+            // ~0.65s arc; damping 0.78 lets the pot stack do a tiny settle
+            // overshoot when it scales in, which reads as chips landing.
+            .animation(.spring(response: 0.65, dampingFraction: 0.78), value: betsSignature)
             .confirmationDialog(
                 "Open Seat",
                 isPresented: $showOpenSeatSheet,
@@ -210,27 +368,78 @@ struct PokerTableView: View {
         let outerH  = l.tableHeight + rw * 2
         let outerCR = cr + rw
 
+        let tr = l.topRatio
+
+        // Underside skirt — visible "edge thickness" of the table viewed
+        // from above-front. Drawn behind the rail; bottom band peeks out
+        // below the rail's lower curve. Because the trapezoid is wider at
+        // the bottom, the skirt's silhouette also widens down — and because
+        // the offset is purely vertical, the top of the skirt is fully
+        // hidden by the rail (skirt has zero thickness up there). The
+        // result is a natural "thicker at bottom, thinning to nothing at
+        // the top" appearance with no per-side computed offsets needed.
+        let skirtDrop: CGFloat = 14
+
         return ZStack {
-            // 1. Cast shadow on the floor — soft, slightly offset down
-            RoundedRectangle(cornerRadius: outerCR)
+            // 1. Cast shadow on the floor — soft, slightly offset down. Uses
+            //    the trapezoid shape so the floor-shadow silhouette tracks
+            //    the felt instead of betraying a rectangular underlay.
+            //    Pushed a touch further down to clear the new skirt so the
+            //    skirt reads as solid table edge, not as part of the shadow.
+            TablePerspectiveShape(topRatio: tr)
                 .fill(Color.black.opacity(0.55))
                 .frame(width: outerW + 28, height: outerH + 28)
                 .blur(radius: 26)
-                .offset(y: 18)
+                .offset(y: 18 + skirtDrop)
+                .allowsHitTesting(false)
+
+            // 1b. Underside skirt. Dark wood/leather band that gives the
+            //     table apparent thickness. Top-to-bottom gradient: deepest
+            //     at the top (recessed under the rail), warmed slightly at
+            //     the bottom (catches indirect light from below). A faint
+            //     highlight stroke at the very bottom edge sells the front
+            //     lip of the table — tiny detail, big perceptual lift.
+            TablePerspectiveShape(topRatio: tr)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#0A0502"),
+                            Color(hex: "#1B0F06"),
+                            Color(hex: "#241408"),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(width: outerW, height: outerH)
+                .overlay(
+                    // Bottom-edge highlight — only the lower portion of this
+                    // stroke is visible (the rest is hidden behind the rail
+                    // once the offset moves the skirt down). Reads as a
+                    // thin lit lip running along the front curve of the
+                    // table.
+                    TablePerspectiveShape(topRatio: tr)
+                        .stroke(Color(hex: "#5A3C20").opacity(0.55), lineWidth: 1)
+                        .frame(width: outerW, height: outerH)
+                )
+                .offset(y: skirtDrop)
                 .allowsHitTesting(false)
 
             // 2. Padded leather rail
-            railLayer(outerW: outerW, outerH: outerH, outerCR: outerCR)
+            railLayer(outerW: outerW, outerH: outerH, outerCR: outerCR, topRatio: tr)
 
-            // 3a. Inner bevel — bright top edge / dark bottom edge sells the
-            //     felt as recessed below the padded rail
-            RoundedRectangle(cornerRadius: cr + 2)
-                .strokeBorder(
+            // 3a. Inner bevel — DARK top edge / bright bottom edge. Same
+            //     reversal as the rail: with the table tilted back, the far
+            //     side of the bevel is in shadow under the rail, while the
+            //     near side catches a hint of light spilling off the felt.
+            //     Old top-bright bevel reinforced the "raised flap" look at
+            //     the top of the table.
+            TablePerspectiveShape(topRatio: tr)
+                .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.18),
-                            Color.white.opacity(0.04),
                             Color.black.opacity(0.55),
+                            Color.black.opacity(0.18),
+                            Color.white.opacity(0.16),
                         ],
                         startPoint: .top, endPoint: .bottom
                     ),
@@ -240,20 +449,48 @@ struct PokerTableView: View {
                 .allowsHitTesting(false)
 
             // 3b. Saddle stitching where rail meets felt
-            RoundedRectangle(cornerRadius: cr + 1)
-                .strokeBorder(
+            TablePerspectiveShape(topRatio: tr)
+                .stroke(
                     Color(hex: "#C9A574").opacity(0.32),
                     style: StrokeStyle(lineWidth: 0.6, dash: [3, 2.5])
                 )
                 .frame(width: l.tableWidth + 2, height: l.tableHeight + 2)
                 .allowsHitTesting(false)
 
+            // 3c. Inner rim gleam — warm highlight right at the felt/rail
+            //     boundary, top-biased. Required because the rail's top
+            //     depth fade darkens the far edge so much that the rail
+            //     visually "dissolves" into the felt up there. This thin
+            //     stroke re-anchors the boundary at the top without
+            //     fighting the perspective gradient: peak opacity at the
+            //     top (where the rail is otherwise lost), fading to nearly
+            //     nothing at the bottom (where the rail's bottom highlight
+            //     already defines the edge). Tan/copper tone reads as a
+            //     leather lip catching ambient light, not a hard outline.
+            TablePerspectiveShape(topRatio: tr)
+                .stroke(
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color(hex: "#8A6038").opacity(0.65), location: 0.00),
+                            .init(color: Color(hex: "#8A6038").opacity(0.30), location: 0.35),
+                            .init(color: Color(hex: "#8A6038").opacity(0.08), location: 0.70),
+                            .init(color: Color.clear,                          location: 1.00),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    ),
+                    lineWidth: 1.2
+                )
+                .frame(width: l.tableWidth + 1, height: l.tableHeight + 1)
+                .allowsHitTesting(false)
+
             // 4. Felt surface (gradient + cloth texture + sheen + vignette)
             feltSurface(l, cr: cr)
 
-            // 5. Inset betting line — the guide curve where action chips land
-            RoundedRectangle(cornerRadius: max(0, cr - 30))
-                .strokeBorder(Color.white.opacity(0.085), lineWidth: 1)
+            // 5. Inset betting line — the guide curve where action chips land.
+            //    Same trapezoidal silhouette, just inset 30pt on each axis so
+            //    it nests inside the felt rim.
+            TablePerspectiveShape(topRatio: tr)
+                .stroke(Color.white.opacity(0.085), lineWidth: 1)
                 .frame(width: l.tableWidth - 60, height: l.tableHeight - 60)
                 .allowsHitTesting(false)
         }
@@ -262,46 +499,80 @@ struct PokerTableView: View {
 
     // ── Rail (padded leather) ────────────────────────────────────────────────
 
-    private func railLayer(outerW: CGFloat, outerH: CGFloat, outerCR: CGFloat) -> some View {
+    private func railLayer(outerW: CGFloat,
+                           outerH: CGFloat,
+                           outerCR: CGFloat,
+                           topRatio: CGFloat) -> some View {
         ZStack {
-            // Base leather — top-lit gradient (warm umber → near-black)
-            RoundedRectangle(cornerRadius: outerCR)
+            // Base leather — DARK at top (far end, foreshortened, in shadow),
+            // warmer/lighter at the bottom (near end, catches lamp light off
+            // the felt). Old gradient ran the opposite way, which painted the
+            // far rim brighter than the near rim and made the top of the
+            // table read as a "flap" sitting *above* the felt instead of
+            // receding away from the viewer.
+            TablePerspectiveShape(topRatio: topRatio)
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(hex: "#3A2616"),
-                            Color(hex: "#231408"),
-                            Color(hex: "#0C0703"),
+                            Color(hex: "#0A0502"),
+                            Color(hex: "#1A0F06"),
+                            Color(hex: "#352213"),
                         ],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
                 .frame(width: outerW, height: outerH)
 
-            // Top sheen — light hitting from above, fades by the felt line
-            RoundedRectangle(cornerRadius: outerCR)
+            // Bottom highlight — light grazing the front lip of the rail
+            // (closest to the viewer). Bottom-up gradient inverts what used
+            // to be a top-down "sheen" — the highlight now lives where the
+            // light source would actually hit on a tilted-back table, not on
+            // the recessed far edge. Greatly reduced opacity vs. the old top
+            // sheen so it reads as a subtle gleam, not a polished band.
+            TablePerspectiveShape(topRatio: topRatio)
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.22),
-                            Color.white.opacity(0.06),
                             Color.clear,
+                            Color.white.opacity(0.03),
+                            Color.white.opacity(0.12),
                         ],
-                        startPoint: .top,
-                        endPoint: UnitPoint(x: 0.5, y: 0.42)
+                        startPoint: UnitPoint(x: 0.5, y: 0.55),
+                        endPoint:   .bottom
                     )
                 )
                 .frame(width: outerW, height: outerH)
                 .blendMode(.plusLighter)
 
-            // Outer rail edge — bright top, dark bottom for roundness
-            RoundedRectangle(cornerRadius: outerCR)
-                .strokeBorder(
+            // Top depth fade — explicit darkening of the top third of the
+            // rail. Pushes the far end into noticeable shadow so the eye
+            // reads it as "further away" rather than "thicker." Falls off
+            // to clear by the rail's vertical midpoint, leaving the bottom
+            // half untouched.
+            TablePerspectiveShape(topRatio: topRatio)
+                .fill(
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.black.opacity(0.55), location: 0.00),
+                            .init(color: Color.black.opacity(0.22), location: 0.30),
+                            .init(color: Color.clear,               location: 0.55),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(width: outerW, height: outerH)
+
+            // Outer rail edge — dim at top (in shadow with the rail), bright
+            // at bottom (catches the front-lip highlight). Mirrors the
+            // gradient direction of the base leather so the silhouette stays
+            // consistent under the new lighting.
+            TablePerspectiveShape(topRatio: topRatio)
+                .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.24),
-                            Color.white.opacity(0.05),
-                            Color.black.opacity(0.45),
+                            Color.black.opacity(0.55),
+                            Color.black.opacity(0.20),
+                            Color.white.opacity(0.18),
                         ],
                         startPoint: .top, endPoint: .bottom
                     ),
@@ -315,58 +586,112 @@ struct PokerTableView: View {
     // ── Felt surface ─────────────────────────────────────────────────────────
 
     private func feltSurface(_ l: TableLayout, cr: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: cr)
+        let tr = l.topRatio
+
+        return TablePerspectiveShape(topRatio: tr)
             .fill(
+                // Sharper center-to-edge gradient than before. Tighter inner
+                // radius keeps the bright "spotlight" smaller, and pushing
+                // through `theme.edge` at the perimeter sells the bowl shape
+                // — a flat surface wouldn't have this much contrast.
                 RadialGradient(
                     colors: [
                         Color(hex: theme.inner),
                         Color(hex: theme.mid),
                         Color(hex: theme.edge),
                     ],
-                    center: UnitPoint(x: 0.5, y: 0.45),
-                    startRadius: l.tableWidth * 0.05,
-                    endRadius: l.tableWidth * 0.65
+                    center: UnitPoint(x: 0.5, y: 0.42),
+                    startRadius: l.tableWidth * 0.03,
+                    endRadius: l.tableWidth * 0.72
                 )
             )
             .frame(width: l.tableWidth, height: l.tableHeight)
             .overlay(
-                // Cloth weave — fine speckle clipped to felt shape
+                // Cloth weave — fine speckle clipped to felt shape.
+                // Reduced opacity inline (in FeltTexture) means it doesn't
+                // muddy the new lighting layers.
                 FeltTexture()
                     .frame(width: l.tableWidth, height: l.tableHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: cr))
+                    .clipShape(TablePerspectiveShape(topRatio: tr))
                     .allowsHitTesting(false)
             )
             .overlay(
                 ZStack {
-                    // Top sheen — slight dome highlight
-                    RoundedRectangle(cornerRadius: cr)
+                    // ── Directional top-down lighting ────────────────────
+                    // Light from the upper-front. Brighter band across the
+                    // top third, then a subtle dim across the bottom. This
+                    // is what makes the felt look slightly *domed* rather
+                    // than perfectly flat.
+                    TablePerspectiveShape(topRatio: tr)
                         .fill(
                             LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.10),
-                                    Color.white.opacity(0.02),
-                                    Color.clear,
+                                stops: [
+                                    .init(color: Color.white.opacity(0.14),  location: 0.00),
+                                    .init(color: Color.white.opacity(0.04),  location: 0.35),
+                                    .init(color: Color.clear,                location: 0.55),
+                                    .init(color: Color.black.opacity(0.10),  location: 1.00),
                                 ],
                                 startPoint: .top,
-                                endPoint: .center
+                                endPoint:   .bottom
                             )
                         )
                         .frame(width: l.tableWidth, height: l.tableHeight)
                         .blendMode(.plusLighter)
 
-                    // Vignette toward edges — pushes attention to center
-                    RoundedRectangle(cornerRadius: cr)
+                    // ── Stronger center-to-edge vignette ─────────────────
+                    // Was 0.22 max → now 0.42. Combined with the sharper base
+                    // gradient, the felt now has clear depth: bright concave
+                    // center, dark recessed perimeter. Pushes attention to
+                    // the community cards / pot.
+                    TablePerspectiveShape(topRatio: tr)
                         .fill(
                             RadialGradient(
-                                colors: [Color.clear, Color.black.opacity(0.22)],
+                                colors: [Color.clear, Color.black.opacity(0.42)],
                                 center: .center,
-                                startRadius: l.tableWidth * 0.30,
-                                endRadius: l.tableWidth * 0.62
+                                startRadius: l.tableWidth * 0.28,
+                                endRadius: l.tableWidth * 0.66
+                            )
+                        )
+                        .frame(width: l.tableWidth, height: l.tableHeight)
+
+                    // ── Inner shadow at the rim (recessed felt) ──────────
+                    // Drawn as a thick stroke just inside the felt edge,
+                    // blurred so it fades softly toward the center. This is
+                    // the single most impactful 3D cue: the felt now reads
+                    // as *sunken below* the leather rail rather than sitting
+                    // flat at the same plane. Roughly mimics the inner-
+                    // shadow effect from CSS / Figma without needing a
+                    // bespoke shader.
+                    TablePerspectiveShape(topRatio: tr)
+                        .stroke(Color.black.opacity(0.65), lineWidth: 14)
+                        .blur(radius: 10)
+                        .frame(width: l.tableWidth, height: l.tableHeight)
+                        .mask(
+                            // Mask keeps the shadow only inside the felt
+                            // trapezoid — without this, the blurred stroke
+                            // would bleed onto the rail.
+                            TablePerspectiveShape(topRatio: tr)
+                                .frame(width: l.tableWidth, height: l.tableHeight)
+                        )
+
+                    // ── Subtle bottom contact shadow ─────────────────────
+                    // The lower edge of the felt sits in a touch more
+                    // shadow than the top, mimicking a light source above.
+                    // Helps the 3D shape feel anchored to a "down" axis.
+                    TablePerspectiveShape(topRatio: tr)
+                        .fill(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: Color.clear,               location: 0.65),
+                                    .init(color: Color.black.opacity(0.18), location: 1.00),
+                                ],
+                                startPoint: .top,
+                                endPoint:   .bottom
                             )
                         )
                         .frame(width: l.tableWidth, height: l.tableHeight)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: cr))
+                .clipShape(TablePerspectiveShape(topRatio: tr))
                 .allowsHitTesting(false)
             )
     }
@@ -383,13 +708,67 @@ struct PokerTableView: View {
 
     // ─── Pot cluster ─────────────────────────────────────────────────────────
 
+    // The pot stack should only show chips that have *physically been
+    // collected* into the middle — i.e. chips from completed streets, not
+    // chips currently sitting in front of seats as live bets. Without this
+    // gate, the pot double-counts: bet badges show chips in front of each
+    // seat AND those same chips appear in the middle pot, which is wrong
+    // (e.g. preflop with just SB+BB posted there should be NO chips in the
+    // middle, since the betting round hasn't ended yet).
+    //
+    // Collected = totalPot − sum(betThisStreet). Once a street completes
+    // the engine resets every seat's betThisStreet to 0, at which point
+    // the bet badges remove (their `.transition` flies them to the pot
+    // center) and `collected` jumps to the new total — the visual is the
+    // chips physically migrating from in front of each seat into the
+    // middle stack, which is exactly how a live dealer collects.
     @ViewBuilder
     private func potCluster(_ l: TableLayout) -> some View {
-        if let state = vm.gameState, state.totalPot > 0 {
-            PotChipStack(amount: state.totalPot)
-                .position(x: l.potCenter.x, y: l.potCenter.y)
-                .transition(.scale(scale: 0.7).combined(with: .opacity))
-                .id(ChipTier.forAmount(state.totalPot))
+        if let state = vm.gameState {
+            let onTable   = seats.reduce(0) { $0 + $1.betThisStreet }
+            let collected = max(0, state.totalPot - onTable)
+            let winners   = state.winners ?? []
+
+            if !winners.isEmpty {
+                // Hand resolved — slide the actual pot stack toward each
+                // winner. Replaces the old "static pot in middle + separate
+                // flying chip" pattern, which read as two simultaneous
+                // animations playing past each other. Now the pot itself
+                // moves: the chips you've been watching collect in the
+                // middle physically migrate to the winner's seat, then fade
+                // as they're "absorbed" into the winner's stack.
+                //
+                // For split pots we render one stack per winner, each with
+                // its own share. They slide independently to their seats.
+                let positions = l.seatPositions(count: maxSeats)
+                ForEach(winners, id: \.playerId) { winner in
+                    if let idx = seats.firstIndex(where: { $0.userId == winner.playerId }),
+                       idx < positions.count {
+                        AwardingPotStack(
+                            amount: winner.amount,
+                            from:   l.potCenter,
+                            to:     positions[idx]
+                        )
+                    }
+                }
+            } else if collected > 0 {
+                PotChipStack(amount: collected)
+                    // Tilt before .position so each chip stack tilts around
+                    // its own center, not the felt center.
+                    .tableSurfaceTilt()
+                    .position(x: l.potCenter.x, y: l.potCenter.y)
+                    // Removal is .identity (instant) instead of a scale-fade
+                    // because at hand-end this view is replaced by the
+                    // AwardingPotStack at the same position — overlapping
+                    // a fading copy with the new sliding copy would render
+                    // two stacks for ~0.3s. Instant swap = continuous look:
+                    // user sees the same chip stack pop into "moving" mode.
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.7).combined(with: .opacity),
+                        removal:   .identity
+                    ))
+                    .id(ChipTier.forAmount(collected))
+            }
         }
     }
 
@@ -412,53 +791,58 @@ struct PokerTableView: View {
             colored:         true,
             revealableBoard: runOut
         )
+        // Cards lie flat on the felt — tilt them by the felt's full
+        // foreshortening angle. Chips stand vertically on the felt so
+        // the default 26° tilt reads correctly for them, and the same
+        // tilt is applied here so the board sits at the shared surface
+        // angle.
+        .tableSurfaceTilt()
         .position(x: l.boardCenter.x, y: l.boardCenter.y)
     }
 
-    // ─── Game type pill ──────────────────────────────────────────────────────
-
-    private func gamePill(_ l: TableLayout) -> some View {
-        let label = (vm.gameState?.gameType ?? "TEXAS_HOLDEM") == "PLO" ? "PLO" : "NLH"
-        return Text(label)
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(.white.opacity(0.7))
-            .tracking(1.2)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 5)
-            .background(Color.white.opacity(0.08))
-            .clipShape(Capsule())
-            .position(x: l.gamePillCenter.x, y: l.gamePillCenter.y)
-    }
-
-    // ─── Blinds label ────────────────────────────────────────────────────────
-
+    // ─── Combined table info pill (game type · blinds) ──────────────────────
+    // Single low-contrast pill replaces what used to be three separate text
+    // rows (NLH pill / Blinds label / Hosted-by). Game type and blinds are
+    // the only two pieces of info worth surfacing on the felt itself; host
+    // identity already lives in the lobby header. One pill = far less
+    // crowding around the pot/community-card area.
     @ViewBuilder
-    private func blindsLabel(_ l: TableLayout) -> some View {
+    private func tableInfoPill(_ l: TableLayout) -> some View {
         if let state = vm.gameState {
-            Text("Blinds: \(formatChips(String(state.smallBlind)))/\(formatChips(String(state.bigBlind)))")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.35))
-                .position(x: l.blindsCenter.x, y: l.blindsCenter.y)
-        }
-    }
-
-    // ─── "Hosted by" label ───────────────────────────────────────────────────
-
-    private func hostedByLabel(_ l: TableLayout) -> some View {
-        VStack(spacing: 3) {
-            Text("Hosted by")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.25))
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 14, height: 14)
-                Text("StackPoker")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.35))
+            let game = state.gameType == "PLO" ? "PLO" : "NLH"
+            let sb   = formatChips(String(state.smallBlind))
+            let bb   = formatChips(String(state.bigBlind))
+            HStack(spacing: 8) {
+                Text(game)
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .tracking(1.2)
+                    .foregroundStyle(.white.opacity(0.65))
+                // Thin divider keeps the two halves visually distinct
+                // without adding extra pixels of vertical clutter.
+                Rectangle()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: 1, height: 10)
+                Text("\(sb) / \(bb)")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.55))
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.22))
+                    .overlay(
+                        Capsule().strokeBorder(
+                            Color.white.opacity(0.06),
+                            lineWidth: 0.5
+                        )
+                    )
+            )
+            // Sits where the old gamePill was — closest to the pot, far
+            // enough above the watermark to leave breathing room.
+            .position(x: l.gamePillCenter.x, y: l.gamePillCenter.y)
+            .allowsHitTesting(false)
         }
-        .position(x: l.hostedByCenter.x, y: l.hostedByCenter.y)
     }
 
     // ─── Dealer "D" button ───────────────────────────────────────────────────
@@ -479,6 +863,7 @@ struct PokerTableView: View {
                           tint: Color(hex: "#F4ECDC"),
                           textColor: Color(hex: "#1B1B1B"),
                           size: 24)
+                    .tableSurfaceTilt()
                     .position(x: bx, y: by)
             }
         }
@@ -488,26 +873,30 @@ struct PokerTableView: View {
         seats.firstIndex(where: { $0.isDealer })
     }
 
-    // ─── Blind rail chips ────────────────────────────────────────────────────
-    // Render SB / BB as realistic-looking chips on the felt, placed along the
-    // line from each blind seat toward the table center. Same rail ratio as
-    // the dealer button (which sits at a different seat), so all three
-    // markers form a clean concentric ring around the felt.
+    // ─── Blind markers (small ambient icons next to each seat) ──────────────
+    // Previous design parked SB/BB chips out on the felt (rail-ratio 0.30
+    // toward center), which drew the eye and competed with the bet stacks
+    // for attention. New design: tiny muted chip pinned to the LEFT of the
+    // player avatar so the marker is *always* with the player and never on
+    // the action area. The dealer button keeps its rail-line placement
+    // because it visually rotates around the table each hand — it's
+    // information about *where the action is*, not about a specific seat.
     @ViewBuilder
     private func blindRailChips(_ l: TableLayout) -> some View {
         let positions = l.seatPositions(count: maxSeats)
+        let markerSize: CGFloat = 14
+        // Distance from seat center to the marker. Avatar radius +
+        // half-marker + a small gap so the chip kisses the avatar
+        // border without overlapping it.
+        let offset = l.seatAvatarSize / 2 + markerSize / 2 + 4
         ForEach(Array(seats.enumerated()), id: \.element.userId) { idx, seat in
             if idx < positions.count, seat.isSmallBlind || seat.isBigBlind {
                 let seatPt = positions[idx]
-                let dx = l.tableCenter.x - seatPt.x
-                let dy = l.tableCenter.y - seatPt.y
-                // Sit blind markers right in front of the player's seat
-                // (rail ratio 0.30) — not halfway to center where they
-                // would crowd the community cards. The dealer button is
-                // still at 0.50 so the three markers stagger naturally.
-                let bx = seatPt.x + dx * 0.30
-                let by = seatPt.y + dy * 0.30
-                // SB → blue, BB → red. Standard live-poker color coding.
+                // Always to the *screen-left* of the seat, regardless of
+                // where the seat sits around the rim. Keeps the marker
+                // location predictable for the player's eye.
+                let bx = seatPt.x - offset
+                let by = seatPt.y
                 let tint = seat.isSmallBlind
                     ? Color(hex: "#3B7DD8")
                     : Color(hex: "#C9342B")
@@ -515,27 +904,10 @@ struct PokerTableView: View {
                 PokerChip(text: label,
                           tint: tint,
                           textColor: .white,
-                          size: 22)
+                          size: markerSize,
+                          muted: true)
+                    .tableSurfaceTilt()
                     .position(x: bx, y: by)
-            }
-        }
-    }
-
-    // ─── Pot flow layer ──────────────────────────────────────────────────────
-
-    @ViewBuilder
-    private func potFlowLayer(_ l: TableLayout) -> some View {
-        if let winners = vm.gameState?.winners, !winners.isEmpty {
-            let positions = l.seatPositions(count: maxSeats)
-            ForEach(winners, id: \.playerId) { winner in
-                if let idx = seats.firstIndex(where: { $0.userId == winner.playerId }),
-                   idx < positions.count {
-                    PotFlowChip(
-                        from:   l.potCenter,
-                        to:     positions[idx],
-                        amount: winner.amount
-                    )
-                }
             }
         }
     }
@@ -554,10 +926,27 @@ struct PokerTableView: View {
                     let dx = l.potCenter.x - bx
                     let dy = l.potCenter.y - by
                     BetChipBadge(amount: seat.betThisStreet)
+                        // Tilt the chip around its own center BEFORE
+                        // positioning, so the chip's spot on the felt stays
+                        // exactly where the layout placed it. Cards/chips
+                        // would look pasted-on flat without this.
+                        .tableSurfaceTilt()
                         .position(x: bx, y: by)
+                        // Insertion: chip pops up from in front of the seat.
+                        // Removal (street ended): chip translates to potCenter
+                        // AND scales down to 0.45 — visually the chips look
+                        // like they're falling/settling onto the pot stack
+                        // rather than just sliding flat on the felt. The
+                        // opacity fade is part of the same transition so the
+                        // chip dissolves into the pot at arrival, never
+                        // hard-cutting. Spring physics on `betsSignature`
+                        // (see body's `.animation`) gives the motion weight.
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0.35).combined(with: .opacity),
-                            removal: .offset(x: dx, y: dy).combined(with: .opacity)
+                            insertion: .scale(scale: 0.35, anchor: .bottom)
+                                .combined(with: .opacity),
+                            removal: .offset(x: dx, y: dy)
+                                .combined(with: .scale(scale: 0.45, anchor: .center))
+                                .combined(with: .opacity)
                         ))
                 }
             }
@@ -590,10 +979,15 @@ struct PokerTableView: View {
                     .position(x: positions[idx].x, y: positions[idx].y)
                     .zIndex(isWinner ? 20 : (isActive ? 10 : 1))
                 } else {
+                    // Hit area MUST be bounded before .position(). Applying
+                    // .contentShape after .position lets the empty-seat tap
+                    // swallow taps anywhere on the table (because .position
+                    // expands the view to the full parent rect), which is
+                    // why tapping run-out cards was firing the invite sheet.
                     TargetEmptySeat(avatarSize: l.seatAvatarSize)
-                        .position(x: positions[idx].x, y: positions[idx].y)
                         .contentShape(Rectangle())
                         .onTapGesture { showOpenSeatSheet = true }
+                        .position(x: positions[idx].x, y: positions[idx].y)
                 }
             }
         }
@@ -648,6 +1042,13 @@ struct PokerTableView: View {
             )
             .transition(.scale(scale: 0.7).combined(with: .opacity))
             .zIndex(50)
+            // Purely informational text — must not intercept taps. Without
+            // this, the banner's frame overlaps the bottom of the community
+            // board (board at tableHeight*0.12 above center, banner at
+            // tableHeight*0.02 above center) and swallows taps targeted at
+            // the run-out face-down placeholders, which sit on the right
+            // side of the board during a fold-out reveal.
+            .allowsHitTesting(false)
         }
     }
 
@@ -727,6 +1128,12 @@ private struct PokerChip: View {
     let tint:      Color
     let textColor: Color
     var size:      CGFloat = 22
+    // Muted = dimmer, lower-saturation rendering for ambient markers
+    // (small SB/BB indicators that should sit quietly next to a seat).
+    // The detailed chip rendering still applies — we just reduce the
+    // visual weight via opacity + a desaturating overlay so the eye
+    // goes to action chips first.
+    var muted:     Bool   = false
 
     var body: some View {
         ZStack {
@@ -880,46 +1287,65 @@ private struct PokerChip: View {
         }
         .frame(width: size, height: size)
         .compositingGroup()
+        // Muted rendering: pull saturation/contrast down so the chip recedes
+        // visually next to fully-saturated action chips. Implementation note:
+        // .saturation requires iOS 16+, but the project already targets 17+
+        // (see other modifiers throughout this file), so it's safe.
+        .saturation(muted ? 0.55 : 1.0)
+        .opacity(muted ? 0.72 : 1.0)
     }
 }
 
 // ─── Pot Flow Chip ───────────────────────────────────────────────────────────
 
-private struct PotFlowChip: View {
+// ─── Awarding pot stack ──────────────────────────────────────────────────────
+// Replaces the old PotFlowChip "+amount" capsule. When a hand resolves, the
+// actual pot stack mounted at potCenter is replaced (in `potCluster`) by one
+// AwardingPotStack per winner. Each stack:
+//
+//   1. Renders at potCenter on first frame (so the visual is continuous from
+//      the static pot — the user sees the same chip stack they were watching
+//      "decide" to move).
+//   2. Spring-slides to the winner's seat. Spring physics give the slide
+//      "weight"; ease-in-out alone reads as a UI tween rather than chips
+//      being raked across the felt.
+//   3. Fades to zero on arrival, simulating the chips being absorbed into
+//      the winner's stack.
+//
+// All three timings (slide duration, fade delay, fade duration) are tuned so
+// the fade *starts* roughly when the slide reaches the seat — not before
+// (would look like the stack disintegrates mid-flight) and not after (would
+// look like the stack hovers awkwardly over the avatar before disappearing).
+private struct AwardingPotStack: View {
+    let amount: Int
     let from:   CGPoint
     let to:     CGPoint
-    let amount: Int
 
-    @State private var progress: CGFloat = 0
-    @State private var opacity:  Double = 0
-
-    private var currentPos: CGPoint {
-        CGPoint(
-            x: from.x + (to.x - from.x) * progress,
-            y: from.y + (to.y - from.y) * progress
-        )
-    }
+    @State private var arrived = false
+    @State private var faded   = false
 
     var body: some View {
-        HStack(spacing: 4) {
-            pokerChipIcon(diameter: 14, amount: amount)
-            Text("+\(formatChips(String(amount)))")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color(hex: "#F5C842"))
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Color.black.opacity(0.6))
-        .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Color(hex: "#F5C842").opacity(0.6), lineWidth: 1))
-        .shadow(color: Color(hex: "#F5C842").opacity(0.5), radius: 6)
-        .position(currentPos)
-        .opacity(opacity)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.15)) { opacity = 1 }
-            withAnimation(.easeInOut(duration: 0.75).delay(0.1)) { progress = 1 }
-            withAnimation(.easeIn(duration: 0.25).delay(0.65)) { opacity = 0 }
-        }
+        PotChipStack(amount: amount)
+            // Same tilt as the static pot — keeps visual continuity at the
+            // moment of swap (no sudden flatten or rotate during transition).
+            .tableSurfaceTilt()
+            .position(arrived ? to : from)
+            .opacity(faded ? 0 : 1)
+            .onAppear {
+                // Slide: spring with moderate response and damping ~0.85 so
+                // the stack settles cleanly at the winner's seat without an
+                // overshoot bounce (overshooting reads as cartoonish).
+                withAnimation(.spring(response: 0.65, dampingFraction: 0.85)) {
+                    arrived = true
+                }
+                // Fade kicks in just before the slide finishes settling, so
+                // the chips appear to *arrive and dissolve* into the player's
+                // stack rather than hovering then blinking out. Delay is the
+                // spring's effective travel time.
+                withAnimation(.easeOut(duration: 0.30).delay(0.55)) {
+                    faded = true
+                }
+            }
     }
 }
 
@@ -946,35 +1372,63 @@ private struct BetChipBadge: View {
         }
     }
 
-    private let chipDiameter: CGFloat = 14
-    private let stackStep:    CGFloat = 3   // y-offset between stacked chips
+    // Bumped from 14 → 18 so the detailed chip rendering (edge spots,
+    // gloss arc, inner rings) actually reads at this size. Step grows
+    // proportionally so taller stacks still look like real chip stacks.
+    private let chipDiameter: CGFloat = 18
+    private let stackStep:    CGFloat = 4
+
+    // Tint pulled from the same ChipTier the pot uses, so action chips
+    // visually match the pot in front of you (a 5K bet looks the same
+    // color as the chips already in the pot at 5K).
+    private var tint: Color {
+        ChipTier.forAmount(amount).colors.primary
+    }
 
     var body: some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 4) {
             ZStack(alignment: .bottom) {
                 // Base shadow under the stack to anchor it to the felt.
                 Ellipse()
-                    .fill(Color.black.opacity(0.35))
-                    .frame(width: chipDiameter * 1.1, height: 3)
-                    .offset(y: 1)
+                    .fill(Color.black.opacity(0.40))
+                    .frame(width: chipDiameter * 1.15, height: 4)
+                    .offset(y: 2)
+                    .blur(radius: 0.6)
 
                 ForEach(0..<chipCount, id: \.self) { i in
-                    pokerChipIcon(diameter: chipDiameter, amount: amount)
-                        // Stack up from the bottom; topmost chip is the
-                        // "face" of the bet.
-                        .offset(y: -CGFloat(i) * stackStep)
+                    // Use the detailed PokerChip rendering (edge spots, gloss,
+                    // dome shading) instead of the simple gradient icon. No
+                    // center label — bet stacks read as anonymous chips and
+                    // get their amount from the pill below.
+                    PokerChip(
+                        text: "",
+                        tint: tint,
+                        textColor: .white,
+                        size: chipDiameter
+                    )
+                    .offset(y: -CGFloat(i) * stackStep)
                 }
             }
-            // Height accounts for stacked chips so text sits below the stack
             .frame(height: chipDiameter + CGFloat(chipCount - 1) * stackStep)
 
+            // Larger, bolder amount pill so the bet size is the dominant
+            // signal — outweighs the SB/BB markers and matches the pot pill
+            // visual weight. 10pt → 13pt, slightly bigger horizontal pad.
             Text(formatChips(String(amount)))
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1)
-                .background(Color.black.opacity(0.55))
-                .clipShape(Capsule())
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.65))
+                        .overlay(
+                            Capsule().strokeBorder(
+                                Color.white.opacity(0.10),
+                                lineWidth: 0.5
+                            )
+                        )
+                )
                 .contentTransition(.numericText())
         }
     }
@@ -1001,38 +1455,39 @@ private struct PotChipStack: View {
         }
     }
 
-    private let chipDiameter: CGFloat = 22
-    private let stackStep:    CGFloat = 4
+    private let chipDiameter: CGFloat = 24
+    private let stackStep:    CGFloat = 5
+
+    // Tint = the same ChipTier used by the bet stacks. As bets feed the
+    // pot, a 5K pot's chips look identical to the 5K chips that just
+    // arrived — visually reinforces "those chips are now this stack".
+    private var tint: Color {
+        ChipTier.forAmount(amount).colors.primary
+    }
 
     var body: some View {
         VStack(spacing: 4) {
             ZStack(alignment: .bottom) {
                 // Cast shadow under the stack.
                 Ellipse()
-                    .fill(Color.black.opacity(0.45))
-                    .frame(width: chipDiameter * 1.2, height: 5)
+                    .fill(Color.black.opacity(0.50))
+                    .frame(width: chipDiameter * 1.25, height: 6)
                     .offset(y: 2)
-                    .blur(radius: 1)
+                    .blur(radius: 1.2)
 
+                // Detailed PokerChip rendering — same chip the BetChipBadge
+                // uses, so the pot reads as "the same chips, just stacked
+                // higher". The top-chip highlight overlay we used to add by
+                // hand is redundant: PokerChip already has its own gloss
+                // arc + dome shading on every chip.
                 ForEach(0..<chipCount, id: \.self) { i in
-                    pokerChipIcon(diameter: chipDiameter, amount: amount)
-                        .offset(y: -CGFloat(i) * stackStep)
-                        // Top chip catches a slight highlight to sell the
-                        // 3D illusion without doing actual 3D.
-                        .overlay(
-                            i == chipCount - 1
-                                ? Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.white.opacity(0.15), .clear],
-                                            startPoint: .top, endPoint: .center
-                                        )
-                                    )
-                                    .frame(width: chipDiameter, height: chipDiameter)
-                                    .offset(y: -CGFloat(i) * stackStep)
-                                    .allowsHitTesting(false)
-                                : nil
-                        )
+                    PokerChip(
+                        text: "",
+                        tint: tint,
+                        textColor: .white,
+                        size: chipDiameter
+                    )
+                    .offset(y: -CGFloat(i) * stackStep)
                 }
             }
             .frame(height: chipDiameter + CGFloat(chipCount - 1) * stackStep + 4)
@@ -1231,6 +1686,11 @@ struct TargetSeatView: View {
                         winningCardIds:     winningCardIds,
                         partialReveals:     seat.revealed
                     )
+                    // Tilt the cluster so the small face-down cards lie on
+                    // the felt at the same angle as the community board.
+                    // Applied before .offset so the card tilts in place
+                    // rather than swinging the whole cluster off the avatar.
+                    .tableSurfaceTilt()
                     .offset(x: -avatarSize * 0.52, y: -avatarSize * 0.15)
                     .zIndex(8)
                 }
