@@ -25,58 +25,69 @@ struct SPButton: View {
     }
 
     var body: some View {
+        // Retro comic button: hard ink offset shadow behind a color
+        // capsule, ink panel border, AmericanTypewriter-Bold label. Same
+        // language as the lobby's JOIN! CTA, the +15s burst, and the
+        // action-bar pill row. ScaleButtonStyle still drives the press
+        // micro-scale; the offset shadow stays static (the comic-page
+        // shadow shouldn't slide around per press — that's a Material
+        // ripple idiom).
         Button(action: action) {
-            HStack(spacing: SPSpacing.sm) {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(foregroundColor)
-                        .scaleEffect(0.8)
-                } else if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
+            ZStack {
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.ink)
+                    .offset(x: 2, y: 3)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(backgroundColor)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .strokeBorder(SPRetro.ink, lineWidth: 2)
+
+                HStack(spacing: SPSpacing.sm) {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(foregroundColor)
+                            .scaleEffect(0.8)
+                    } else if let icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    Text(title)
+                        .font(.custom("AmericanTypewriter-Bold", size: 16))
+                        .tracking(0.6)
                 }
-                Text(title)
-                    .font(SPFonts.headline(16))
+                .foregroundStyle(foregroundColor)
             }
-            .foregroundStyle(foregroundColor)
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .background(backgroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-            .overlay(
-                RoundedRectangle(cornerRadius: SPRadius.md)
-                    .strokeBorder(borderColor, lineWidth: style == .secondary || style == .ghost ? 1 : 0)
-            )
-            .opacity(isDisabled || isLoading ? 0.5 : 1)
+            .opacity(isDisabled || isLoading ? 0.55 : 1)
         }
         .disabled(isDisabled || isLoading)
         .buttonStyle(ScaleButtonStyle())
     }
 
+    /// Foreground color paired with each retro background. Mustard /
+    /// paperShade get ink text for contrast on the cream tones; maroon
+    /// (danger) and the transparent ghost-on-paper get paper / ink
+    /// respectively so the label always reads against the page.
     private var foregroundColor: Color {
         switch style {
-        case .primary:   return .white
-        case .secondary: return SPColors.textPrimary
-        case .ghost:     return SPColors.accent
-        case .danger:    return .white
+        case .primary:   return SPRetro.ink
+        case .secondary: return SPRetro.ink
+        case .ghost:     return SPRetro.ink
+        case .danger:    return SPRetro.paper
         }
     }
 
+    /// Retro fill: mustard (primary), paperShade (secondary), paper
+    /// (ghost — same tone as the page, leaning on the ink border to
+    /// define the shape), maroon (danger).
     private var backgroundColor: Color {
         switch style {
-        case .primary:   return SPColors.accent
-        case .secondary: return SPColors.surfaceElevated
-        case .ghost:     return .clear
-        case .danger:    return SPColors.danger
-        }
-    }
-
-    private var borderColor: Color {
-        switch style {
-        case .secondary: return SPColors.border
-        case .ghost:     return SPColors.accent.opacity(0.4)
-        default:         return .clear
+        case .primary:   return SPRetro.mustard
+        case .secondary: return SPRetro.paperShade
+        case .ghost:     return SPRetro.paper
+        case .danger:    return SPRetro.maroon
         }
     }
 }
@@ -107,27 +118,45 @@ struct SPTextField: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
+        // Retro form field: paperShade fill, ink panel border that
+        // thickens on focus (2pt → 1pt unfocused), AmericanTypewriter
+        // body text. Reads as a printed line on the form rather than a
+        // glossy Material text box. Icon tint flips ink (focused) / ink-
+        // soft (idle) so the focus state is visible without color shift.
         HStack(spacing: SPSpacing.sm) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 15))
-                    .foregroundStyle(isFocused ? SPColors.accent : SPColors.textTertiary)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isFocused
+                                     ? SPRetro.ink
+                                     : SPRetro.inkMuted)
                     .frame(width: 20)
                     .animation(.easeInOut(duration: 0.2), value: isFocused)
             }
 
+            // Use the `prompt:` API instead of the implicit-placeholder
+            // initializer so the placeholder string inherits both the
+            // custom AmericanTypewriter font and an ink-soft brown
+            // foreground. SwiftUI's default placeholder rendering uses
+            // a system-gray on the system font, which on the paperShade
+            // background reads as a different typeface and washes out
+            // for readability.
+            let prompt = Text(placeholder)
+                .font(.custom("AmericanTypewriter", size: 15))
+                .foregroundColor(SPRetro.inkMuted.opacity(0.75))
+
             Group {
                 if isSecure && !showPassword {
-                    SecureField(placeholder, text: $text)
+                    SecureField("", text: $text, prompt: prompt)
                 } else {
-                    TextField(placeholder, text: $text)
+                    TextField("", text: $text, prompt: prompt)
                         .keyboardType(keyboardType)
                         .autocorrectionDisabled(!autocorrect)
                         .textInputAutocapitalization(autocapitalization)
                 }
             }
-            .font(SPFonts.body())
-            .foregroundStyle(SPColors.textPrimary)
+            .font(.custom("AmericanTypewriter", size: 15))
+            .foregroundStyle(SPRetro.ink)
             .focused($isFocused)
 
             if let suffix { suffix }
@@ -136,20 +165,20 @@ struct SPTextField: View {
                 Button(action: { showPassword.toggle() }) {
                     Image(systemName: showPassword ? "eye.slash" : "eye")
                         .font(.system(size: 14))
-                        .foregroundStyle(SPColors.textTertiary)
+                        .foregroundStyle(SPRetro.inkMuted)
                 }
             }
         }
         .padding(.horizontal, SPSpacing.md)
         .frame(height: 52)
-        .background(SPColors.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-        .overlay(
-            RoundedRectangle(cornerRadius: SPRadius.md)
-                .strokeBorder(
-                    isFocused ? SPColors.accent.opacity(0.6) : SPColors.border,
-                    lineWidth: 1
-                )
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.paperShade)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .strokeBorder(SPRetro.ink,
+                                  lineWidth: isFocused ? 2 : 1.2)
+            }
         )
         .animation(.easeInOut(duration: 0.2), value: isFocused)
     }
@@ -195,22 +224,30 @@ struct ErrorBanner: View {
     let message: String
 
     var body: some View {
+        // Retro error pill: maroon panel with paper text, ink border and
+        // a hard ink offset shadow. Reads as a stamped warning sticker
+        // rather than a Material toast.
         HStack(spacing: SPSpacing.sm) {
             Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(SPColors.danger)
-                .font(.system(size: 14))
+                .foregroundStyle(SPRetro.paper)
+                .font(.system(size: 14, weight: .bold))
             Text(message)
-                .font(SPFonts.caption())
-                .foregroundStyle(SPColors.danger)
+                .font(.custom("AmericanTypewriter-Bold", size: 13))
+                .foregroundStyle(SPRetro.paper)
                 .multilineTextAlignment(.leading)
             Spacer()
         }
         .padding(SPSpacing.md)
-        .background(SPColors.danger.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: SPRadius.sm))
-        .overlay(
-            RoundedRectangle(cornerRadius: SPRadius.sm)
-                .strokeBorder(SPColors.danger.opacity(0.3), lineWidth: 1)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: SPRadius.sm)
+                    .fill(SPRetro.ink)
+                    .offset(x: 1.5, y: 2.5)
+                RoundedRectangle(cornerRadius: SPRadius.sm)
+                    .fill(SPRetro.maroon)
+                RoundedRectangle(cornerRadius: SPRadius.sm)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+            }
         )
         .transition(.move(edge: .top).combined(with: .opacity))
     }
@@ -222,24 +259,33 @@ struct ToastView: View {
     let message: ToastMessage
 
     var body: some View {
+        // Retro toast: paper pill with ink border + hard ink offset shadow,
+        // AmericanTypewriter-Bold body. Drops the .ultraThinMaterial blur
+        // (which read as a glass HUD) and the blurred black shadow in
+        // favor of the comic-page ink stamp vocab used elsewhere.
         VStack {
             HStack(spacing: SPSpacing.sm) {
                 Image(systemName: iconName)
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(iconColor)
                 Text(message.text)
-                    .font(SPFonts.caption(13))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 13))
+                    .foregroundStyle(SPRetro.ink)
                     .multilineTextAlignment(.leading)
             }
             .padding(.horizontal, SPSpacing.md)
             .padding(.vertical, SPSpacing.sm + 4)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: SPRadius.full))
-            .overlay(
-                RoundedRectangle(cornerRadius: SPRadius.full)
-                    .strokeBorder(SPColors.border, lineWidth: 0.5)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: SPRadius.full)
+                        .fill(SPRetro.ink)
+                        .offset(x: 1.5, y: 2.5)
+                    RoundedRectangle(cornerRadius: SPRadius.full)
+                        .fill(SPRetro.paper)
+                    RoundedRectangle(cornerRadius: SPRadius.full)
+                        .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                }
             )
-            .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
             .padding(.top, 60)
             Spacer()
         }
@@ -254,12 +300,15 @@ struct ToastView: View {
         }
     }
 
+    /// Retro toast icon tints — pop colors keyed to the message style,
+    /// staying inside the cream/ink/pop palette rather than the system
+    /// success/info greens & blues.
     private var iconColor: Color {
         switch message.style {
-        case .info:    return SPColors.info
-        case .success: return SPColors.success
-        case .error:   return SPColors.danger
-        case .warning: return SPColors.warning
+        case .info:    return SPRetro.popBlue // pop blue
+        case .success: return SPRetro.teal // muted teal
+        case .error:   return SPRetro.popRed // pop red
+        case .warning: return SPRetro.mustardDark // accent dark / mustard ink
         }
     }
 }
@@ -273,25 +322,26 @@ struct ChipBadge: View {
     enum ChipSize { case small, medium, large }
 
     var body: some View {
+        // Retro chip-badge: flat mustard disc with ink border + ink "$"
+        // glyph, paired with a ChalkboardSE-Bold amount in accent-dark.
+        // Replaces the rounded-system gradient chip with the same disc
+        // vocab used by the lobby's chip stickers.
         HStack(spacing: size == .small ? 3 : 4) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [SPColors.chipGold, SPColors.chipGoldDark],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: chipSize, height: chipSize)
-                .overlay(
-                    Text("$")
-                        .font(.system(size: chipSize * 0.55, weight: .black, design: .rounded))
-                        .foregroundStyle(SPColors.chipGoldDark)
-                )
+            ZStack {
+                Circle()
+                    .fill(SPRetro.mustard)
+                    .frame(width: chipSize, height: chipSize)
+                Circle()
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                    .frame(width: chipSize, height: chipSize)
+                Text("$")
+                    .font(.custom("ChalkboardSE-Bold", size: chipSize * 0.55))
+                    .foregroundStyle(SPRetro.ink)
+            }
 
             Text(amount)
-                .font(.system(size: fontSize, weight: .bold, design: .rounded))
-                .foregroundStyle(SPColors.chipGold)
+                .font(.custom("ChalkboardSE-Bold", size: fontSize))
+                .foregroundStyle(SPRetro.mustardDark)
         }
     }
 
@@ -319,17 +369,20 @@ struct SPSectionHeader: View {
     var action: (String, () -> Void)?
 
     var body: some View {
+        // Retro section header: AmericanTypewriter-Bold all-caps with
+        // wide tracking in ink-soft — reads like a printed sub-header on
+        // the page. Action label uses accent-dark ink-on-paper.
         HStack {
             Text(title)
-                .font(SPFonts.caption(11))
-                .foregroundStyle(SPColors.textTertiary)
+                .font(.custom("AmericanTypewriter-Bold", size: 11))
+                .foregroundStyle(SPRetro.inkMuted)
                 .textCase(.uppercase)
-                .tracking(1)
+                .tracking(1.5)
             Spacer()
             if let (label, handler) = action {
                 Button(label, action: handler)
-                    .font(SPFonts.caption(12))
-                    .foregroundStyle(SPColors.accent)
+                    .font(.custom("AmericanTypewriter-Bold", size: 12))
+                    .foregroundStyle(SPRetro.mustardDark)
             }
         }
         .padding(.horizontal, SPSpacing.md)
@@ -340,9 +393,11 @@ struct SPSectionHeader: View {
 
 struct SPDivider: View {
     var body: some View {
+        // Retro divider: 1pt ink hairline at 0.4 opacity — reads as a
+        // printed rule on the page rather than a faint Material hairline.
         Rectangle()
-            .fill(SPColors.border)
-            .frame(height: 0.5)
+            .fill(SPRetro.ink.opacity(0.4))
+            .frame(height: 1)
     }
 }
 
@@ -356,12 +411,16 @@ struct SPCard<Content: View>: View {
     }
 
     var body: some View {
+        // Retro card panel: paperShade surface + ink panel border 1.5pt.
+        // Reads as a printed card on the page; intentionally no offset
+        // shadow here so containers can stack without compounding
+        // shadows — call-sites add the offset where the lift is wanted.
         content
-            .background(SPColors.surface)
+            .background(SPRetro.paperShade)
             .clipShape(RoundedRectangle(cornerRadius: SPRadius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: SPRadius.lg)
-                    .strokeBorder(SPColors.border, lineWidth: 0.5)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.5)
             )
     }
 }
@@ -376,19 +435,30 @@ struct AvatarView: View {
     private var avatar: AvatarOption { AvatarOption.find(avatarId) }
 
     var body: some View {
+        // Retro avatar disc: when `showBorder` is true (selection/me
+        // states) we drop a hard ink offset shadow behind the disc and
+        // thicken the ink panel border to 2.5pt — matching the
+        // AvatarGridCell selected state in AvatarPickerSheet and the
+        // PlayerSeatView "me" treatment. Idle keeps a thin 1pt ink
+        // hairline (instead of the prior accent/border opacity) so every
+        // avatar reads as an ink-bordered sticker on the cream page.
         ZStack {
+            if showBorder {
+                Circle()
+                    .fill(SPRetro.ink)
+                    .frame(width: size, height: size)
+                    .offset(x: 1.5, y: 2)
+            }
             Circle()
                 .fill(Color(hex: avatar.color).opacity(0.25))
+                .frame(width: size, height: size)
             Text(avatar.emoji)
                 .font(.system(size: size * 0.55))
+            Circle()
+                .strokeBorder(SPRetro.ink,
+                              lineWidth: showBorder ? 2.5 : 1)
+                .frame(width: size, height: size)
         }
         .frame(width: size, height: size)
-        .overlay(
-            Circle()
-                .strokeBorder(
-                    showBorder ? SPColors.accent : SPColors.border.opacity(0.5),
-                    lineWidth: showBorder ? 2 : 0.5
-                )
-        )
     }
 }

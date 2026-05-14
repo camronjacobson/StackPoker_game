@@ -74,10 +74,23 @@ struct RegisterView: View {
         }
 
             // Navigation buttons
+            //
+            // Force-unwrapping `RegisterStep(rawValue:)` used to crash here
+            // when a fast double-tap on Continue fired the closure twice
+            // before SwiftUI tore down the button on the new step's
+            // re-render: tap #1 advanced 1→2, tap #2 advanced 2→3 → nil →
+            // assertion failure. Optional-binding the result clamps the
+            // edges and turns the second tap into a harmless no-op while
+            // SwiftUI catches up. Same defensive guard for Back even
+            // though it's less likely to misfire.
             HStack(spacing: SPSpacing.sm) {
                 if step.rawValue > 0 {
                     SPButton("Back", style: .secondary) {
-                        withAnimation { step = RegisterStep(rawValue: step.rawValue - 1)! }
+                        withAnimation {
+                            if let prev = RegisterStep(rawValue: step.rawValue - 1) {
+                                step = prev
+                            }
+                        }
                     }
                     .frame(width: 90)
                 }
@@ -85,7 +98,11 @@ struct RegisterView: View {
                 if step.rawValue < RegisterStep.allCases.count - 1 {
                     SPButton("Continue", icon: "arrow.right") {
                         authVM.errorMessage = nil
-                        withAnimation { step = RegisterStep(rawValue: step.rawValue + 1)! }
+                        withAnimation {
+                            if let next = RegisterStep(rawValue: step.rawValue + 1) {
+                                step = next
+                            }
+                        }
                     }
                     .disabled(!canContinue)
                     .opacity(canContinue ? 1 : 0.5)
@@ -94,16 +111,24 @@ struct RegisterView: View {
             .padding(.horizontal, SPSpacing.md)
             .padding(.bottom, SPSpacing.xl)
 
-            // Apple Sign Up option on first step
+            // Apple Sign Up option on first step — retro typographic
+            // divider (ink hairlines + AmericanTypewriter ink-soft label),
+            // matching the LoginView pattern so both screens read as the
+            // same printed form.
             if step == .credentials {
                 VStack(spacing: SPSpacing.sm) {
                     HStack {
-                        Rectangle().fill(SPColors.border).frame(height: 0.5)
+                        Rectangle()
+                            .fill(SPRetro.ink.opacity(0.4))
+                            .frame(height: 1)
                         Text("or sign up with Apple")
-                            .font(SPFonts.caption(12))
-                            .foregroundStyle(SPColors.textTertiary)
+                            .font(.custom("AmericanTypewriter", size: 12))
+                            .tracking(1.0)
+                            .foregroundStyle(SPRetro.inkMuted)
                             .fixedSize()
-                        Rectangle().fill(SPColors.border).frame(height: 0.5)
+                        Rectangle()
+                            .fill(SPRetro.ink.opacity(0.4))
+                            .frame(height: 1)
                     }
                     .padding(.horizontal, SPSpacing.md)
 

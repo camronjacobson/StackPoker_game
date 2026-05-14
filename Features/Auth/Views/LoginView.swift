@@ -41,14 +41,22 @@ struct LoginView: View {
                     Task { await authVM.login() }
                 }
 
-                // Divider with "or"
+                // "or" divider — ink hairlines with an AmericanTypewriter
+                // ink-soft label. Reads as the kind of printed
+                // typographic break used in retro forms rather than a
+                // faint Material divider.
                 HStack {
-                    Rectangle().fill(SPColors.border).frame(height: 0.5)
+                    Rectangle()
+                        .fill(SPRetro.ink.opacity(0.4))
+                        .frame(height: 1)
                     Text("or")
-                        .font(SPFonts.caption(12))
-                        .foregroundStyle(SPColors.textTertiary)
+                        .font(.custom("AmericanTypewriter", size: 12))
+                        .tracking(1.5)
+                        .foregroundStyle(SPRetro.inkMuted)
                         .padding(.horizontal, SPSpacing.sm)
-                    Rectangle().fill(SPColors.border).frame(height: 0.5)
+                    Rectangle()
+                        .fill(SPRetro.ink.opacity(0.4))
+                        .frame(height: 1)
                 }
 
                 // Apple Sign In
@@ -74,8 +82,22 @@ struct AppleSignInButton: View {
         } onCompletion: { result in
             Task { await authVM.handleAppleSignIn(result: result) }
         }
-        .signInWithAppleButtonStyle(.white)
+        // .black Apple style sits in the retro ink-on-paper palette much
+        // better than the .white default, which previously read as a
+        // chrome control floating on the cream substrate. Wrapped in an
+        // ink-bordered rounded rect with a hard offset shadow so it
+        // matches the SPButton vocabulary directly above it.
+        .signInWithAppleButtonStyle(.black)
         .frame(height: 52)
         .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: SPRadius.md)
+                .strokeBorder(SPRetro.ink, lineWidth: 2)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: SPRadius.md)
+                .fill(SPRetro.ink)
+                .offset(x: 2, y: 3)
+        )
     }
 }

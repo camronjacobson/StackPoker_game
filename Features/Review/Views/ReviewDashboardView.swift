@@ -117,42 +117,58 @@ struct ReviewDashboardView: View {
         let tint  = isUp ? SPColors.success : SPColors.danger
         let arrow = isUp ? "arrow.up.right" : "arrow.down.right"
 
+        // Retro hero card: paperShade card with ink panel border + hard
+        // offset shadow (same vocab as the lobby cards). Tint comes from
+        // SPColors.success/danger (already retroed to muted teal/maroon).
         return VStack(alignment: .leading, spacing: SPSpacing.sm) {
             HStack(spacing: 6) {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(SPColors.textSecondary)
+                    .foregroundStyle(SPRetro.inkMuted)
                 Text("ALL TIME")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(SPColors.textSecondary)
-                    .tracking(1.2)
+                    .font(.custom("AmericanTypewriter-Bold", size: 11))
+                    .foregroundStyle(SPRetro.inkMuted)
+                    .tracking(1.5)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 // Sign + number. Use contentTransition so deltas animate as
-                // new hands roll in via @ObservedObject.
+                // new hands roll in via @ObservedObject. ChalkboardSE-Bold
+                // matches the chip-count typography used throughout the app.
                 Text("\(isUp ? "+" : "")\(formatChips(s.netChips))")
-                    .font(.system(size: 38, weight: .heavy, design: .rounded))
+                    .font(.custom("ChalkboardSE-Bold", size: 36))
                     .foregroundStyle(tint)
                     .contentTransition(.numericText())
                     .animation(.easeOut(duration: 0.35), value: s.netChips)
 
-                Image(systemName: arrow)
-                    .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(tint)
-                    .padding(6)
-                    .background(Circle().fill(tint.opacity(0.18)))
+                // Ink-bordered tinted sticker disc instead of a soft tint
+                // wash — matches the retro sticker vocabulary used by every
+                // CTA/badge across the app.
+                ZStack {
+                    Circle()
+                        .fill(SPRetro.ink)
+                        .frame(width: 30, height: 30)
+                        .offset(x: 1.5, y: 2)
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 30, height: 30)
+                    Circle()
+                        .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                        .frame(width: 30, height: 30)
+                    Image(systemName: arrow)
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundStyle(SPRetro.ink)
+                }
             }
 
             Text(isUp ? "Net winnings across \(s.handsPlayed) hand\(s.handsPlayed == 1 ? "" : "s")"
                       : "Net losses across \(s.handsPlayed) hand\(s.handsPlayed == 1 ? "" : "s")")
-                .font(SPFonts.body(13))
-                .foregroundStyle(SPColors.textSecondary)
+                .font(.custom("AmericanTypewriter", size: 13))
+                .foregroundStyle(SPRetro.inkSoft)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SPSpacing.md)
         .background(elevatedCardBackground(tint: tint))
-        .shadow(color: Color.black.opacity(0.45), radius: 8, x: 0, y: 4)
     }
 
     // ── Streak badge (optional) ─────────────────────────────────────────────
@@ -164,28 +180,30 @@ struct ReviewDashboardView: View {
         let s = stats
         if s.streakCount >= 2 {
             let tint = s.streakWon ? SPColors.success : SPColors.danger
+            // Retro streak pill: paperShade card with ink border + tint icon
+            // + ink body copy. No translucent tint wash — flat ink/paper.
             HStack(spacing: 8) {
                 Image(systemName: s.streakWon ? "flame.fill" : "snowflake")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(tint)
                 Text("\(s.streakCount) \(s.streakWon ? "wins" : "losses") in a row")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 13))
+                    .foregroundStyle(SPRetro.ink)
                 Spacer()
                 Text(s.streakWon ? "You're hot." : "Cool off — review the leaks.")
-                    .font(SPFonts.caption(11))
-                    .foregroundStyle(SPColors.textSecondary)
+                    .font(.custom("AmericanTypewriter", size: 11))
+                    .foregroundStyle(SPRetro.inkMuted)
                     .lineLimit(1)
             }
             .padding(.horizontal, SPSpacing.md)
             .padding(.vertical, SPSpacing.sm + 2)
             .background(
-                RoundedRectangle(cornerRadius: SPRadius.md)
-                    .fill(tint.opacity(0.10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: SPRadius.md)
-                            .strokeBorder(tint.opacity(0.30), lineWidth: 0.5)
-                    )
+                ZStack {
+                    RoundedRectangle(cornerRadius: SPRadius.md)
+                        .fill(SPRetro.paperShade)
+                    RoundedRectangle(cornerRadius: SPRadius.md)
+                        .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                }
             )
         } else {
             // No interesting streak — render nothing. SwiftUI's VStack
@@ -287,18 +305,18 @@ struct ReviewDashboardView: View {
     ) -> some View {
         HStack {
             Text(title)
-                .font(SPFonts.headline(15))
-                .foregroundStyle(SPColors.textPrimary)
+                .font(.custom("AmericanTypewriter-Bold", size: 15))
+                .foregroundStyle(SPRetro.ink)
             Spacer()
             if showSeeAll, let onSeeAll {
                 Button(action: onSeeAll) {
                     HStack(spacing: 3) {
                         Text("See all")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(.custom("AmericanTypewriter-Bold", size: 12))
                         Image(systemName: "chevron.right")
                             .font(.system(size: 10, weight: .bold))
                     }
-                    .foregroundStyle(SPColors.accentLight)
+                    .foregroundStyle(SPRetro.mustardDark)
                 }
             }
         }
@@ -312,59 +330,41 @@ struct ReviewDashboardView: View {
         pushReplay = true
     }
 
-    /// Hero-card background. Layered: deep gradient + faint tint glow keyed
-    /// off the trend color (green/red), top bevel highlight. Same visual
-    /// language as the rows in HistoryListView so the dashboard reads as one
-    /// system, not a different screen.
+    /// Retro hero-card background: paperShade card with a hard ink panel
+    /// border and a 2.5pt ink offset shadow — the same vocabulary used by
+    /// every elevated card and primary CTA across the app, so the dashboard
+    /// reads as one printed-magazine system instead of a different screen.
+    /// `tint` is intentionally unused at the background level now; the
+    /// verdict color lives on the headline number and the arrow disc.
     private func elevatedCardBackground(tint: Color) -> some View {
-        RoundedRectangle(cornerRadius: SPRadius.md)
-            .fill(
-                LinearGradient(
-                    colors: [Color(hex: "#1F2C4A"), Color(hex: "#0D1525")],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-            )
-            .overlay(
-                // Verdict-tinted glow in the top-left corner. Keeps the card
-                // feeling alive without overwhelming the headline number.
-                RoundedRectangle(cornerRadius: SPRadius.md)
-                    .fill(
-                        RadialGradient(
-                            colors: [tint.opacity(0.20), .clear],
-                            center: .topLeading,
-                            startRadius: 0,
-                            endRadius: 180
-                        )
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: SPRadius.md)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.18),
-                                Color.white.opacity(0.04)
-                            ],
-                            startPoint: .top, endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
-            )
+        _ = tint
+        return ZStack {
+            RoundedRectangle(cornerRadius: SPRadius.md)
+                .fill(SPRetro.ink)
+                .offset(x: 2, y: 3)
+            RoundedRectangle(cornerRadius: SPRadius.md)
+                .fill(SPRetro.paperShade)
+            RoundedRectangle(cornerRadius: SPRadius.md)
+                .strokeBorder(SPRetro.ink, lineWidth: 2)
+        }
     }
 
     // ─── Empty state ─────────────────────────────────────────────────────────
 
     private var emptyState: some View {
+        // Retro empty state: mustard sparkles + ink title + ink-soft body.
+        // Sits directly on the paper substrate (no card) so it reads as a
+        // friendly hand-written note rather than another panel.
         VStack(spacing: SPSpacing.md) {
             Image(systemName: "sparkles")
                 .font(.system(size: 48))
-                .foregroundStyle(SPColors.accent.opacity(0.5))
+                .foregroundStyle(SPRetro.mustardDark)
             Text("Your coach is waiting")
-                .font(SPFonts.headline())
-                .foregroundStyle(SPColors.textPrimary)
+                .font(.custom("AmericanTypewriter-Bold", size: 18))
+                .foregroundStyle(SPRetro.ink)
             Text("Play a hand and we'll start tracking your stats, streaks, and biggest pots.")
-                .font(SPFonts.body(13))
-                .foregroundStyle(SPColors.textSecondary)
+                .font(.custom("AmericanTypewriter", size: 13))
+                .foregroundStyle(SPRetro.inkMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, SPSpacing.xl)
         }
@@ -434,19 +434,23 @@ private struct MiniStat: View {
     let tint:  Color
 
     var body: some View {
+        // Retro mini-stat tile: paperShade card with ink panel border and
+        // small ink offset shadow — same sticker vocabulary as the lobby
+        // mini cards. AmericanTypewriter-Bold label + ChalkboardSE-Bold
+        // value so the number reads like a chip count.
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(tint)
                 Text(label.uppercased())
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(SPColors.textSecondary)
-                    .tracking(0.8)
+                    .font(.custom("AmericanTypewriter-Bold", size: 10))
+                    .foregroundStyle(SPRetro.inkMuted)
+                    .tracking(1.0)
             }
             Text(value)
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
-                .foregroundStyle(SPColors.textPrimary)
+                .font(.custom("ChalkboardSE-Bold", size: 18))
+                .foregroundStyle(SPRetro.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .contentTransition(.numericText())
@@ -455,12 +459,15 @@ private struct MiniStat: View {
         .padding(.horizontal, SPSpacing.sm + 2)
         .padding(.vertical, SPSpacing.sm + 2)
         .background(
-            RoundedRectangle(cornerRadius: SPRadius.md)
-                .fill(SPColors.surfaceElevated)
-                .overlay(
-                    RoundedRectangle(cornerRadius: SPRadius.md)
-                        .strokeBorder(tint.opacity(0.18), lineWidth: 0.5)
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.ink)
+                    .offset(x: 1.5, y: 2)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.paperShade)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+            }
         )
     }
 }
@@ -502,14 +509,14 @@ private struct RecentHandCard: View {
             // Bottom: hand name (if any) + delta. Delta is the focal point.
             VStack(alignment: .leading, spacing: 2) {
                 Text(summary.winningHandName ?? "Hand #\(summary.handNumber)")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(SPColors.textSecondary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 11))
+                    .foregroundStyle(SPRetro.inkMuted)
                     .lineLimit(1)
 
                 Text(summary.iWon
                      ? "+\(formatChips(summary.stackDelta))"
                      : formatChips(summary.stackDelta))
-                    .font(SPFonts.chips(16))
+                    .font(.custom("ChalkboardSE-Bold", size: 16))
                     .foregroundStyle(summary.iWon ? SPColors.success : SPColors.danger)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -518,40 +525,32 @@ private struct RecentHandCard: View {
         .padding(SPSpacing.sm + 2)
         .frame(width: 140, height: 130, alignment: .topLeading)
         .background(
-            RoundedRectangle(cornerRadius: SPRadius.md)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "#1F2C4A"), Color(hex: "#0D1525")],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: SPRadius.md)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.18),
-                                    Color.white.opacity(0.04)
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            ),
-                            lineWidth: 1
-                        )
-                )
+            // Retro recent-hand tile: paperShade card with ink border +
+            // hard ink offset shadow — matches the magazine/print look of
+            // every other elevated tile in the app.
+            ZStack {
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.ink)
+                    .offset(x: 1.5, y: 2.5)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.paperShade)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+            }
         )
-        .shadow(color: Color.black.opacity(0.45), radius: 5, x: 0, y: 2)
     }
 
     /// Carousel-card-sized hole-card glyph. Larger than the list row's mini
     /// cards because the carousel is the "highlight" surface and the cards
-    /// are its center of gravity.
+    /// are its center of gravity. Retro: paper face + ink hairline border,
+    /// no soft shadow — flat printed-card look.
     private func bigCard(_ c: PFCard) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white)
+                .fill(SPRetro.paper)
             VStack(spacing: -2) {
                 Text(c.live.displayRank)
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .font(.custom("ChalkboardSE-Bold", size: 20))
                 Text(c.live.suitSymbol)
                     .font(.system(size: 16, weight: .bold))
             }
@@ -560,8 +559,7 @@ private struct RecentHandCard: View {
         .frame(width: 38, height: 52)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.black.opacity(0.30), lineWidth: 0.6)
+                .stroke(SPRetro.ink, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.45), radius: 2, x: 0, y: 1)
     }
 }

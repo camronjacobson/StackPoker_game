@@ -14,36 +14,43 @@ struct UsernameSetupView: View {
 
     var body: some View {
         ZStack {
-            SPColors.background.ignoresSafeArea()
-
-            Circle()
-                .fill(SPColors.accent.opacity(0.06))
-                .frame(width: 400, height: 400)
-                .blur(radius: 100)
-                .ignoresSafeArea()
+            // Aged-paper substrate — same as the lobby and AuthFlowView,
+            // so the post-Apple-Sign-In setup reads as the next page of
+            // the same printed booklet rather than a separate modal.
+            AgedPaperBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: SPSpacing.xl) {
 
-                    // Header
+                    // Header — mustard burst-circle with ink border and a
+                    // hard offset shadow, matching AuthFlowView's logo
+                    // disc so the user perceives a continuous flow.
                     VStack(spacing: SPSpacing.sm) {
                         ZStack {
                             Circle()
-                                .fill(SPColors.accent.opacity(0.15))
+                                .fill(SPRetro.ink)
+                                .frame(width: 72, height: 72)
+                                .offset(x: 2.5, y: 3.5)
+                            Circle()
+                                .fill(SPRetro.mustard)
+                                .frame(width: 72, height: 72)
+                            Circle()
+                                .strokeBorder(SPRetro.ink, lineWidth: 2.5)
                                 .frame(width: 72, height: 72)
                             Image(systemName: "person.crop.circle.badge.plus")
-                                .font(.system(size: 32))
-                                .foregroundStyle(SPColors.accent)
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundStyle(SPRetro.ink)
                         }
                         .padding(.top, 60)
 
                         Text("One more step")
-                            .font(SPFonts.title(26))
-                            .foregroundStyle(SPColors.textPrimary)
+                            .font(.custom("AmericanTypewriter-Bold", size: 26))
+                            .tracking(0.6)
+                            .foregroundStyle(SPRetro.ink)
 
                         Text("Set up your StackPoker identity")
-                            .font(SPFonts.body())
-                            .foregroundStyle(SPColors.textSecondary)
+                            .font(.custom("AmericanTypewriter", size: 14))
+                            .foregroundStyle(SPRetro.inkSoft)
                     }
 
                     // Step indicator

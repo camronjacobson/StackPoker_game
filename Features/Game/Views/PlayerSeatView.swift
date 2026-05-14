@@ -26,12 +26,17 @@ struct PlayerSeatView: View {
 
             // Avatar with turn ring
             ZStack {
-                // Turn progress ring
+                // Turn progress ring — retro palette: muted teal while
+                // safe, pop red when the clock is bleeding out. Pulled from
+                // the same color set as the table's turn-timer ring so the
+                // seat ring + center timer agree visually.
                 if isMyTurn {
                     Circle()
                         .trim(from: 0, to: turnProgress)
                         .stroke(
-                            turnProgress > 0.3 ? SPColors.success : SPColors.warning,
+                            turnProgress > 0.3
+                                ? SPRetro.teal
+                                : SPRetro.popRed,
                             style: StrokeStyle(lineWidth: 3, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
@@ -39,14 +44,27 @@ struct PlayerSeatView: View {
                         .animation(.linear(duration: 0.2), value: turnProgress)
                 }
 
-                // Dealer / blind badges
+                // Dealer button — paper disc with an ink border and a hard
+                // ink offset shadow. AmericanTypewriter-Bold ink "D" so it
+                // reads as a hand-stamped dealer chip.
                 if seat.isDealer {
-                    Circle()
-                        .fill(SPColors.chipGold)
-                        .frame(width: 16, height: 16)
-                        .overlay(Text("D").font(.system(size: 9, weight: .black)).foregroundStyle(SPColors.chipGoldDark))
-                        .offset(x: avatarSize * 0.38, y: -avatarSize * 0.38)
-                        .zIndex(2)
+                    ZStack {
+                        Circle()
+                            .fill(SPRetro.ink)
+                            .frame(width: 16, height: 16)
+                            .offset(x: 1, y: 1.5)
+                        Circle()
+                            .fill(SPRetro.paper)
+                            .frame(width: 16, height: 16)
+                        Circle()
+                            .strokeBorder(SPRetro.ink, lineWidth: 1)
+                            .frame(width: 16, height: 16)
+                        Text("D")
+                            .font(.custom("AmericanTypewriter-Bold", size: 10))
+                            .foregroundStyle(SPRetro.ink)
+                    }
+                    .offset(x: avatarSize * 0.38, y: -avatarSize * 0.38)
+                    .zIndex(2)
                 }
 
                 // Avatar
@@ -58,59 +76,84 @@ struct PlayerSeatView: View {
                     )
                     .opacity(seat.status == .folded ? 0.4 : seat.isConnected ? 1 : 0.6)
 
-                    // Folded X
+                    // Folded X — maroon ink mark, the danger pop color.
                     if seat.status == .folded {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(SPColors.danger)
+                            .foregroundStyle(SPRetro.maroon)
                     }
 
-                    // All-in crown
+                    // All-in pill — mustard stamp with ink border and a
+                    // hard ink offset shadow. AmericanTypewriter-Bold ink
+                    // text + tracking so the label reads as a punched-in
+                    // sticker rather than a thin system pill.
                     if seat.status == .allIn {
-                        Text("ALL IN")
-                            .font(.system(size: 7, weight: .black))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(SPColors.warning)
-                            .clipShape(Capsule())
-                            .offset(y: avatarSize * 0.55)
+                        ZStack {
+                            Capsule()
+                                .fill(SPRetro.ink)
+                                .offset(x: 1, y: 1.2)
+                            Capsule()
+                                .fill(SPRetro.mustard)
+                            Capsule()
+                                .strokeBorder(SPRetro.ink, lineWidth: 1)
+                            Text("ALL IN")
+                                .font(.custom("AmericanTypewriter-Bold", size: 8))
+                                .tracking(0.8)
+                                .foregroundStyle(SPRetro.ink)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                        }
+                        .fixedSize()
+                        .offset(y: avatarSize * 0.55)
                     }
 
-                    // Disconnected indicator
+                    // Disconnected — ink scrim over the avatar with a paper
+                    // wifi-slash glyph; reads as a printed "offline" stamp.
                     if !seat.isConnected {
                         Circle()
-                            .fill(Color.black.opacity(0.5))
+                            .fill(SPRetro.ink.opacity(0.55))
                             .frame(width: avatarSize, height: avatarSize)
                         Image(systemName: "wifi.slash")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(SPRetro.paper.opacity(0.85))
                     }
 
-                    // Online dot
+                    // Online dot — muted teal on-turn / ink-soft idle,
+                    // with a paper hairline so the dot reads against any
+                    // avatar regardless of its underlying tone.
                     if seat.isConnected && seat.status != .sittingOut {
                         Circle()
-                            .fill(isMyTurn ? SPColors.success : SPColors.textTertiary)
+                            .fill(isMyTurn
+                                  ? SPRetro.teal
+                                  : SPRetro.inkMuted)
                             .frame(width: 8, height: 8)
-                            .overlay(Circle().strokeBorder(SPColors.felt, lineWidth: 1.5))
+                            .overlay(
+                                Circle().strokeBorder(SPRetro.paper,
+                                                      lineWidth: 1.5)
+                            )
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     }
                 }
             }
             .frame(width: avatarSize + 10, height: avatarSize + 10)
 
-            // Username + stack
+            // Username + stack — retro fonts. AmericanTypewriter-Bold for
+            // the username (mustard for "me", ink for others so the local
+            // player still pops on the page). ChalkboardSE-Bold for the
+            // chip count, matching the table's StackPill.
             VStack(spacing: 1) {
                 Text(seat.username)
-                    .font(.system(size: 10, weight: isMe ? .bold : .medium))
-                    .foregroundStyle(isMe ? SPColors.accentLight : .white)
+                    .font(.custom("AmericanTypewriter-Bold", size: 11))
+                    .foregroundStyle(isMe
+                                     ? SPRetro.mustardDark
+                                     : SPRetro.ink)
                     .lineLimit(1)
                     .frame(maxWidth: nameWidth)
 
                 if seat.status != .sittingOut {
                     Text(formatChips(String(seat.stack)))
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(SPColors.chipGold)
+                        .font(.custom("ChalkboardSE-Bold", size: 11))
+                        .foregroundStyle(SPRetro.ink)
                 }
             }
 
@@ -120,16 +163,23 @@ struct PlayerSeatView: View {
                     .transition(.scale.combined(with: .opacity))
             }
 
-            // Last action badge
+            // Last action badge — retro stamp: solid pop-color capsule with
+            // ink border, AmericanTypewriter-Bold paper text. Same vocab as
+            // the seat action bubbles in PokerTableView so the under-name
+            // badge and the bubble agree visually.
             if let action = lastAction, action.playerId == seat.userId {
-                Text(action.displayText)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(actionColor(action.action))
-                    .clipShape(Capsule())
-                    .transition(.scale.combined(with: .opacity))
+                ZStack {
+                    Capsule().fill(actionColor(action.action))
+                    Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+                    Text(action.displayText)
+                        .font(.custom("AmericanTypewriter-Bold", size: 9))
+                        .tracking(0.4)
+                        .foregroundStyle(SPRetro.paper)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                }
+                .fixedSize()
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.3), value: seat.status)
@@ -139,14 +189,16 @@ struct PlayerSeatView: View {
     private var avatarSize: CGFloat { isMe ? 46 : 38 }
     private var nameWidth:  CGFloat { isMe ? 70 : 58 }
 
+    /// Retro action-badge palette — solid pop colors from SPRetro so the
+    /// stamp under each seat matches the in-table action bubbles.
     private func actionColor(_ action: String) -> Color {
         switch action {
-        case "FOLD":  return SPColors.danger.opacity(0.8)
-        case "CHECK": return SPColors.textTertiary.opacity(0.8)
-        case "CALL":  return SPColors.success.opacity(0.8)
-        case "RAISE": return SPColors.accent.opacity(0.9)
-        case "ALL_IN": return SPColors.warning.opacity(0.9)
-        default:      return Color.black.opacity(0.6)
+        case "FOLD":   return SPRetro.popRed  // pop red
+        case "CHECK":  return SPRetro.inkMuted  // ink-soft (neutral)
+        case "CALL":   return SPRetro.teal  // muted teal
+        case "RAISE":  return SPRetro.popBlue  // pop blue
+        case "ALL_IN": return SPRetro.mustard  // mustard
+        default:       return SPRetro.ink.opacity(0.6)
         }
     }
 }
@@ -157,12 +209,19 @@ struct BlindBadge: View {
     let isSB: Bool
 
     var body: some View {
-        Text(isSB ? "SB" : "BB")
-            .font(.system(size: 8, weight: .black))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 1)
-            .background(isSB ? Color(hex: "#0984E3") : Color(hex: "#E84393"))
-            .clipShape(Capsule())
+        // Retro blind chip: pop-blue (SB) / pop-red (BB) capsule with an
+        // ink border + paper AmericanTypewriter-Bold label. Replaces the
+        // saturated blue/pink Material capsules.
+        ZStack {
+            Capsule().fill(isSB ? SPRetro.popBlue : SPRetro.popRed)
+            Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+            Text(isSB ? "SB" : "BB")
+                .font(.custom("AmericanTypewriter-Bold", size: 8))
+                .tracking(0.4)
+                .foregroundStyle(SPRetro.paper)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+        }
+        .fixedSize()
     }
 }

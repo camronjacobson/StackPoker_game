@@ -3,10 +3,13 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3681CECA2FABD98B0066D2EE /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3681CEC92FABD98B0066D2EE /* WidgetKit.framework */; };
+		3681CECC2FABD98B0066D2EE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3681CECB2FABD98B0066D2EE /* SwiftUI.framework */; };
+		3681CED92FABD98D0066D2EE /* PokerActionWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3681CEC72FABD98B0066D2EE /* PokerActionWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		36C91CD22F7F592A00697E42 /* StackPokerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CD12F7F592A00697E42 /* StackPokerTests.swift */; };
 		36C91CDC2F7F592A00697E42 /* StackPokerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDB2F7F592A00697E42 /* StackPokerUITests.swift */; };
 		36C91CDE2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDD2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift */; };
@@ -48,9 +51,10 @@
 		36C91D542F7F5B8B00697E42 /* SPComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */; };
 		36C91D552F7F5B8B00697E42 /* SPTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */; };
 		36C91D562F7F5B8B00697E43 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D572F7F5B8B00697E43 /* SoundManager.swift */; };
-		36C91E012F80000000697E42 /* Sounds in Resources */ = {isa = PBXBuildFile; fileRef = 36C91E002F80000000697E42 /* Sounds */; };
-		36C91E022F80000000697E43 /* Videos in Resources */ = {isa = PBXBuildFile; fileRef = 36C91E032F80000000697E43 /* Videos */; };
-		36C91F212F80000000697E42 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36C91F202F80000000697E42 /* Assets.xcassets */; };
+		36C91DA12F7F5B8B00697E42 /* SPRetroTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91DA02F7F5B8B00697E42 /* SPRetroTokens.swift */; };
+		36C91DA32F7F5B8B00697E42 /* RetroComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91DA22F7F5B8B00697E42 /* RetroComponents.swift */; };
+		36C91E012F80000000697E42 /* StackPoker/Sounds in Resources */ = {isa = PBXBuildFile; fileRef = 36C91E002F80000000697E42 /* StackPoker/Sounds */; };
+		36C91E022F80000000697E43 /* StackPoker/Videos in Resources */ = {isa = PBXBuildFile; fileRef = 36C91E032F80000000697E43 /* StackPoker/Videos */; };
 		36C91E302F80000100697E42 /* RecordedHand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E202F80000100697E42 /* RecordedHand.swift */; };
 		36C91E312F80000100697E42 /* HandAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E212F80000100697E42 /* HandAnalysis.swift */; };
 		36C91E322F80000100697E42 /* HandHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E222F80000100697E42 /* HandHistoryStore.swift */; };
@@ -58,17 +62,32 @@
 		36C91E342F80000100697E42 /* HandAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E242F80000100697E42 /* HandAnalyzer.swift */; };
 		36C91E352F80000100697E42 /* ReplayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E252F80000100697E42 /* ReplayViewModel.swift */; };
 		36C91E362F80000100697E42 /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E262F80000100697E42 /* HistoryListView.swift */; };
-		36C91E392F80000100697E42 /* ReviewDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000100697E42 /* ReviewDashboardView.swift */; };
-		36C91E3A2F80000100697E42 /* EquityStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2A2F80000100697E42 /* EquityStripView.swift */; };
-		36C91E3B2F80000100697E42 /* DailyBonusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2B2F80000100697E42 /* DailyBonusCard.swift */; };
-		36C91F052F80000100697E42 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91F032F80000100697E42 /* SubscriptionManager.swift */; };
-		36C91F062F80000100697E42 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91F042F80000100697E42 /* PaywallView.swift */; };
 		36C91E372F80000100697E42 /* HandReplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E272F80000100697E42 /* HandReplayView.swift */; };
 		36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E282F80000100697E42 /* ReplayTableView.swift */; };
+		36C91E392F80000100697E42 /* ReviewDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000100697E42 /* ReviewDashboardView.swift */; };
 		36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E292F80000200697E42 /* ReplayNarrator.swift */; };
+		36C91E3A2F80000100697E42 /* EquityStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2A2F80000100697E42 /* EquityStripView.swift */; };
+		36C91E3B2F80000100697E42 /* DailyBonusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2B2F80000100697E42 /* DailyBonusCard.swift */; };
+		36C91E3C2F80020100697E42 /* DailyBonusReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91E2C2F80020100697E42 /* DailyBonusReveal.swift */; };
+		36C91F052F80000100697E42 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91F032F80000100697E42 /* SubscriptionManager.swift */; };
+		36C91F062F80000100697E42 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91F042F80000100697E42 /* PaywallView.swift */; };
+		36C91F212F80000000697E42 /* StackPoker/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36C91F202F80000000697E42 /* StackPoker/Assets.xcassets */; };
+		36C91FA22F80020000697E42 /* PokerActionAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91FA12F80020000697E42 /* PokerActionAttributes.swift */; };
+		36C91FA42F80020000697E42 /* PokerActionActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91FA32F80020000697E42 /* PokerActionActivityManager.swift */; };
+		36C91FA62F80020000697E42 /* PokerActionDeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91FA52F80020000697E42 /* PokerActionDeepLinkRouter.swift */; };
+		36C91FA72F80020000697E42 /* PokerActionAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91FA12F80020000697E42 /* PokerActionAttributes.swift */; };
+		AAAAAA012F7F5B8B00697E42 /* OpponentPopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAA002F7F5B8A00697E42 /* OpponentPopupView.swift */; };
+		AAAAAA032F7F5B8C00697E42 /* TopUpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAA022F7F5B8C00697E42 /* TopUpSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		3681CED72FABD98D0066D2EE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 36C91CB52F7F592800697E42 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3681CEC62FABD98B0066D2EE;
+			remoteInfo = PokerActionWidgetExtension;
+		};
 		36C91CCE2F7F592A00697E42 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 36C91CB52F7F592800697E42 /* Project object */;
@@ -85,7 +104,24 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		3681CEDA2FABD98D0066D2EE /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3681CED92FABD98D0066D2EE /* PokerActionWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		3681CEC72FABD98B0066D2EE /* PokerActionWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PokerActionWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3681CEC92FABD98B0066D2EE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		3681CECB2FABD98B0066D2EE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		36C91CBD2F7F592800697E42 /* StackPoker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StackPoker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CCD2F7F592A00697E42 /* StackPokerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StackPokerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CD12F7F592A00697E42 /* StackPokerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackPokerTests.swift; sourceTree = "<group>"; };
@@ -107,7 +143,6 @@
 		36C91D002F7F5B8A00697E42 /* SplashView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		36C91D012F7F5B8A00697E42 /* UsernameSetupView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UsernameSetupView.swift; sourceTree = "<group>"; };
 		36C91D072F7F5B8A00697E42 /* GameSocketClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameSocketClient.swift; sourceTree = "<group>"; };
-		36C91D572F7F5B8B00697E43 /* SoundManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
 		36C91D092F7F5B8A00697E42 /* GameModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameModels.swift; sourceTree = "<group>"; };
 		36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
 		36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
@@ -130,9 +165,11 @@
 		36C91D272F7F5B8A00697E42 /* ProfileView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPComponents.swift; sourceTree = "<group>"; };
 		36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPTokens.swift; sourceTree = "<group>"; };
-		36C91E002F80000000697E42 /* Sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StackPoker/Sounds; sourceTree = "<group>"; };
-		36C91E032F80000000697E43 /* Videos */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StackPoker/Videos; sourceTree = "<group>"; };
-		36C91F202F80000000697E42 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = StackPoker/Assets.xcassets; sourceTree = "<group>"; };
+		36C91D572F7F5B8B00697E43 /* SoundManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
+		36C91DA02F7F5B8B00697E42 /* SPRetroTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPRetroTokens.swift; sourceTree = "<group>"; };
+		36C91DA22F7F5B8B00697E42 /* RetroComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RetroComponents.swift; sourceTree = "<group>"; };
+		36C91E002F80000000697E42 /* StackPoker/Sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StackPoker/Sounds; sourceTree = "<group>"; };
+		36C91E032F80000000697E43 /* StackPoker/Videos */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StackPoker/Videos; sourceTree = "<group>"; };
 		36C91E202F80000100697E42 /* RecordedHand.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecordedHand.swift; sourceTree = "<group>"; };
 		36C91E212F80000100697E42 /* HandAnalysis.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandAnalysis.swift; sourceTree = "<group>"; };
 		36C91E222F80000100697E42 /* HandHistoryStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandHistoryStore.swift; sourceTree = "<group>"; };
@@ -140,17 +177,47 @@
 		36C91E242F80000100697E42 /* HandAnalyzer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandAnalyzer.swift; sourceTree = "<group>"; };
 		36C91E252F80000100697E42 /* ReplayViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayViewModel.swift; sourceTree = "<group>"; };
 		36C91E262F80000100697E42 /* HistoryListView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
-		36C91E292F80000100697E42 /* ReviewDashboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReviewDashboardView.swift; sourceTree = "<group>"; };
-		36C91E2A2F80000100697E42 /* EquityStripView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EquityStripView.swift; sourceTree = "<group>"; };
-		36C91E2B2F80000100697E42 /* DailyBonusCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyBonusCard.swift; sourceTree = "<group>"; };
-		36C91F032F80000100697E42 /* SubscriptionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
-		36C91F042F80000100697E42 /* PaywallView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		36C91E272F80000100697E42 /* HandReplayView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HandReplayView.swift; sourceTree = "<group>"; };
 		36C91E282F80000100697E42 /* ReplayTableView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayTableView.swift; sourceTree = "<group>"; };
+		36C91E292F80000100697E42 /* ReviewDashboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReviewDashboardView.swift; sourceTree = "<group>"; };
 		36C91E292F80000200697E42 /* ReplayNarrator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplayNarrator.swift; sourceTree = "<group>"; };
+		36C91E2A2F80000100697E42 /* EquityStripView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EquityStripView.swift; sourceTree = "<group>"; };
+		36C91E2B2F80000100697E42 /* DailyBonusCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyBonusCard.swift; sourceTree = "<group>"; };
+		36C91E2C2F80020100697E42 /* DailyBonusReveal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyBonusReveal.swift; sourceTree = "<group>"; };
+		36C91F032F80000100697E42 /* SubscriptionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		36C91F042F80000100697E42 /* PaywallView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		36C91F202F80000000697E42 /* StackPoker/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = StackPoker/Assets.xcassets; sourceTree = "<group>"; };
+		36C91FA12F80020000697E42 /* PokerActionAttributes.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PokerActionAttributes.swift; sourceTree = "<group>"; };
+		36C91FA32F80020000697E42 /* PokerActionActivityManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PokerActionActivityManager.swift; sourceTree = "<group>"; };
+		36C91FA52F80020000697E42 /* PokerActionDeepLinkRouter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PokerActionDeepLinkRouter.swift; sourceTree = "<group>"; };
+		AAAAAA002F7F5B8A00697E42 /* OpponentPopupView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OpponentPopupView.swift; sourceTree = "<group>"; };
+		AAAAAA022F7F5B8C00697E42 /* TopUpSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TopUpSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3681CEDD2FABD98D0066D2EE /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3681CEC62FABD98B0066D2EE /* PokerActionWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		3681CECD2FABD98B0066D2EE /* PokerActionWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (3681CEDD2FABD98D0066D2EE /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PokerActionWidget; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
+		3681CEC42FABD98B0066D2EE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3681CECC2FABD98B0066D2EE /* SwiftUI.framework in Frameworks */,
+				3681CECA2FABD98B0066D2EE /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		36C91CBA2F7F592800697E42 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -175,6 +242,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3681CEC82FABD98B0066D2EE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3681CEC92FABD98B0066D2EE /* WidgetKit.framework */,
+				3681CECB2FABD98B0066D2EE /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		36C91CB42F7F592800697E42 = {
 			isa = PBXGroup;
 			children = (
@@ -182,11 +258,13 @@
 				36C91CF62F7F5B8A00697E42 /* Core */,
 				36C91D302F7F5B8B00697E42 /* DesignSystem */,
 				36C91D2A2F7F5B8A00697E42 /* Features */,
-				36C91E002F80000000697E42 /* Sounds */,
-				36C91E032F80000000697E43 /* Videos */,
-				36C91F202F80000000697E42 /* Assets.xcassets */,
+				36C91E002F80000000697E42 /* StackPoker/Sounds */,
+				36C91E032F80000000697E43 /* StackPoker/Videos */,
+				36C91F202F80000000697E42 /* StackPoker/Assets.xcassets */,
 				36C91CD02F7F592A00697E42 /* StackPokerTests */,
 				36C91CDA2F7F592A00697E42 /* StackPokerUITests */,
+				3681CECD2FABD98B0066D2EE /* PokerActionWidget */,
+				3681CEC82FABD98B0066D2EE /* Frameworks */,
 				36C91CBE2F7F592800697E42 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -197,6 +275,7 @@
 				36C91CBD2F7F592800697E42 /* StackPoker.app */,
 				36C91CCD2F7F592A00697E42 /* StackPokerTests.xctest */,
 				36C91CD72F7F592A00697E42 /* StackPokerUITests.xctest */,
+				3681CEC72FABD98B0066D2EE /* PokerActionWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -271,6 +350,7 @@
 			children = (
 				36C91CEE2F7F5B8A00697E42 /* {Network,Storage,Extensions,Utilities} */,
 				36C91CF02F7F5B8A00697E42 /* Extensions */,
+				36C91FA02F80020000697E42 /* LiveActivity */,
 				36C91CF22F7F5B8A00697E42 /* Network */,
 				36C91CF42F7F5B8A00697E42 /* Storage */,
 				36C91CF52F7F5B8A00697E42 /* Utilities */,
@@ -382,6 +462,7 @@
 				36C91D112F7F5B8A00697E42 /* GameView.swift */,
 				36C91D122F7F5B8A00697E42 /* PlayerSeatView.swift */,
 				36C91D132F7F5B8A00697E42 /* PokerTableView.swift */,
+				AAAAAA002F7F5B8A00697E42 /* OpponentPopupView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -431,6 +512,8 @@
 				36C91D1F2F7F5B8A00697E42 /* LobbyView.swift */,
 				36C91D202F7F5B8A00697E42 /* TableCardView.swift */,
 				36C91E2B2F80000100697E42 /* DailyBonusCard.swift */,
+				36C91E2C2F80020100697E42 /* DailyBonusReveal.swift */,
+				AAAAAA022F7F5B8C00697E42 /* TopUpSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -494,29 +577,39 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
-		36C91F002F80000100697E42 /* Subscription */ = {
+		36C91D2B2F7F5B8B00697E42 /* {Components,Tokens} */ = {
 			isa = PBXGroup;
 			children = (
-				36C91F012F80000100697E42 /* ViewModels */,
-				36C91F022F80000100697E42 /* Views */,
 			);
-			path = Subscription;
+			path = "{Components,Tokens}";
 			sourceTree = "<group>";
 		};
-		36C91F012F80000100697E42 /* ViewModels */ = {
+		36C91D2D2F7F5B8B00697E42 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				36C91F032F80000100697E42 /* SubscriptionManager.swift */,
+				36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */,
+				36C91DA22F7F5B8B00697E42 /* RetroComponents.swift */,
 			);
-			path = ViewModels;
+			path = Components;
 			sourceTree = "<group>";
 		};
-		36C91F022F80000100697E42 /* Views */ = {
+		36C91D2F2F7F5B8B00697E42 /* Tokens */ = {
 			isa = PBXGroup;
 			children = (
-				36C91F042F80000100697E42 /* PaywallView.swift */,
+				36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */,
+				36C91DA02F7F5B8B00697E42 /* SPRetroTokens.swift */,
 			);
-			path = Views;
+			path = Tokens;
+			sourceTree = "<group>";
+		};
+		36C91D302F7F5B8B00697E42 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				36C91D2B2F7F5B8B00697E42 /* {Components,Tokens} */,
+				36C91D2D2F7F5B8B00697E42 /* Components */,
+				36C91D2F2F7F5B8B00697E42 /* Tokens */,
+			);
+			path = DesignSystem;
 			sourceTree = "<group>";
 		};
 		36C91E102F80000100697E42 /* Review */ = {
@@ -570,42 +663,66 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
-		36C91D2B2F7F5B8B00697E42 /* {Components,Tokens} */ = {
+		36C91F002F80000100697E42 /* Subscription */ = {
 			isa = PBXGroup;
 			children = (
+				36C91F012F80000100697E42 /* ViewModels */,
+				36C91F022F80000100697E42 /* Views */,
 			);
-			path = "{Components,Tokens}";
+			path = Subscription;
 			sourceTree = "<group>";
 		};
-		36C91D2D2F7F5B8B00697E42 /* Components */ = {
+		36C91F012F80000100697E42 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
-				36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */,
+				36C91F032F80000100697E42 /* SubscriptionManager.swift */,
 			);
-			path = Components;
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
-		36C91D2F2F7F5B8B00697E42 /* Tokens */ = {
+		36C91F022F80000100697E42 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */,
+				36C91F042F80000100697E42 /* PaywallView.swift */,
 			);
-			path = Tokens;
+			path = Views;
 			sourceTree = "<group>";
 		};
-		36C91D302F7F5B8B00697E42 /* DesignSystem */ = {
+		36C91FA02F80020000697E42 /* LiveActivity */ = {
 			isa = PBXGroup;
 			children = (
-				36C91D2B2F7F5B8B00697E42 /* {Components,Tokens} */,
-				36C91D2D2F7F5B8B00697E42 /* Components */,
-				36C91D2F2F7F5B8B00697E42 /* Tokens */,
+				36C91FA12F80020000697E42 /* PokerActionAttributes.swift */,
+				36C91FA32F80020000697E42 /* PokerActionActivityManager.swift */,
+				36C91FA52F80020000697E42 /* PokerActionDeepLinkRouter.swift */,
 			);
-			path = DesignSystem;
+			path = LiveActivity;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3681CEC62FABD98B0066D2EE /* PokerActionWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3681CEDE2FABD98D0066D2EE /* Build configuration list for PBXNativeTarget "PokerActionWidgetExtension" */;
+			buildPhases = (
+				3681CEC32FABD98B0066D2EE /* Sources */,
+				3681CEC42FABD98B0066D2EE /* Frameworks */,
+				3681CEC52FABD98B0066D2EE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3681CECD2FABD98B0066D2EE /* PokerActionWidget */,
+			);
+			name = PokerActionWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = PokerActionWidgetExtension;
+			productReference = 3681CEC72FABD98B0066D2EE /* PokerActionWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		36C91CBC2F7F592800697E42 /* StackPoker */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 36C91CE12F7F592A00697E42 /* Build configuration list for PBXNativeTarget "StackPoker" */;
@@ -613,10 +730,12 @@
 				36C91CB92F7F592800697E42 /* Sources */,
 				36C91CBA2F7F592800697E42 /* Frameworks */,
 				36C91CBB2F7F592800697E42 /* Resources */,
+				3681CEDA2FABD98D0066D2EE /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				3681CED82FABD98D0066D2EE /* PBXTargetDependency */,
 			);
 			name = StackPoker;
 			productName = StackPoker;
@@ -666,9 +785,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1540;
+				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 1540;
 				TargetAttributes = {
+					3681CEC62FABD98B0066D2EE = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 					36C91CBC2F7F592800697E42 = {
 						CreatedOnToolsVersion = 15.4;
 					};
@@ -698,18 +820,26 @@
 				36C91CBC2F7F592800697E42 /* StackPoker */,
 				36C91CCC2F7F592A00697E42 /* StackPokerTests */,
 				36C91CD62F7F592A00697E42 /* StackPokerUITests */,
+				3681CEC62FABD98B0066D2EE /* PokerActionWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		3681CEC52FABD98B0066D2EE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		36C91CBB2F7F592800697E42 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				36C91E012F80000000697E42 /* Sounds in Resources */,
-				36C91E022F80000000697E43 /* Videos in Resources */,
-				36C91F212F80000000697E42 /* Assets.xcassets in Resources */,
+				36C91E012F80000000697E42 /* StackPoker/Sounds in Resources */,
+				36C91E022F80000000697E43 /* StackPoker/Videos in Resources */,
+				36C91F212F80000000697E42 /* StackPoker/Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -730,6 +860,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3681CEC32FABD98B0066D2EE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				36C91FA72F80020000697E42 /* PokerActionAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		36C91CB92F7F592800697E42 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -753,7 +891,9 @@
 				36C91D4F2F7F5B8B00697E42 /* LobbyView.swift in Sources */,
 				36C91D382F7F5B8B00697E42 /* AuthViewModel.swift in Sources */,
 				36C91D552F7F5B8B00697E42 /* SPTokens.swift in Sources */,
+				36C91DA12F7F5B8B00697E42 /* SPRetroTokens.swift in Sources */,
 				36C91D542F7F5B8B00697E42 /* SPComponents.swift in Sources */,
+				36C91DA32F7F5B8B00697E42 /* RetroComponents.swift in Sources */,
 				36C91D3F2F7F5B8B00697E42 /* GameSocketClient.swift in Sources */,
 				36C91D562F7F5B8B00697E43 /* SoundManager.swift in Sources */,
 				36C91D402F7F5B8B00697E42 /* GameModels.swift in Sources */,
@@ -766,6 +906,7 @@
 				36C91D452F7F5B8B00697E42 /* GameHUD.swift in Sources */,
 				36C91D4E2F7F5B8B00697E42 /* LobbySheets.swift in Sources */,
 				36C91D482F7F5B8B00697E42 /* PokerTableView.swift in Sources */,
+				AAAAAA012F7F5B8B00697E42 /* OpponentPopupView.swift in Sources */,
 				36C91D3B2F7F5B8B00697E42 /* LoginView.swift in Sources */,
 				36C91D3C2F7F5B8B00697E42 /* RegisterView.swift in Sources */,
 				36C91D342F7F5B8B00697E42 /* ViewExtensions.swift in Sources */,
@@ -782,11 +923,16 @@
 				36C91E392F80000100697E42 /* ReviewDashboardView.swift in Sources */,
 				36C91E3A2F80000100697E42 /* EquityStripView.swift in Sources */,
 				36C91E3B2F80000100697E42 /* DailyBonusCard.swift in Sources */,
+				36C91E3C2F80020100697E42 /* DailyBonusReveal.swift in Sources */,
+				AAAAAA032F7F5B8C00697E42 /* TopUpSheet.swift in Sources */,
 				36C91F052F80000100697E42 /* SubscriptionManager.swift in Sources */,
 				36C91F062F80000100697E42 /* PaywallView.swift in Sources */,
 				36C91E372F80000100697E42 /* HandReplayView.swift in Sources */,
 				36C91E382F80000100697E42 /* ReplayTableView.swift in Sources */,
 				36C91E392F80000200697E42 /* ReplayNarrator.swift in Sources */,
+				36C91FA22F80020000697E42 /* PokerActionAttributes.swift in Sources */,
+				36C91FA42F80020000697E42 /* PokerActionActivityManager.swift in Sources */,
+				36C91FA62F80020000697E42 /* PokerActionDeepLinkRouter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -810,6 +956,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		3681CED82FABD98D0066D2EE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3681CEC62FABD98B0066D2EE /* PokerActionWidgetExtension */;
+			targetProxy = 3681CED72FABD98D0066D2EE /* PBXContainerItemProxy */;
+		};
 		36C91CCF2F7F592A00697E42 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 36C91CBC2F7F592800697E42 /* StackPoker */;
@@ -823,6 +974,68 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		3681CEDB2FABD98D0066D2EE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FKT42UHJN5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PokerActionWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PokerActionWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 3.32;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker.PokerActionWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3681CEDC2FABD98D0066D2EE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FKT42UHJN5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PokerActionWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PokerActionWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 3.32;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker.PokerActionWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		36C91CDF2F7F592A00697E42 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -963,12 +1176,16 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 3.33;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -993,12 +1210,16 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 3.33;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -1081,6 +1302,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3681CEDE2FABD98D0066D2EE /* Build configuration list for PBXNativeTarget "PokerActionWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3681CEDB2FABD98D0066D2EE /* Debug */,
+				3681CEDC2FABD98D0066D2EE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		36C91CB82F7F592800697E42 /* Build configuration list for PBXProject "StackPoker" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -111,19 +111,26 @@ struct AvatarOption: Identifiable {
     let label: String
     let color: String   // hex background
 
+    // Retro-themed avatar roster — poker suits, casino classics, and
+    // 60s-pulp motifs. Background colors all sit inside the retro palette
+    // (maroon / popRed / popBlue / mutedTeal / mustard / ink etc.) so the
+    // avatar discs read as printed stamps on the comic page rather than
+    // generic emoji circles. Existing user `selectedAvatarId` values
+    // (avatar_1 … avatar_12) still resolve, so this is a pure cosmetic
+    // swap with no data migration required.
     static let all: [AvatarOption] = [
-        AvatarOption(id: "avatar_1",  emoji: "🦁", label: "Lion",     color: "#E67E22"),
-        AvatarOption(id: "avatar_2",  emoji: "🐺", label: "Wolf",     color: "#6C5CE7"),
-        AvatarOption(id: "avatar_3",  emoji: "🦊", label: "Fox",      color: "#E17055"),
-        AvatarOption(id: "avatar_4",  emoji: "🐻", label: "Bear",     color: "#795548"),
-        AvatarOption(id: "avatar_5",  emoji: "🦅", label: "Eagle",    color: "#2980B9"),
-        AvatarOption(id: "avatar_6",  emoji: "🐯", label: "Tiger",    color: "#F39C12"),
-        AvatarOption(id: "avatar_7",  emoji: "🦈", label: "Shark",    color: "#1A6FA8"),
-        AvatarOption(id: "avatar_8",  emoji: "🐉", label: "Dragon",   color: "#C0392B"),
-        AvatarOption(id: "avatar_9",  emoji: "🦋", label: "Butterfly",color: "#8E44AD"),
-        AvatarOption(id: "avatar_10", emoji: "🐸", label: "Frog",     color: "#27AE60"),
-        AvatarOption(id: "avatar_11", emoji: "🦌", label: "Deer",     color: "#A0522D"),
-        AvatarOption(id: "avatar_12", emoji: "🐼", label: "Panda",    color: "#555555"),
+        AvatarOption(id: "avatar_1",  emoji: "🃏",  label: "Joker",    color: "#8B2C2C"),
+        AvatarOption(id: "avatar_2",  emoji: "🎩",  label: "Top Hat",  color: "#1A1410"),
+        AvatarOption(id: "avatar_3",  emoji: "🎲",  label: "Dice",     color: "#D33232"),
+        AvatarOption(id: "avatar_4",  emoji: "♠️", label: "Spade",    color: "#2E7C8B"),
+        AvatarOption(id: "avatar_5",  emoji: "♥️", label: "Heart",    color: "#B68A14"),
+        AvatarOption(id: "avatar_6",  emoji: "♦️", label: "Diamond",  color: "#2A6DB5"),
+        AvatarOption(id: "avatar_7",  emoji: "♣️", label: "Club",     color: "#5C4838"),
+        AvatarOption(id: "avatar_8",  emoji: "🍀",  label: "Clover",   color: "#3F6B3A"),
+        AvatarOption(id: "avatar_9",  emoji: "💎",  label: "Gem",      color: "#3F87C9"),
+        AvatarOption(id: "avatar_10", emoji: "👑",  label: "Crown",    color: "#E8B923"),
+        AvatarOption(id: "avatar_11", emoji: "🎯",  label: "Bullseye", color: "#A53939"),
+        AvatarOption(id: "avatar_12", emoji: "🚀",  label: "Rocket",   color: "#8A6038"),
     ]
 
     static func find(_ id: String) -> AvatarOption {

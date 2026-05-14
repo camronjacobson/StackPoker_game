@@ -9,7 +9,9 @@ struct FriendsSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                SPColors.background.ignoresSafeArea()
+                // Aged-paper substrate — keeps the friends sheet inside
+                // the same printed-booklet aesthetic as the lobby.
+                AgedPaperBackground().ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     FriendsTabBar(vm: vm)
@@ -86,26 +88,50 @@ struct FriendTabButton: View {
     let action: () -> Void
 
     var body: some View {
+        // Retro tab button: ink-bordered rounded rect; mustard fill when
+        // selected (with a small hard offset shadow so the selected tab
+        // visibly lifts), paperShade when idle. Count badge becomes a
+        // pop-red sticker with ink border. Same vocab as the auth tab
+        // picker so all segmented controls feel like the same printed UI.
         Button(action: action) {
             HStack(spacing: 4) {
                 Text(label)
-                    .font(SPFonts.headline(13))
-                    .foregroundStyle(isSelected ? .white : SPColors.textSecondary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 13))
+                    .tracking(0.4)
+                    .foregroundStyle(SPRetro.ink)
                 if let count {
                     Text("\(count)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(isSelected ? SPColors.accent : .white)
+                        .font(.custom("AmericanTypewriter-Bold", size: 10))
+                        .foregroundStyle(SPRetro.paper)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(isSelected ? .white : SPColors.danger)
-                        .clipShape(Capsule())
+                        .background(
+                            ZStack {
+                                Capsule().fill(SPRetro.popRed)
+                                Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+                            }
+                        )
                 }
             }
             .padding(.horizontal, SPSpacing.md)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .background(isSelected ? SPColors.accent : SPColors.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: SPRadius.sm))
+            .background(
+                ZStack {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: SPRadius.sm)
+                            .fill(SPRetro.ink)
+                            .offset(x: 1.5, y: 2)
+                    }
+                    RoundedRectangle(cornerRadius: SPRadius.sm)
+                        .fill(isSelected
+                              ? SPRetro.mustard
+                              : SPRetro.paperShade)
+                    RoundedRectangle(cornerRadius: SPRadius.sm)
+                        .strokeBorder(SPRetro.ink,
+                                      lineWidth: isSelected ? 1.8 : 1.2)
+                }
+            )
         }
         .buttonStyle(.plain)
     }
@@ -160,17 +186,20 @@ struct FriendsListTab: View {
     }
 
     private func sectionHeader(_ title: String) -> some View {
+        // Retro section header — typewriter-bold all-caps tracked, sits
+        // on paperShade so it visually separates pinned section breaks
+        // from the cream page below.
         HStack {
             Text(title)
-                .font(SPFonts.caption(11))
-                .foregroundStyle(SPColors.textTertiary)
+                .font(.custom("AmericanTypewriter-Bold", size: 11))
+                .foregroundStyle(SPRetro.inkMuted)
                 .textCase(.uppercase)
-                .tracking(0.8)
+                .tracking(1.2)
             Spacer()
         }
         .padding(.horizontal, SPSpacing.md)
         .padding(.vertical, SPSpacing.xs)
-        .background(SPColors.background)
+        .background(SPRetro.paperShade)
     }
 
     private var loadingSkeleton: some View {
@@ -192,18 +221,21 @@ struct FriendsListTab: View {
     }
 
     private var emptyFriendsState: some View {
+        // Retro empty state — ink-soft icon + typewriter copy + the
+        // SPButton CTA already inherits the new retro vocab via the
+        // SPComponents pass.
         VStack(spacing: SPSpacing.lg) {
             Spacer()
             Image(systemName: "person.2.slash")
                 .font(.system(size: 44))
-                .foregroundStyle(SPColors.textTertiary)
+                .foregroundStyle(SPRetro.inkMuted)
             VStack(spacing: 4) {
                 Text("No friends yet")
-                    .font(SPFonts.headline())
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 18))
+                    .foregroundStyle(SPRetro.ink)
                 Text("Find players to add as friends")
-                    .font(SPFonts.body(14))
-                    .foregroundStyle(SPColors.textSecondary)
+                    .font(.custom("AmericanTypewriter", size: 14))
+                    .foregroundStyle(SPRetro.inkMuted)
             }
             SPButton("Find Players", icon: "magnifyingglass") {
                 withAnimation { vm.activeTab = .search }
@@ -222,29 +254,33 @@ struct FriendRow: View {
     @State private var showRemoveConfirm = false
 
     var body: some View {
+        // Retro friend row: AmericanTypewriter typography, muted-teal
+        // online dot with paper hairline (same as PlayerSeatView), ink-
+        // soft ellipsis. The whole row sits on the cream page; rows are
+        // separated by SPDivider's ink hairline.
         HStack(spacing: SPSpacing.md) {
             ZStack(alignment: .bottomTrailing) {
                 AvatarView(avatarId: friend.avatarId, size: 44)
                 if friend.isOnline {
                     Circle()
-                        .fill(SPColors.success)
+                        .fill(SPRetro.teal)
                         .frame(width: 11, height: 11)
-                        .overlay(Circle().strokeBorder(SPColors.background, lineWidth: 1.5))
+                        .overlay(Circle().strokeBorder(SPRetro.paper, lineWidth: 1.5))
                 }
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(friend.displayName)
-                    .font(SPFonts.headline(14))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 14))
+                    .foregroundStyle(SPRetro.ink)
                 HStack(spacing: SPSpacing.xs) {
                     Text("@\(friend.username)")
-                        .font(SPFonts.caption(12))
-                        .foregroundStyle(SPColors.textTertiary)
+                        .font(.custom("AmericanTypewriter", size: 12))
+                        .foregroundStyle(SPRetro.inkMuted)
                     if friend.isOnline {
                         Text("\u{00B7} Online")
-                            .font(SPFonts.caption(12))
-                            .foregroundStyle(SPColors.success)
+                            .font(.custom("AmericanTypewriter-Bold", size: 12))
+                            .foregroundStyle(SPRetro.teal)
                     }
                 }
             }
@@ -257,8 +293,8 @@ struct FriendRow: View {
                 showRemoveConfirm = true
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 16))
-                    .foregroundStyle(SPColors.textTertiary)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(SPRetro.inkMuted)
                     .frame(width: 32, height: 32)
             }
         }
@@ -320,37 +356,50 @@ struct FriendRequestRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(request.sender.displayName)
-                    .font(SPFonts.headline(14))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 14))
+                    .foregroundStyle(SPRetro.ink)
                 Text("@\(request.sender.username) wants to be friends")
-                    .font(SPFonts.caption(12))
-                    .foregroundStyle(SPColors.textTertiary)
+                    .font(.custom("AmericanTypewriter", size: 12))
+                    .foregroundStyle(SPRetro.inkMuted)
             }
 
             Spacer()
 
+            // Retro accept/decline sticker buttons — same vocab as the
+            // InviteRow in LobbySheets so confirming a friend request
+            // reads as the same gesture as confirming a table invite.
             HStack(spacing: SPSpacing.xs) {
                 Button {
                     Task { await vm.declineRequest(request) }
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(SPColors.textSecondary)
-                        .frame(width: 34, height: 34)
-                        .background(SPColors.surfaceElevated)
-                        .clipShape(Circle())
+                    ZStack {
+                        Circle().fill(SPRetro.ink)
+                            .frame(width: 34, height: 34).offset(x: 1.5, y: 2)
+                        Circle().fill(SPRetro.paperShade)
+                            .frame(width: 34, height: 34)
+                        Circle().strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                            .frame(width: 34, height: 34)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .black))
+                            .foregroundStyle(SPRetro.ink)
+                    }
                 }
                 .buttonStyle(.plain)
 
                 Button {
                     Task { await vm.acceptRequest(request) }
                 } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
-                        .background(SPColors.accent)
-                        .clipShape(Circle())
+                    ZStack {
+                        Circle().fill(SPRetro.ink)
+                            .frame(width: 34, height: 34).offset(x: 1.5, y: 2)
+                        Circle().fill(SPRetro.mustard)
+                            .frame(width: 34, height: 34)
+                        Circle().strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                            .frame(width: 34, height: 34)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 13, weight: .black))
+                            .foregroundStyle(SPRetro.ink)
+                    }
                 }
                 .buttonStyle(.plain)
             }
@@ -367,28 +416,35 @@ struct FriendSearchTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Retro search field — paperShade fill, ink panel border,
+            // AmericanTypewriter input. Same vocab as SPTextField.
             HStack(spacing: SPSpacing.sm) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(SPColors.textTertiary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(SPRetro.inkMuted)
                 TextField("Search by username or name", text: $vm.searchQuery)
-                    .font(SPFonts.body())
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter", size: 15))
+                    .foregroundStyle(SPRetro.ink)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                 if !vm.searchQuery.isEmpty {
                     Button { vm.searchQuery = "" } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
-                            .foregroundStyle(SPColors.textTertiary)
+                            .foregroundStyle(SPRetro.inkMuted)
                     }
                 }
             }
             .padding(.horizontal, SPSpacing.md)
             .frame(height: 44)
-            .background(SPColors.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-            .overlay(RoundedRectangle(cornerRadius: SPRadius.md).strokeBorder(SPColors.border, lineWidth: 0.5))
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: SPRadius.md)
+                        .fill(SPRetro.paperShade)
+                    RoundedRectangle(cornerRadius: SPRadius.md)
+                        .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                }
+            )
             .padding(.horizontal, SPSpacing.md)
             .padding(.vertical, SPSpacing.md)
 
@@ -453,11 +509,11 @@ struct SearchUserRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(user.displayName)
-                    .font(SPFonts.headline(14))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 14))
+                    .foregroundStyle(SPRetro.ink)
                 Text("@\(user.username)")
-                    .font(SPFonts.caption(12))
-                    .foregroundStyle(SPColors.textTertiary)
+                    .font(.custom("AmericanTypewriter", size: 12))
+                    .foregroundStyle(SPRetro.inkMuted)
             }
 
             Spacer()
@@ -470,30 +526,47 @@ struct SearchUserRow: View {
         .padding(.vertical, SPSpacing.sm + 2)
     }
 
+    // Retro "add user" affordance — three states each rendered as a
+    // small ink-bordered sticker: muted-teal "Friends" pill (paid),
+    // paperShade "Pending" pill (idle/awaiting), mustard +badge disc
+    // with offset shadow (CTA).
     @ViewBuilder
     private var addButton: some View {
         if user.isFriend {
             Label("Friends", systemImage: "checkmark")
-                .font(SPFonts.caption(11))
-                .foregroundStyle(SPColors.success)
+                .font(.custom("AmericanTypewriter-Bold", size: 11))
+                .tracking(0.4)
+                .foregroundStyle(SPRetro.teal)
         } else if user.hasPendingRequest {
             Text("Pending")
-                .font(SPFonts.caption(11))
-                .foregroundStyle(SPColors.textTertiary)
+                .font(.custom("AmericanTypewriter-Bold", size: 11))
+                .tracking(0.4)
+                .foregroundStyle(SPRetro.inkMuted)
                 .padding(.horizontal, SPSpacing.sm)
                 .padding(.vertical, 5)
-                .background(SPColors.surfaceHighlight)
-                .clipShape(RoundedRectangle(cornerRadius: SPRadius.sm))
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: SPRadius.sm)
+                            .fill(SPRetro.paperShade)
+                        RoundedRectangle(cornerRadius: SPRadius.sm)
+                            .strokeBorder(SPRetro.ink, lineWidth: 1)
+                    }
+                )
         } else {
             Button {
                 Task { await vm.sendRequest(to: user) }
             } label: {
-                Image(systemName: "person.badge.plus")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(SPColors.accent)
-                    .clipShape(Circle())
+                ZStack {
+                    Circle().fill(SPRetro.ink)
+                        .frame(width: 34, height: 34).offset(x: 1.5, y: 2)
+                    Circle().fill(SPRetro.mustard)
+                        .frame(width: 34, height: 34)
+                    Circle().strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                        .frame(width: 34, height: 34)
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(SPRetro.ink)
+                }
             }
             .buttonStyle(.plain)
         }

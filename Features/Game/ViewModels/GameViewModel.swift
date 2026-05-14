@@ -15,6 +15,29 @@ import Combine
 // - showCard (voluntary fold-show) ......... L436
 // - Convenience vars (mySeat, isMyTurn …) .. L543
 
+// ─── Turn Clock ──────────────────────────────────────────────────────────────
+// Standalone ObservableObject for the per-turn timer values. See the
+// `turnClock` property on GameViewModel for the rationale (5Hz tick was
+// invalidating the whole VM observer tree). Only views that actually need
+// the live progress (the seat's countdown ring + last-5s digit) hold an
+// @ObservedObject reference to this; the rest of the table observes the
+// VM directly and is unaffected by tick churn.
+@MainActor
+final class TurnClock: ObservableObject {
+    @Published var progress:    Double = 1.0  // 0…1, retained for any non-ring consumer
+    @Published var secondsLeft: Int    = 20   // whole-second display digit
+    // Absolute end time of the current turn — set once at turn start, then
+    // left alone. The ring view consumes this directly via TimelineView so
+    // the trim animates at the display refresh rate (~60Hz) instead of
+    // being driven by 5Hz `progress` writes from the Task loop (which
+    // looked choppy because SwiftUI was interpolating between five
+    // discrete points per second). nil ⇒ no active turn, hide the ring.
+    @Published var deadline:    Date?  = nil
+    // Total span of the current turn (base + time bank, in seconds). Used
+    // alongside `deadline` by the ring view to compute the trim ratio.
+    @Published var duration:    Double = 0
+}
+
 // Cached subset of TableDetail used by the in-game side menu. The websocket
 // game state doesn't include join code, owner, or buy-in limits — those come
 // from the lobby's REST detail endpoint and are loaded lazily.
@@ -37,7 +60,27 @@ final class GameViewModel: ObservableObject {
     @Published var gameState:     ClientGameState?
     @Published var chatMessages:  [ChatMessage] = []
     @Published var chatInput      = ""
-    @Published var showChat       = false
+    @Published var showChat       = false {
+        // Opening the chat clears any unread state and dismisses the transient
+        // top-right toast — the user is already looking at the panel, so the
+        // out-of-band cues are redundant.
+        didSet {
+            if showChat {
+                unreadChatCount = 0
+                chatToast = nil
+            }
+        }
+    }
+    /// Number of incoming messages received while the chat panel was closed.
+    /// Drives the red dot on the chat-toggle bubble button. Resets to 0 the
+    /// moment the user opens the panel (see `showChat.didSet`) or sends a
+    /// message themselves (sending implies "I'm aware of the conversation").
+    @Published private(set) var unreadChatCount: Int = 0
+    /// Transient surface for the last incoming message. Drives the small
+    /// truncated banner that fades in at the top-right of the table when
+    /// chat is closed. Auto-cleared by a `.task(id:)` timer in the view, so
+    /// the VM only needs to publish — it does not own the dismiss schedule.
+    @Published var chatToast: ChatMessage?
     @Published var showWinners    = false
     @Published var winnerPayouts: [WinnerPayout] = []
 
@@ -48,9 +91,18 @@ final class GameViewModel: ObservableObject {
     @Published var errorMessage:   String?
     @Published var lastActionLabel: String?
 
-    // Timer
-    @Published var turnTimeRemaining: Double = 1.0  // 0..1 progress
-    @Published var turnSecondsLeft:   Int    = 20
+    // Timer — moved off the GameViewModel @Published cascade and onto a
+    // dedicated TurnClock object. Background: the timer task ticks at 5Hz,
+    // and when those two values were @Published on this VM, every tick fired
+    // objectWillChange, which re-evaluated the entire body of every view
+    // observing the VM (GameView, PokerTableView, ActionBar, GameHUD, …)
+    // five times per second. That was the source of the per-second stutter
+    // the user felt during normal play. Isolating the clock means only the
+    // small wrapper view that explicitly subscribes to it (the seat ring +
+    // last-5s countdown digit in PokerTableView) re-renders on tick. Static
+    // chrome — the felt, pot, board, action bar — stays stable between server
+    // game-state pushes.
+    let turnClock = TurnClock()
 
     /// True after the local player has used their per-turn +15s extension.
     /// Reset when the active player changes (i.e. each new turn). Drives
@@ -84,6 +136,22 @@ final class GameViewModel: ObservableObject {
     // play a matching chip/fold sound when another player acts.
     private var lastSeenActionTimestamp: Int = 0
 
+    // ─── Checked-down auto-reveal ──────────────────────────────────────────
+    // Stays true for hands where no aggression beyond the blinds happens —
+    // i.e. nobody RAISEs and nobody goes ALL_IN. When a hand like that
+    // reaches showdown, the local player's hole cards are auto-broadcast
+    // to the rest of the table the moment winners are declared, so the
+    // user doesn't have to tap "show". A bet anywhere in the hand flips
+    // this off and we revert to the normal opt-in tap-to-show flow.
+    @Published private(set) var noBetsThisHand: Bool = true
+    /// Hand number we last saw — drives the per-hand reset of
+    /// `noBetsThisHand` and `hasAutoShownThisHand`.
+    private var lastSeenHandNumber: Int = 0
+    /// Guards against re-firing the auto-show on every state push for the
+    /// rest of the hand. The first push that meets the conditions fires
+    /// the broadcasts; subsequent pushes are ignored.
+    private var hasAutoShownThisHand: Bool = false
+
     // Kick/exit
     @Published var wasKicked = false
     @Published var shouldExit = false
@@ -103,6 +171,12 @@ final class GameViewModel: ObservableObject {
     let tableId:  String
     let tableName: String
     private let userId:   String
+    /// Public accessor for the cached local user ID. Views (e.g. GameView's
+    /// `sortedSeats`, ChatOverlay) call this on every body evaluation, so we
+    /// expose the cached value rather than have each call site reach into
+    /// KeychainManager.shared.userId — which would trigger a synchronous
+    /// Keychain syscall (SecItemCopyMatching) per render. Set once at init.
+    var localUserId: String { userId }
     private let socket   = GameSocketClient.shared
     private let keychain = KeychainManager.shared
     private var cancellables = Set<AnyCancellable>()
@@ -131,6 +205,11 @@ final class GameViewModel: ObservableObject {
         // Cut any in-flight sfx (e.g. a timer tick scheduled right before
         // exit) so audio doesn't continue over the rejoin banner.
         SoundManager.shared.stopAll()
+        // End any running Live Activity. This covers the "user dismissed
+        // the table view but left the app open" path; the in-app teardown
+        // happens here, while the timer-based teardown lives inside
+        // updateTurnTimer for normal turn-end transitions.
+        PokerActionActivityManager.shared.end()
     }
 
     // ─── Subscriptions ────────────────────────────────────────────────────────
@@ -144,8 +223,20 @@ final class GameViewModel: ObservableObject {
         socket.chatSubject
             .receive(on: RunLoop.main)
             .sink { [weak self] msg in
-                self?.chatMessages.append(msg)
-                if self?.chatMessages.count ?? 0 > 100 { self?.chatMessages.removeFirst() }
+                guard let self else { return }
+                self.chatMessages.append(msg)
+                if self.chatMessages.count > 100 { self.chatMessages.removeFirst() }
+                // Out-of-band notifications when the chat panel is closed and
+                // the message is from someone else. Echoes of the local user's
+                // own sends skip both surfaces — bumping the unread badge for
+                // your own message would be misleading. Toast updates fire
+                // unconditionally (each new incoming message replaces any
+                // currently-visible toast so the latest is what the user sees).
+                let isFromMe = msg.userId == self.userId
+                if !isFromMe && !self.showChat {
+                    self.unreadChatCount += 1
+                    self.chatToast = msg
+                }
             }
             .store(in: &cancellables)
 
@@ -162,13 +253,20 @@ final class GameViewModel: ObservableObject {
                 }
                 // Persist to local hand history for the Review feature.
                 HandRecorder.shared.finalize(winners: payouts)
-                Task {
+                Task { [weak self] in
                     // Hide the winner-celebration UI 2s sooner than before
                     // (was 4s) so the next deal feels snappy. Note: the
                     // *server* still controls when the next hand actually
                     // starts dealing — if next-hand pacing still feels slow,
                     // shorten the matching delay in the backend hand loop.
+                    //
+                    // [weak self]: the outer Combine sink already uses [weak
+                    // self], but this inner Task was capturing self strongly,
+                    // keeping the VM alive past scene-disconnect and crashing
+                    // with EXC_BAD_ACCESS when the sleep resolves on a half-
+                    // torn-down view tree. Drop the work if VM is gone.
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard let self else { return }
                     withAnimation { self.showWinners = false }
                 }
             }
@@ -196,9 +294,13 @@ final class GameViewModel: ObservableObject {
                 // open the slider it will re-clamp to the current legal range.
                 self.showRaiseSlider = false
 
-                Task {
+                Task { [weak self] in
+                    // See comment on the showWinners Task above — same
+                    // pattern, same EXC_BAD_ACCESS risk if the VM is torn
+                    // down during the 3s sleep (e.g., user swipes the game
+                    // scene off while a server error toast is in-flight).
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    self.errorMessage = nil
+                    self?.errorMessage = nil
                 }
             }
             .store(in: &cancellables)
@@ -206,6 +308,24 @@ final class GameViewModel: ObservableObject {
         socket.kickedSubject
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.wasKicked = true }
+            .store(in: &cancellables)
+
+        // ─── Live Activity → fold bridge ──────────────────────────────────────
+        // When the user taps "Fold" in the Dynamic Island / Lock Screen tile,
+        // the OpenIntent in the widget extension launches the app with a
+        // `stackpoker://table/<id>/action/fold` URL. StackPokerApp.swift's
+        // .onOpenURL handler parses it and posts to the router, which fans
+        // out via this notification. We filter to make sure the fold is for
+        // *this* table (multiple GameViewModels could theoretically exist if
+        // the user navigates between tables, even if the UI only shows one),
+        // then run it through the same re-validating path the URL handler
+        // uses on cold launch — so a tap that arrives after the turn ended
+        // is silently dropped instead of firing on the next street.
+        NotificationCenter.default.publisher(for: PokerActionDeepLinkRouter.foldNotification)
+            .compactMap { $0.userInfo?["tableId"] as? String }
+            .filter { [weak self] in $0 == self?.tableId }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.foldFromDeepLink() }
             .store(in: &cancellables)
     }
 
@@ -216,10 +336,49 @@ final class GameViewModel: ObservableObject {
         let prevCardCount = gameState?.seats.first(where: { $0.userId == userId })?.holeCards?.count ?? 0
         let prevCommunityCount = gameState?.communityCards.count ?? 0
 
-        withAnimation(.easeInOut(duration: 0.25)) {
-            gameState = state
+        // PERF: previously this assignment was wrapped in
+        // `withAnimation(.easeInOut(duration: 0.25)) { ... }`. That wrap was
+        // the root cause of the action-button stutter — it animated EVERY
+        // property derived from gameState (isMyTurn, mySeat.status, every
+        // seat field, legalActions, the works) inside a single 0.25s easeInOut
+        // transaction. Downstream views with their own .animation(value:)
+        // modifiers (hole cards' spring, community-board ease, pot/bets
+        // springs in PokerTableView) then opened SECOND transactions on top,
+        // and the two sets fought over the same animatable properties — which
+        // is exactly what the user saw: a smooth deal during quiet moments,
+        // but a visible "snap-back / hitch" the moment a button press caused
+        // a state broadcast that flipped many properties at once.
+        //
+        // Each view that should animate already has a scoped .animation(value:)
+        // attached to the specific value it cares about, so removing the global
+        // wrap leaves every intentional animation intact while killing the
+        // accidental cross-cutting one.
+        gameState = state
+        // Per-hand reset of the checked-down auto-reveal flags. Detected via
+        // handNumber transition rather than phase, because phase can re-enter
+        // .waiting between hands without strictly bumping the hand number on
+        // some server builds. handNumber is the most authoritative
+        // monotonic identifier of "this is a fresh hand".
+        if state.handNumber != lastSeenHandNumber {
+            lastSeenHandNumber   = state.handNumber
+            noBetsThisHand       = true
+            hasAutoShownThisHand = false
         }
         updateTurnTimer(state)
+
+        // ─── Cold-launch fold consumption ─────────────────────────────────────
+        // If the app was launched from a Live Activity Fold tap while the
+        // process was killed, the URL handler ran *before* this VM existed,
+        // so the NotificationCenter sink above missed it. The router caches
+        // the request as `pendingFold` for exactly this case. On every
+        // incoming game state we ask the router whether there's a fresh
+        // pending fold for this table — `consumePendingFold` clears the slot
+        // on first hit, so it's idempotent across subsequent state pushes.
+        // The fold itself still goes through `foldFromDeepLink`, which
+        // re-validates that it's actually our turn before firing.
+        if PokerActionDeepLinkRouter.shared.consumePendingFold(forTableId: tableId) {
+            foldFromDeepLink()
+        }
 
         // Capture for hand-history / review feature. Cheap, runs on main.
         let myUsername = state.seats.first(where: { $0.userId == userId })?.username ?? ""
@@ -287,6 +446,14 @@ final class GameViewModel: ObservableObject {
         if let last = state.lastAction,
            last.timestamp > lastSeenActionTimestamp {
             lastSeenActionTimestamp = last.timestamp
+            // Aggression tracking for the "checked-down auto-reveal" path:
+            // any RAISE or ALL_IN by ANYONE means the hand had real betting,
+            // so we drop the flag for the remainder of the hand. Blinds
+            // (SMALL_BLIND / BIG_BLIND) are forced posts and don't count.
+            // CHECK / CALL / FOLD don't put new aggression into the pot.
+            if last.action == "RAISE" || last.action == "ALL_IN" {
+                noBetsThisHand = false
+            }
             if last.playerId != userId {
                 switch last.action {
                 case "FOLD":        SoundManager.shared.play(.fold)
@@ -298,6 +465,48 @@ final class GameViewModel: ObservableObject {
                 case "ALL_IN":      SoundManager.shared.play(.allIn)
                 default: break
                 }
+            }
+        }
+
+        // Checked-down auto-reveal. Fires once per hand the first time we
+        // see winners declared on a hand with no aggression by the local
+        // player or anyone else — broadcasts every still-hidden hole card
+        // so the table sees them automatically, instead of forcing the
+        // user to tap each one. We gate on `mySeat?.status != .folded`
+        // because a folded hero shouldn't have their cards exposed
+        // against their will (they intentionally mucked); they can still
+        // opt in via the existing tap-to-show flow.
+        //
+        // Additionally require at least one winner to have `showCards`
+        // true: the server flips that on for genuine contested showdowns
+        // (endHand(true)) but leaves it false for uncontested fold-wins
+        // (endHand(false)). Without this guard, winning a hand because
+        // everyone folded preflop — no RAISE/ALL_IN, so `noBetsThisHand`
+        // is still true — would auto-broadcast the winner's hole cards
+        // even though they took the pot uncontested. That defeats the
+        // whole point of folding for protection. Fold-winners can still
+        // voluntarily flex via tap-to-show.
+        if !hasAutoShownThisHand,
+           noBetsThisHand,
+           let winners = state.winners,
+           !winners.isEmpty,
+           winners.contains(where: { $0.showCards }),
+           let me = state.seats.first(where: { $0.userId == userId }),
+           me.status != .folded,
+           me.status != .sittingOut,
+           let cards = me.holeCards,
+           !cards.isEmpty {
+            // Mark first so subsequent state pushes during the same
+            // hand-end window don't re-fire the broadcasts.
+            hasAutoShownThisHand = true
+            let alreadyShown = Set((me.revealedCards ?? []).map(\.index))
+            // Pin handNumber from the snapshot we're auto-showing for.
+            // If the hand transitions before these reach the server (rare,
+            // but possible during a fast HAND_START_DELAY) the server-side
+            // handNumber guard will drop the stale tap.
+            let handNumber = state.handNumber
+            for idx in 0..<cards.count where !alreadyShown.contains(idx) {
+                socket.showCard(tableId: tableId, cardIndex: idx, handNumber: handNumber)
             }
         }
     }
@@ -332,11 +541,21 @@ final class GameViewModel: ObservableObject {
 
         guard state.activePlayerId != nil,
               state.actionDeadline > 0 else {
-            turnTimeRemaining = 1.0
+            turnClock.progress    = 1.0
             // Fallback only — real value is server-authoritative via
             // state.turnDuration. The matching shorter base TURN_DURATION
             // belongs in the backend; this just keeps offline/test UIs sane.
-            turnSecondsLeft   = 20
+            turnClock.secondsLeft = 20
+            // Clear the absolute deadline so the TimelineView-driven ring
+            // hides itself. Without this it would keep ticking down past
+            // the previous turn's deadline until the next state push.
+            turnClock.deadline    = nil
+            turnClock.duration    = 0
+            // No active player or no deadline → end any running Live
+            // Activity. This is the path hit when the hand resolves, when
+            // we leave the table, and during showdown — all moments where
+            // a lingering "your action" island chip would be misleading.
+            PokerActionActivityManager.shared.end()
             return
         }
 
@@ -353,24 +572,106 @@ final class GameViewModel: ObservableObject {
 
         lastWarningSecond = -1
         let isMe = state.activePlayerId == userId
+
+        // Publish the absolute deadline + total span once. The ring view
+        // (TimelineView, ~60Hz) reads these directly and computes its trim
+        // ratio on the fly, so we don't need to push thousands of progress
+        // values through @Published just to feed a single Circle.
+        // Set duration first: if the view happens to read between these two
+        // assignments, a non-zero duration with the previous deadline is
+        // self-correcting on the next frame.
+        turnClock.duration = total
+        turnClock.deadline = deadline
+        // Snap progress to the initial ratio so any consumer that still
+        // reads `progress` (currently none in the ring path) gets a sane
+        // initial value rather than a stale 0/1 from the previous turn.
+        turnClock.progress = max(0, min(1, deadline.timeIntervalSinceNow / total))
+
+        // ── Live Activity sync ─────────────────────────────────────────────
+        // Start a Live Activity at the moment it becomes the local player's
+        // turn, end it the moment the turn passes to anyone else. Doing
+        // this here (inside updateTurnTimer) keeps the activity perfectly
+        // aligned with the in-app turn ring — every server state push that
+        // changes the timer also touches the activity.
+        if isMe {
+            // Build the content state from the latest server snapshot.
+            // The deadline is absolute, so the widget self-ticks the
+            // countdown without us pushing per-second updates.
+            let myStack = state.seats.first(where: { $0.userId == userId })?.stack ?? 0
+            let toCall  = state.legalActions.first(where: { $0.action == .call })?.callAmount ?? 0
+            let content = PokerActionAttributes.ContentState(
+                deadline: deadline,
+                pot:      state.totalPot,
+                toCall:   toCall,
+                myStack:  myStack
+            )
+            PokerActionActivityManager.shared.start(
+                tableId:     state.tableId,
+                tableName:   tableName,
+                blindsLabel: "\(state.smallBlind)/\(state.bigBlind)",
+                state:       content
+            )
+        } else {
+            // Not our turn anymore (or never was) — clear any activity from
+            // a prior turn. The manager is idempotent if nothing's running.
+            PokerActionActivityManager.shared.end()
+        }
+
         turnTimerTask = Task { [weak self] in
+            // Loop responsibilities, post-refactor: drive the whole-second
+            // countdown digit and fire the per-second warning haptic in the
+            // final 5s. We no longer publish a fractional `progress` here —
+            // the ring view computes that itself from clock.deadline via
+            // TimelineView, which renders at the display's refresh rate
+            // (typically 60Hz, 120Hz on ProMotion) for a fluid sweep instead
+            // of the previous 5Hz step. Sleep cadence dropped to 1s for the
+            // same reason: nothing in this loop needs sub-second granularity
+            // anymore.
             while !Task.isCancelled {
                 let remaining = deadline.timeIntervalSinceNow
-                let progress  = max(0, min(1, remaining / total))
                 let secs      = max(0, Int(ceil(remaining)))
-                self?.turnTimeRemaining = progress
-                self?.turnSecondsLeft   = secs
-                // Timer warning: tick haptic + sound only in the final 5 seconds
-                // for the local player, matching the visible countdown overlay.
+                if let clock = self?.turnClock {
+                    if clock.secondsLeft != secs { clock.secondsLeft = secs }
+                }
                 if isMe, secs <= 5, secs > 0, secs != self?.lastWarningSecond {
                     self?.lastWarningSecond = secs
                     self?.haptic(.light)
                     SoundManager.shared.play(.timerWarning)
                 }
-                if remaining <= 0 { break }
-                try? await Task.sleep(nanoseconds: 200_000_000)
+                if remaining <= 0 {
+                    // Deadline elapsed locally — also end the Live Activity
+                    // here as a safety net. The next server state push will
+                    // arrive momentarily and will also call end() via the
+                    // isMe==false branch above; this just makes sure the
+                    // island chip never overstays the actual decision
+                    // window even if that next push is briefly delayed.
+                    if isMe {
+                        await PokerActionActivityManager.shared.end()
+                    }
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
+    }
+
+    // ─── Live Activity bridge ─────────────────────────────────────────────────
+    // Allow callers (e.g. the URL handler in StackPokerApp.swift, when the
+    // user taps "Fold" in the Dynamic Island) to trigger a fold without
+    // touching internal state directly. Re-validates that it is in fact
+    // our turn — if the deep link arrives after the turn has already passed
+    // (because of app launch latency), we silently discard rather than
+    // accidentally firing a fold on the wrong street.
+    func foldFromDeepLink() {
+        guard let s = gameState,
+              s.activePlayerId == userId,
+              s.legalActions.contains(where: { $0.action == .fold })
+        else {
+            // Turn already gone — clean up the now-stale activity if any.
+            PokerActionActivityManager.shared.end()
+            return
+        }
+        fold()
     }
 
     // ─── Player Actions ───────────────────────────────────────────────────────
@@ -384,9 +685,13 @@ final class GameViewModel: ObservableObject {
 
         // Optimistic label
         lastActionLabel = action.label
-        Task {
+        Task { [weak self] in
+            // [weak self]: see EXC_BAD_ACCESS notes on the showWinners /
+            // errorMessage Tasks. If the VM is torn down (scene-disconnect,
+            // user swipes away) during the 2s sleep, the trailing property
+            // write must no-op rather than crash on a zombie self.
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            lastActionLabel = nil
+            self?.lastActionLabel = nil
         }
     }
 
@@ -414,9 +719,11 @@ final class GameViewModel: ObservableObject {
     func allIn() {
         haptic(.heavy)
         SoundManager.shared.play(.allIn)
-        Task {
+        Task { [weak self] in
+            // Double-tap haptic for the all-in. [weak self] so the second
+            // pulse no-ops if the VM has been torn down in the 100ms gap.
             try? await Task.sleep(nanoseconds: 100_000_000)
-            self.haptic(.heavy)
+            self?.haptic(.heavy)
         }
         sendAction(.allIn)
     }
@@ -449,7 +756,12 @@ final class GameViewModel: ObservableObject {
     /// which drives the flip animation in HoleCardsView.
     func showCard(at index: Int) {
         haptic(.light)
-        socket.showCard(tableId: tableId, cardIndex: index)
+        // Snapshot the hand number at the moment of tap. The server's
+        // handNumber guard rejects this tap if the engine has rolled
+        // forward to the next hand by the time it arrives, which prevents
+        // a last-second tap from exposing a card in the next deal.
+        let handNumber = gameState?.handNumber ?? 0
+        socket.showCard(tableId: tableId, cardIndex: index, handNumber: handNumber)
     }
 
     // True when local player is the only active seat (or table is empty of others)
@@ -573,6 +885,42 @@ final class GameViewModel: ObservableObject {
     /// dim-the-losers / highlight-the-winners visual state.
     var anyWinnersDeclared: Bool {
         !(gameState?.winners?.isEmpty ?? true)
+    }
+
+    /// True iff the current showdown will trigger the checked-down
+    /// auto-reveal of the local player's hole cards. Mirrors the predicate
+    /// inside `handleGameState` (around L489) — keep these two in sync.
+    ///
+    /// GameView uses this to decide whether to *suppress* the tap-to-show
+    /// prompt: if auto-reveal will fire, the explicit "TAP A CARD TO SHOW"
+    /// prompt would be misleading. The previous version of this check lived
+    /// inline in GameView and only tested `noBetsThisHand && anyWinnersDeclared
+    /// && !isFolded`, which gave a false positive on uncontested preflop
+    /// fold-wins: those satisfy all three conditions but the *real*
+    /// auto-reveal additionally requires at least one winner with
+    /// `showCards == true` (set by the server only for contested showdowns).
+    /// That false positive blocked the user from voluntarily flexing their
+    /// winning hand after the opponent folded preflop — fixed 2026-05-13.
+    var isAutoRevealingMyCards: Bool {
+        guard noBetsThisHand,
+              let winners = gameState?.winners,
+              !winners.isEmpty,
+              winners.contains(where: { $0.showCards }),
+              mySeat?.status != .folded,
+              mySeat?.status != .sittingOut
+        else { return false }
+        return true
+    }
+
+    /// True only when *the local player* is among the declared winners. Used
+    /// to gate the gold winning-card border on the local hole-cards overlay
+    /// (GameView.localPlayerOverlay) so a card whose rank+suit happens to
+    /// appear in winnerCardIds — impossible by construction today, but a
+    /// cheap defence-in-depth guard against future regressions — won't get
+    /// painted gold while you're the loser at a PLO all-in showdown.
+    var isMeWinner: Bool {
+        guard let winners = gameState?.winners else { return false }
+        return winners.contains(where: { $0.playerId == userId })
     }
 
     var legalActions: [LegalAction] { gameState?.legalActions ?? [] }

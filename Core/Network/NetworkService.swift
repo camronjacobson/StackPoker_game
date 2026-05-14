@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+// UIKit needed for UIDevice.current.identifierForVendor (sent as the
+// X-Device-ID header so the backend can correlate sessions per install).
+import UIKit
 
 // ─── API Configuration ────────────────────────────────────────────────────────
 
@@ -58,6 +61,10 @@ enum APIEndpoint {
     // Users
     case userProfile(id: String)
     case updateProfile
+    // Light-weight profile blob used by the in-game opponent popup. Returns
+    // VPIP stats + friendship status in a single request so the popup can
+    // render the right friend-button state without an extra round trip.
+    case quickProfile(userId: String)
 
     // Lobby
     case tables
@@ -70,8 +77,10 @@ enum APIEndpoint {
 
     // Friends
     case friends
+    case friendRequests
     case sendFriendRequest(userId: String)
     case respondFriendRequest(id: String)
+    case removeFriend(id: String)
     case searchUsers(query: String)
 
     // Clubs
@@ -87,6 +96,13 @@ enum APIEndpoint {
     case chipHistory
     case dailyBonus
     case transferChips
+
+    // Cosmetics
+    // POST /cosmetics/purchase — server-authoritative atomic chip deduction +
+    // ownership grant. Backend route is added in the same Phase 1 patch as
+    // the iOS-side StorePurchaseService; until that lands, this endpoint
+    // 404s and LiveNetworkPurchasePort surfaces it as PurchaseError.network.
+    case purchaseCosmetic
 
     // Invites
     case tableInvites
@@ -113,6 +129,7 @@ enum APIEndpoint {
         case .me:                    return "/auth/me"
         case .userProfile(let id):   return "/users/\(id)"
         case .updateProfile:         return "/auth/me"
+        case .quickProfile(let id):  return "/users/\(id)/quick-profile"
         case .tables:                return "/tables"
         case .createTable:           return "/tables"
         case .joinTable(let code):   return "/tables/join/\(code)"
@@ -121,9 +138,17 @@ enum APIEndpoint {
         case .closeTable(let id):    return "/tables/\(id)/close"
         case .topUpChips(let id):    return "/tables/\(id)/topup"
         case .friends:               return "/friends"
+        case .friendRequests:        return "/friends/requests"
         case .sendFriendRequest(let id): return "/friends/request/\(id)"
         case .respondFriendRequest(let id): return "/friends/\(id)/respond"
-        case .searchUsers(let q):    return "/users/search?q=\(q)"
+        case .removeFriend(let id):  return "/friends/\(id)"
+        // Backend serves the search route under /friends, not /users.
+        // Percent-encoding is required because the user can type spaces or
+        // any URL-reserved character — without it, " " produces an invalid
+        // URL and `URL(string:)` returns nil before we ever hit the server.
+        case .searchUsers(let q):
+            let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
+            return "/friends/search?q=\(encoded)"
         case .clubs:                 return "/clubs"
         case .createClub:            return "/clubs"
         case .joinClub(let code):    return "/clubs/join/\(code)"
@@ -134,6 +159,7 @@ enum APIEndpoint {
         case .chipHistory:           return "/chips/history"
         case .dailyBonus:            return "/chips/daily"
         case .transferChips:         return "/chips/transfer"
+        case .purchaseCosmetic:      return "/cosmetics/purchase"
         case .tableInvites:                return "/tables/invites/pending"
         case .respondInvite(let id):       return "/tables/invites/\(id)/respond"
         case .sendInvite(let tid):         return "/tables/\(tid)/invite"

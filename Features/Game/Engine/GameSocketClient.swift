@@ -44,6 +44,20 @@ final class GameSocketClient: ObservableObject {
 
     private let decoder = JSONDecoder()
 
+    // Serial background queue for parsing + decoding incoming socket events.
+    // The full ClientGameState JSON is non-trivial (9 seats, hole cards,
+    // run-out boards, winners, revealedCards…) and decoding it on the main
+    // thread used to hitch button taps and animation transactions whenever
+    // a state update landed mid-frame. Decoding here off-main and letting
+    // each subject's downstream `.receive(on: RunLoop.main)` hop the typed
+    // value back to main keeps the UI thread free.
+    //
+    // Why serial (not concurrent): event order matters — a `game_state`
+    // emit immediately followed by another must be applied in send order,
+    // otherwise the UI can briefly snap backward to an older snapshot.
+    // A serial queue preserves that ordering at zero coordination cost.
+    private let eventQueue = DispatchQueue(label: "GameSocketClient.events", qos: .userInteractive)
+
     private init() {}
 
     // ─── Connect ──────────────────────────────────────────────────────────────
@@ -111,8 +125,18 @@ final class GameSocketClient: ObservableObject {
     /// including the sender, so we render the reveal off the broadcast
     /// rather than optimistically. Idempotent on the server side — a
     /// duplicate tap is a no-op.
-    func showCard(tableId: String, cardIndex: Int) {
-        sendEvent("show_cards", data: ["tableId": tableId, "cardIndex": cardIndex])
+    ///
+    /// `handNumber` lets the server reject taps that landed during the
+    /// next hand. Without it, a late tap at hand-end could expose a card
+    /// in the *new* deal's hole cards because the index pushes onto the
+    /// post-startHand seat. Optional on the wire so older builds still
+    /// work; the server only enforces the match when the field is sent.
+    func showCard(tableId: String, cardIndex: Int, handNumber: Int) {
+        sendEvent("show_cards", data: [
+            "tableId":    tableId,
+            "cardIndex":  cardIndex,
+            "handNumber": handNumber,
+        ])
     }
 
     /// Requests a +15s extension on the active player's decision timer.
@@ -193,8 +217,14 @@ final class GameSocketClient: ObservableObject {
         }
 
         // Socket.IO EVENT: "42[...]"
+        // Offload parsing + JSON decode to the serial background queue so
+        // the main thread isn't doing decode work during animations. Order
+        // is preserved by the queue's serial nature.
         guard text.hasPrefix("42") else { return }
-        parseSocketEvent(String(text.dropFirst(2)))
+        let payload = String(text.dropFirst(2))
+        eventQueue.async { [weak self] in
+            self?.parseSocketEvent(payload)
+        }
     }
 
     private func parseSocketEvent(_ json: String) {
@@ -240,7 +270,15 @@ final class GameSocketClient: ObservableObject {
         case "error":
             if let err = try? decoder.decode(WsEnvelope<WsErrorData>.self, from: envData) {
                 errorSubject.send(err.data)
-                lastError = err.data.message
+                // `lastError` is @Published — must be written on main so
+                // SwiftUI's objectWillChange fires on the UI thread. The
+                // subject above is consumed via .receive(on:) downstream
+                // so it doesn't need this hop, but the direct property
+                // write does.
+                let message = err.data.message
+                DispatchQueue.main.async { [weak self] in
+                    self?.lastError = message
+                }
             }
 
         case "pong":

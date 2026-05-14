@@ -83,6 +83,11 @@ final class AuthViewModel: ObservableObject {
         do {
             let user: UserProfile = try await network.request(.me)
             currentUser = user
+            // Scope hand history to this user before any UI binds to it,
+            // otherwise the Review tab can briefly render the previous
+            // session's data on a cold launch. See HandHistoryStore for
+            // why this scoping exists.
+            HandHistoryStore.shared.setActiveUser(user.id)
             isAuthenticated = true
         } catch {
             // Refresh succeeded but profile failed — clear session
@@ -344,6 +349,11 @@ final class AuthViewModel: ObservableObject {
         network.accessToken = nil
         currentUser = nil
         isAuthenticated = false
+        // Detach hand history. The previous user's data stays on disk under
+        // their userId path so it's still there if they sign back in; this
+        // call just clears the in-memory copy so the Review tab is empty
+        // until the next user signs in.
+        HandHistoryStore.shared.setActiveUser(nil)
         clearForm()
     }
 
@@ -378,6 +388,10 @@ final class AuthViewModel: ObservableObject {
         network.accessToken = response.tokens.accessToken
 
         currentUser = response.user
+        // Scope hand history to the freshly-signed-in user. Same reason as
+        // checkSession — must run before isAuthenticated flips so any view
+        // that observes that flag reads the correct summaries on first paint.
+        HandHistoryStore.shared.setActiveUser(response.user.id)
         isAuthenticated = true
         clearForm()
     }

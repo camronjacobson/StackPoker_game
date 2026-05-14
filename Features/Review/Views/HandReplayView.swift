@@ -48,7 +48,10 @@ struct HandReplayView: View {
                 // — they don't scroll away with the commentary cards.
                 EquityStripView(vm: vm)
 
-                Divider().background(SPColors.border)
+                // Retro divider: solid ink hairline. No system Divider().
+                Rectangle()
+                    .fill(SPRetro.ink)
+                    .frame(height: 1)
 
                 analysisList
             }
@@ -57,11 +60,11 @@ struct HandReplayView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Hand #\(vm.hand.handNumber)")
-                    .font(SPFonts.headline())
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 17))
+                    .foregroundStyle(SPRetro.ink)
             }
         }
-        .tint(SPColors.textPrimary)   // colors the system back chevron
+        .tint(SPRetro.ink)   // colors the system back chevron
         .onAppear  { TabBarVisibility.shared.isHidden = true }
         .onDisappear {
             TabBarVisibility.shared.isHidden = false
@@ -82,12 +85,12 @@ struct HandReplayView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(vm.hand.tableName)
-                    .font(SPFonts.headline(15))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 15))
+                    .foregroundStyle(SPRetro.ink)
                     .lineLimit(1)
                 Text("vs \(vm.hand.opponents.joined(separator: ", "))")
-                    .font(SPFonts.caption(11))
-                    .foregroundStyle(SPColors.textSecondary)
+                    .font(.custom("AmericanTypewriter", size: 11))
+                    .foregroundStyle(SPRetro.inkMuted)
                     .lineLimit(1)
             }
 
@@ -96,12 +99,12 @@ struct HandReplayView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(vm.hand.iWon ? "+\(formatChips(vm.hand.stackDelta))"
                                   : formatChips(vm.hand.stackDelta))
-                    .font(SPFonts.chips(16))
+                    .font(.custom("ChalkboardSE-Bold", size: 16))
                     .foregroundStyle(vm.hand.iWon ? SPColors.success : SPColors.danger)
                 if let name = vm.hand.winningHandName {
                     Text(name)
-                        .font(SPFonts.caption(10))
-                        .foregroundStyle(SPColors.textSecondary)
+                        .font(.custom("AmericanTypewriter", size: 10))
+                        .foregroundStyle(SPRetro.inkMuted)
                         .lineLimit(1)
                 }
             }
@@ -127,8 +130,8 @@ struct HandReplayView: View {
                 .frame(height: 32)
 
                 Text("\(vm.frameIndex + 1)/\(vm.totalFrames)")
-                    .font(SPFonts.caption(11))
-                    .foregroundStyle(SPColors.textSecondary)
+                    .font(.custom("ChalkboardSE-Bold", size: 11))
+                    .foregroundStyle(SPRetro.inkMuted)
                     .monospacedDigit()
             }
 
@@ -159,26 +162,34 @@ struct HandReplayView: View {
                     haptic(.medium)
                     vm.togglePlay()
                 } label: {
+                    // Retro play disc: ink track + mustard progress arc +
+                    // mustard inner disc with ink border + hard ink offset
+                    // shadow. Reads as a stamped sticker button.
                     ZStack {
                         Circle()
-                            .stroke(Color.white.opacity(0.10), lineWidth: 2.5)
+                            .stroke(SPRetro.ink.opacity(0.25), lineWidth: 2.5)
                             .frame(width: 50, height: 50)
                         Circle()
                             .trim(from: 0, to: max(0.001, vm.progress))
                             .stroke(
-                                SPColors.accent,
+                                SPRetro.mustardDark,
                                 style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                             )
                             .frame(width: 50, height: 50)
                             .rotationEffect(.degrees(-90))
                         Circle()
-                            .fill(SPColors.accent)
+                            .fill(SPRetro.ink)
                             .frame(width: 42, height: 42)
-                            .shadow(color: SPColors.accent.opacity(0.45),
-                                    radius: 6)
+                            .offset(x: 1.5, y: 2)
+                        Circle()
+                            .fill(SPRetro.mustard)
+                            .frame(width: 42, height: 42)
+                        Circle()
+                            .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                            .frame(width: 42, height: 42)
                         Image(systemName: vm.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 17, weight: .heavy))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(SPRetro.ink)
                             .offset(x: vm.isPlaying ? 0 : 1.5) // optical center play tri.
                     }
                 }
@@ -204,17 +215,16 @@ struct HandReplayView: View {
                         Image(systemName: speedIcon(vm.playbackSpeed))
                             .font(.system(size: 11, weight: .bold))
                         Text(speedLabel(vm.playbackSpeed))
-                            .font(.system(size: 11, weight: .bold,
-                                          design: .rounded))
+                            .font(.custom("ChalkboardSE-Bold", size: 11))
                             .monospacedDigit()
                     }
                     .padding(.horizontal, 8)
                     .frame(height: 28)
-                    .background(Capsule().fill(SPColors.surfaceElevated))
-                    .overlay(
-                        Capsule().strokeBorder(
-                            Color.white.opacity(0.08), lineWidth: 0.5
-                        )
+                    .background(
+                        ZStack {
+                            Capsule().fill(SPRetro.paperShade)
+                            Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                        }
                     )
                 }
 
@@ -229,29 +239,28 @@ struct HandReplayView: View {
                         narrator.speak(newest)
                     }
                 } label: {
+                    // Retro narration toggle: mustard sticker capsule when
+                    // on, paperShade idle. Both with ink border 1.2pt.
                     Image(systemName: narrator.enabled
                           ? "speaker.wave.2.fill"
                           : "speaker.slash.fill")
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 32, height: 28)
                         .background(
-                            Capsule()
-                                .fill(narrator.enabled
-                                      ? SPColors.accent.opacity(0.25)
-                                      : SPColors.surfaceElevated)
+                            ZStack {
+                                Capsule().fill(
+                                    narrator.enabled
+                                        ? SPRetro.mustard
+                                        : SPRetro.paperShade
+                                )
+                                Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                            }
                         )
-                        .overlay(
-                            Capsule().strokeBorder(
-                                Color.white.opacity(0.08), lineWidth: 0.5
-                            )
-                        )
-                        .foregroundStyle(narrator.enabled
-                                         ? SPColors.accent
-                                         : SPColors.textPrimary)
+                        .foregroundStyle(SPRetro.ink)
                 }
                 .accessibilityLabel(narrator.enabled ? "Mute narration" : "Enable narration")
             }
-            .foregroundStyle(SPColors.textPrimary)
+            .foregroundStyle(SPRetro.ink)
         }
     }
 
@@ -280,8 +289,8 @@ struct HandReplayView: View {
                 LazyVStack(spacing: SPSpacing.sm) {
                     if vm.visibleAnalyses.isEmpty {
                         Text("Press play or scrub to see commentary.")
-                            .font(SPFonts.body(13))
-                            .foregroundStyle(SPColors.textSecondary)
+                            .font(.custom("AmericanTypewriter", size: 13))
+                            .foregroundStyle(SPRetro.inkMuted)
                             .padding(.top, SPSpacing.xl)
                     } else {
                         ForEach(vm.visibleAnalyses) { a in
@@ -325,15 +334,19 @@ struct AnalysisCardView: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(analysis.verdict.color)
                     Text(analysis.verdict.label.uppercased())
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .foregroundStyle(analysis.verdict.color)
+                        .font(.custom("AmericanTypewriter-Bold", size: 10))
+                        .foregroundStyle(SPRetro.ink)
+                        .tracking(0.8)
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(
-                            Capsule().fill(analysis.verdict.color.opacity(0.18))
+                            ZStack {
+                                Capsule().fill(analysis.verdict.color)
+                                Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+                            }
                         )
                     Text(analysis.title)
-                        .font(SPFonts.headline(13))
-                        .foregroundStyle(SPColors.textPrimary)
+                        .font(.custom("AmericanTypewriter-Bold", size: 13))
+                        .foregroundStyle(SPRetro.ink)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                 }
@@ -351,7 +364,7 @@ struct AnalysisCardView: View {
                         icon:   "lightbulb.fill",
                         label:  "Try this",
                         text:   rec,
-                        accent: SPColors.accentLight
+                        accent: SPRetro.mustardDark
                     )
                 }
                 if let read = analysis.opponentRead {
@@ -360,7 +373,7 @@ struct AnalysisCardView: View {
                                                        : "eye.fill",
                         label:  analysis.isHeroDecision ? "Why" : "Their story",
                         text:   read,
-                        accent: SPColors.info
+                        accent: SPRetro.popBlue
                     )
                 }
             }
@@ -368,29 +381,22 @@ struct AnalysisCardView: View {
             .padding(.horizontal, SPSpacing.sm + 2)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // Retro analysis card: paperShade card with ink border + hard ink
+        // offset shadow. The 4pt verdict accent bar lives at the leading
+        // edge (already in the HStack above) and remains the single most
+        // important visual signal in the card.
         .background(
-            // Slight verdict-tinted gradient on top of surfaceElevated so
-            // the card visibly carries its verdict color even before you
-            // read the bar — but never enough to compete with the text.
-            RoundedRectangle(cornerRadius: SPRadius.md)
-                .fill(SPColors.surfaceElevated)
-                .overlay(
-                    LinearGradient(
-                        colors: [
-                            analysis.verdict.color.opacity(0.08),
-                            Color.clear
-                        ],
-                        startPoint: .leading, endPoint: .trailing
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: SPRadius.md)
-                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.ink)
+                    .offset(x: 1.5, y: 2.5)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.paperShade)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+            }
         )
         .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-        .shadow(color: Color.black.opacity(0.35), radius: 6, x: 0, y: 3)
     }
 }
 
@@ -411,12 +417,12 @@ private struct CommentaryRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(label.uppercased())
-                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .font(.custom("AmericanTypewriter-Bold", size: 9))
                     .foregroundStyle(accent)
-                    .tracking(0.5)
+                    .tracking(1.0)
                 Text(text)
-                    .font(SPFonts.body(13))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter", size: 13))
+                    .foregroundStyle(SPRetro.ink)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -444,13 +450,16 @@ private struct StreetTimelineRail: View {
         let count: Int
     }
 
+    // Retro zone palette: muted pop-blue / muted teal / mustard / maroon-ish
+    // / pop-red — all keyed to the retro accents already in use across the
+    // app so the rail reads like printed colored tabs on an index card.
     private var zones: [Zone] {
         let order: [(Street, String, Color)] = [
-            (.preflop,  "PRE",   Color(hex: "#4A6FA5")),
-            (.flop,     "FLOP",  Color(hex: "#3F8C5A")),
-            (.turn,     "TURN",  Color(hex: "#C99244")),
-            (.river,    "RIVER", Color(hex: "#9C4C9C")),
-            (.showdown, "SHOW",  Color(hex: "#C9342B")),
+            (.preflop,  "PRE",   SPRetro.popBlue),
+            (.flop,     "FLOP",  SPRetro.teal),
+            (.turn,     "TURN",  SPRetro.mustard),
+            (.river,    "RIVER", SPRetro.maroon),
+            (.showdown, "SHOW",  SPRetro.popRed),
         ]
         return order.compactMap { (street, label, color) -> Zone? in
             let count = frames.filter { $0.streetEnum == street }.count
@@ -478,50 +487,39 @@ private struct StreetTimelineRail: View {
             }()
             let playheadX = totalW * CGFloat(max(0, min(1, progress)))
 
+            // Retro rail: paperShade base, flat zone tints (no gradient
+            // overlay), ink playhead line, ink panel border. No glow.
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(SPColors.surfaceElevated)
+                    .fill(SPRetro.paperShade)
 
                 ForEach(bounds.indices, id: \.self) { i in
                     let item = bounds[i]
                     ZStack {
                         Rectangle()
-                            .fill(item.z.color.opacity(0.38))
-                            .overlay(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.06),
-                                        Color.clear
-                                    ],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
-                        // Hide the label if the zone is too narrow to fit it.
+                            .fill(item.z.color)
                         if item.w > 28 {
                             Text(item.z.label)
-                                .font(.system(size: 9, weight: .heavy,
-                                              design: .rounded))
-                                .foregroundStyle(.white.opacity(0.92))
-                                .tracking(0.6)
-                                .shadow(color: .black.opacity(0.45), radius: 1)
+                                .font(.custom("AmericanTypewriter-Bold", size: 9))
+                                .foregroundStyle(SPRetro.ink)
+                                .tracking(0.8)
                         }
                     }
                     .frame(width: item.w, height: 32)
                     .offset(x: item.x)
                 }
 
-                // Playhead — bright vertical line with an accent-colored
-                // glow so the position pops against any zone color.
+                // Playhead — solid ink line with no glow, sits flush on
+                // top of the zone tints like a pen stroke.
                 Rectangle()
-                    .fill(Color.white)
+                    .fill(SPRetro.ink)
                     .frame(width: 2.5, height: 32)
-                    .shadow(color: SPColors.accent.opacity(0.9), radius: 5)
                     .offset(x: playheadX - 1.25)
             }
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.2)
             )
             .contentShape(Rectangle())
             .gesture(
@@ -542,13 +540,15 @@ private struct StreetTimelineRail: View {
 private struct HeroCardView: View {
     let card: PFCard
 
+    // Retro hero card chip: paper face + ChalkboardSE-Bold rank/suit + ink
+    // hairline border. Flat (no soft shadow) — matches the table cards.
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color.white)
+                .fill(SPRetro.paper)
             VStack(spacing: -1) {
                 Text(card.live.displayRank)
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .font(.custom("ChalkboardSE-Bold", size: 14))
                 Text(card.live.suitSymbol)
                     .font(.system(size: 11, weight: .bold))
             }
@@ -557,7 +557,7 @@ private struct HeroCardView: View {
         .frame(width: 26, height: 36)
         .overlay(
             RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.black.opacity(0.20), lineWidth: 0.5)
+                .stroke(SPRetro.ink, lineWidth: 1)
         )
     }
 }

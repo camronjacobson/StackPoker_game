@@ -3,80 +3,111 @@ import SwiftUI
 // ─── Color Tokens ─────────────────────────────────────────────────────────────
 // All colors defined for dark mode default with light mode variants
 
+// ─── Retro Comic Theme Remap ──────────────────────────────────────────────────
+// The token names below are unchanged so every existing call site keeps
+// compiling, but the values now point at the SPRetro palette. This is the
+// foundation that automatically retros every screen without hand-editing all
+// 60+ Swift files individually — `SPColors.background` is now cream paper,
+// `SPColors.textPrimary` is warm-black ink, `SPColors.accent` is mustard, and
+// so on. Screens that need extra retro flair (halftone, comic panel borders,
+// burst CTAs) get their own bespoke treatments on top of this base.
+//
+// Old semantic meanings preserved:
+//   • background / surface / surfaceElevated → paper / paper-shade / shade2
+//   • accent (was purple)                   → mustard
+//   • textPrimary (was off-white)           → ink
+//   • danger (was red-orange)               → maroon
+//   • success (was teal-green)              → muted teal
+//   • felt (was green)                      → paper-shade w/ ink (we'll
+//                                              overlay a halftone on top)
+//   • cardBack (was navy)                   → maroon (matches the daily-bonus
+//                                              red→maroon shift)
+
 enum SPColors {
-    // Backgrounds
-    static let background     = Color(hex: "#0A0A0F")
-    static let surface        = Color(hex: "#13131A")
-    static let surfaceElevated = Color(hex: "#1A1A24")
-    static let surfaceHighlight = Color(hex: "#22222F")
+    // Backgrounds — aged paper page tones.
+    static let background     = Color(hex: "#F4E4BC")   // paper
+    static let surface        = Color(hex: "#E8D49A")   // paperShade
+    static let surfaceElevated = Color(hex: "#DCC58A")  // shade2 (modal/sheet)
+    static let surfaceHighlight = Color(hex: "#CFB57A") // shade3 (hover/press)
 
-    // Brand
-    static let accent         = Color(hex: "#6C5CE7")   // Purple — primary action
-    static let accentLight    = Color(hex: "#A29BFE")
-    static let accentDark     = Color(hex: "#4A3AB4")
+    // Brand — mustard yellow replaces purple.
+    static let accent         = Color(hex: "#E8B923")
+    static let accentLight    = Color(hex: "#F1CE5C")
+    static let accentDark     = Color(hex: "#B68A14")
 
-    // Chip colors
-    static let chipGold       = Color(hex: "#F9CA24")
-    static let chipGoldDark   = Color(hex: "#C4A11A")
+    // Chip colors — retro mustard.
+    static let chipGold       = Color(hex: "#E8B923")
+    static let chipGoldDark   = Color(hex: "#B68A14")
 
-    // Semantic
-    static let success        = Color(hex: "#00B894")
-    static let warning        = Color(hex: "#FDCB6E")
-    static let danger         = Color(hex: "#E17055")
-    static let info           = Color(hex: "#74B9FF")
+    // Semantic — pulled into the retro palette so alerts/badges don't look
+    // like foreign Material-Design colors next to the cream page.
+    static let success        = Color(hex: "#2E7C8B")   // muted teal
+    static let warning        = Color(hex: "#E8B923")   // mustard
+    static let danger         = Color(hex: "#8B2C2C")   // maroon
+    static let info           = Color(hex: "#2A6DB5")   // pop blue
 
-    // Text
-    static let textPrimary    = Color(hex: "#F0F0F8")
-    static let textSecondary  = Color(hex: "#8888A8")
-    static let textTertiary   = Color(hex: "#55556A")
+    // Text — warm-black ink, with progressively lighter tones for hierarchy.
+    static let textPrimary    = Color(hex: "#1A1410")
+    static let textSecondary  = Color(hex: "#3A2E22")
+    static let textTertiary   = Color(hex: "#5C4838")
 
-    // Table felt — WPT bright green
-    static let felt           = Color(hex: "#1F8840")
-    static let feltDark       = Color(hex: "#166132")
-    static let feltBorder     = Color(hex: "#0F4A25")
+    // Table felt — paper substrate. The PokerTableView gets a halftone
+    // overlay on top so it reads as a printed comic page, not a flat fill.
+    static let felt           = Color(hex: "#F4E4BC")
+    static let feltDark       = Color(hex: "#E8D49A")
+    static let feltBorder     = Color(hex: "#1A1410")
 
-    // Table rail — dark walnut wood
-    static let railOuter      = Color(hex: "#120800")
-    static let railMid        = Color(hex: "#3B1A06")
-    static let railLight      = Color(hex: "#6B3A18")
-    static let railCushion    = Color(hex: "#0E3D1E")
+    // Table rail — solid ink "panel border" instead of walnut wood. Same
+    // values for outer/mid/light so the rail reads as a single ink frame.
+    static let railOuter      = Color(hex: "#1A1410")
+    static let railMid        = Color(hex: "#3A2E22")
+    static let railLight      = Color(hex: "#5C4838")
+    static let railCushion    = Color(hex: "#E8B923")   // mustard cushion edge
 
-    // Card colors
-    static let cardBack       = Color(hex: "#2D2D4A")
-    static let cardFace       = Color(hex: "#F5F5FA")
-    static let cardRed        = Color(hex: "#E84393")
-    static let cardBlack      = Color(hex: "#1A1A2E")
+    // Playing-card surfaces.
+    static let cardBack       = Color(hex: "#8B2C2C")   // maroon
+    static let cardFace       = Color(hex: "#F4E4BC")   // paper face
+    static let cardRed        = Color(hex: "#D33232")   // pop red for hearts/diamonds
+    static let cardBlack      = Color(hex: "#1A1410")   // ink for spades/clubs
 
-    // Borders
-    static let border         = Color(hex: "#2A2A3A")
-    static let borderLight    = Color(hex: "#3A3A52")
+    // Borders — ink hairlines.
+    static let border         = Color(hex: "#1A1410")
+    static let borderLight    = Color(hex: "#3A2E22")
 }
 
 // ─── Typography ───────────────────────────────────────────────────────────────
 
+// Retro typography — vintage-print-shop pairing:
+//   • AmericanTypewriter-Bold for headlines/titles — heavy 60s editorial feel.
+//   • AmericanTypewriter for body — the same family at non-bold, lower
+//     weight so paragraphs are still legible but printed-page in tone.
+//   • ChalkboardSE-Bold for chips/cards — slightly hand-drawn, reads as the
+//     burst/POW family used elsewhere.
+// All fonts are bundled with iOS — no Info.plist edits, no missing-font
+// crashes on a future build that forgot to ship the font file.
 enum SPFonts {
     static func title(_ size: CGFloat = 28) -> Font {
-        .system(size: size, weight: .bold, design: .rounded)
+        .custom("AmericanTypewriter-Bold", size: size)
     }
 
     static func headline(_ size: CGFloat = 17) -> Font {
-        .system(size: size, weight: .semibold, design: .rounded)
+        .custom("AmericanTypewriter-Bold", size: size)
     }
 
     static func body(_ size: CGFloat = 15) -> Font {
-        .system(size: size, weight: .regular, design: .default)
+        .custom("AmericanTypewriter", size: size)
     }
 
     static func caption(_ size: CGFloat = 12) -> Font {
-        .system(size: size, weight: .medium, design: .default)
+        .custom("AmericanTypewriter", size: size)
     }
 
     static func chips(_ size: CGFloat = 16) -> Font {
-        .system(size: size, weight: .bold, design: .rounded)
+        .custom("ChalkboardSE-Bold", size: size)
     }
 
     static func card(_ size: CGFloat = 20) -> Font {
-        .system(size: size, weight: .bold, design: .default)
+        .custom("ChalkboardSE-Bold", size: size)
     }
 }
 
@@ -103,13 +134,47 @@ enum SPRadius {
 
 // ─── Hex Color Extension ──────────────────────────────────────────────────────
 
+// Per-process Color(hex:) cache. SwiftUI body re-evaluations call
+// Color(hex:) hundreds of times per frame across the table (PokerTableView
+// alone has 50+ literal hex sites; the seat view, action bar and chip stacks
+// add more). The previous implementation allocated a CharacterSet,
+// constructed a Scanner, and made a trimmed String on every call — measurable
+// per-frame overhead during interactive moments (drag, animation, tick).
+//
+// Cache rules:
+//   - Main-thread only. SwiftUI body evaluation is on the main thread, so we
+//     don't pay for a lock.
+//   - Keyed by the original input string (cheap for the call sites which
+//     always pass string literals — those are interned, equality is O(1)).
+//   - Bounded growth: hex strings used in the app are a small fixed set
+//     (~50 unique values), so unbounded growth isn't a real concern.
+private var hexColorCache: [String: Color] = [:]
+
 extension Color {
     init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        if let cached = hexColorCache[hex] {
+            self = cached
+            return
+        }
+        // Allocation-free parser: walk the bytes, skip a leading '#' if
+        // present, accumulate hex nibbles directly. No Scanner, no
+        // trimmingCharacters, no CharacterSet.
         var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
+        var count = 0
+        for u in hex.utf8 {
+            let nibble: UInt64
+            switch u {
+            case 0x30...0x39: nibble = UInt64(u - 0x30)        // '0'..'9'
+            case 0x41...0x46: nibble = UInt64(u - 0x41 + 10)   // 'A'..'F'
+            case 0x61...0x66: nibble = UInt64(u - 0x61 + 10)   // 'a'..'f'
+            case 0x23: continue                                 // '#'
+            default:  continue                                  // ignore stray chars
+            }
+            int = (int << 4) | nibble
+            count += 1
+        }
         let a, r, g, b: UInt64
-        switch hex.count {
+        switch count {
         case 3:
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
         case 6:
@@ -119,12 +184,14 @@ extension Color {
         default:
             (a, r, g, b) = (1, 1, 1, 0)
         }
-        self.init(
+        let c = Color(
             .sRGB,
             red: Double(r) / 255,
             green: Double(g) / 255,
             blue: Double(b) / 255,
             opacity: Double(a) / 255
         )
+        hexColorCache[hex] = c
+        self = c
     }
 }

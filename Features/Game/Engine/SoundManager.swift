@@ -152,17 +152,42 @@ final class SoundManager {
         // overlapping plays layer into a constant drone.
         buffers[.timerWarning] = loadSampleBuffer(named: "timer", gain: 0.6, trimmedTo: 0.18)
             ?? makeSoftTick(frequency: 760, duration: 0.05, gain: 0.28)
+
+        // Card rip — used by the Daily Bonus reveal when the user pulls the
+        // two halves apart. The bundled `cardrip.mp3` is a longer source
+        // recording, so we clip it to ~0.55s (matching the on-screen rip
+        // animation) with the loader's built-in 20ms fade-out so the cut
+        // doesn't click. Falls back to a synthesized noise burst if the
+        // sample is missing.
+        buffers[.cardRip] = loadSampleBuffer(named: "cardrip", gain: 0.95, trimmedTo: 0.55)
+            ?? makeCardRip(duration: 0.55, gain: 0.85)
+
+        // Menu tap — short Kenney UI click for the bottom tab bar
+        // (Home/Review/Alerts/Friends). Bundled as `menutap.wav`. No
+        // synthesized fallback: if the file ever fails to load the tab
+        // just falls back to the haptic-only feedback at the call site,
+        // which is fine for a UI cue.
+        buffers[.menuTap] = loadSampleBuffer(named: "menutap", gain: 0.85)
     }
 
-    /// Load an mp3 from the app bundle, convert it to the engine's standard
-    /// mono/44.1kHz format, and apply a gain so loudness matches other samples.
-    /// Tries the top-level bundle first, then Sounds/ subdirectory (in case the
-    /// Sounds folder is bundled as a folder reference, preserving hierarchy).
+    /// Load an audio file from the app bundle, convert it to the engine's
+    /// standard mono/44.1kHz format, and apply a gain so loudness matches
+    /// other samples. Tries the top-level bundle first, then Sounds/
+    /// subdirectory (in case the Sounds folder is bundled as a folder
+    /// reference, preserving hierarchy).
+    ///
+    /// Extensions are tried in priority order — mp3 first (matches the
+    /// existing recordings), then wav and m4a so short UI click samples
+    /// converted from formats iOS Core Audio can't read natively (e.g.
+    /// Ogg Vorbis) can be bundled as WAV without needing a separate loader.
     private func loadSampleBuffer(named name: String, gain: Float, trimmedTo maxSeconds: Double? = nil) -> AVAudioPCMBuffer? {
-        let url = Bundle.main.url(forResource: name, withExtension: "mp3")
-            ?? Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "Sounds")
+        let exts = ["mp3", "wav", "m4a"]
+        let url: URL? = exts.lazy.compactMap { ext in
+            Bundle.main.url(forResource: name, withExtension: ext)
+                ?? Bundle.main.url(forResource: name, withExtension: ext, subdirectory: "Sounds")
+        }.first
         guard let url = url else {
-            print("[SoundManager] missing sample: \(name).mp3")
+            print("[SoundManager] missing sample: \(name) (.mp3/.wav/.m4a)")
             return nil
         }
         do {
@@ -282,6 +307,75 @@ final class SoundManager {
         return buffer
     }
 
+    // ─── Card rip synthesizer ─────────────────────────────────────────────
+    // Approximates the sound of paper being torn: a high-pass filtered noise
+    // burst with a pulsing amplitude (the "shrr-shrr" of fibers giving way),
+    // then a sharper crackling tail as the rip completes.
+    //
+    // Tuned by ear to roughly match the duration of the on-screen rip
+    // animation so the audio cue and the visual stay in sync. If a bundled
+    // `cardrip.mp3` ever ships, this fallback won't run — but we keep the
+    // synth path so the sound never goes silent in production.
+    private func makeCardRip(duration: Double, gain: Float) -> AVAudioPCMBuffer? {
+        guard let buffer = makeBuffer(duration: duration) else { return nil }
+        let data = buffer.floatChannelData![0]
+        let n = Int(buffer.frameLength)
+        let dt = 1.0 / Float(sampleRate)
+
+        // Single-pole high-pass on white noise: produces the bright, dry
+        // hiss characteristic of paper ripping. lp1 holds the running
+        // low-passed value; the high-passed signal is (noise - lp1).
+        var lp1: Float = 0
+
+        // A second, looser low-pass on the rectified signal modulates the
+        // amplitude so the rip "pulses" instead of being flat noise.
+        var envSmoother: Float = 0
+
+        for i in 0..<n {
+            let pct = Float(i) / Float(n)
+
+            // High-pass (cutoff ~3.2kHz) — keeps the dry, brittle character.
+            let cutoffHz: Float = 3200
+            let rc    = 1.0 / (2 * .pi * cutoffHz)
+            let alpha = rc / (rc + dt)
+            let noise = Float.random(in: -1...1)
+            lp1 = alpha * lp1 + (1 - alpha) * noise
+            let hp = noise - lp1
+
+            // Pulse modulation — a low-rate noise envelope (~25Hz) gives
+            // the audible texture of fibers tearing in waves rather than
+            // a continuous shhh.
+            let pulseRate: Float = 25
+            let pulse = 0.55 + 0.45 * sin(2 * .pi * pulseRate * Float(i) * dt
+                                          + Float.random(in: -0.4...0.4))
+
+            // Master envelope: quick attack (5ms), sustain through middle,
+            // quadratic decay over the last 35% so the rip "fades into the
+            // page" rather than slamming off.
+            let attack = min(1, Float(i) / (Float(sampleRate) * 0.005))
+            let tailStart: Float = 0.65
+            let tail: Float = pct < tailStart
+                ? 1
+                : 1 - pow((pct - tailStart) / (1 - tailStart), 2)
+
+            // Crackle layer — sparse short clicks toward the end give the
+            // sense of the last fibers snapping. Probability rises with pct.
+            var crackle: Float = 0
+            if pct > 0.55 && Float.random(in: 0...1) < 0.012 {
+                crackle = Float.random(in: -1...1) * 0.6
+            }
+
+            // Smooth the rectified signal so the gain envelope doesn't
+            // jitter sample-to-sample (would sound like buzz, not paper).
+            let raw = abs(hp) * pulse
+            envSmoother = 0.95 * envSmoother + 0.05 * raw
+
+            let sample = (hp * pulse + crackle) * attack * tail * gain
+            data[i] = sample
+        }
+        return buffer
+    }
+
     private func makeFeltKnock(gain: Float) -> AVAudioPCMBuffer? {
         let duration = 0.13
         guard let buffer = makeBuffer(duration: duration) else { return nil }
@@ -388,4 +482,6 @@ enum GameSound {
     case allIn
     case win
     case timerWarning
+    case cardRip
+    case menuTap
 }

@@ -9,19 +9,38 @@ struct JoinByCodeSheet: View {
   var body: some View {
     NavigationStack {
       ZStack {
-        SPColors.background.ignoresSafeArea()
+        // Aged-paper substrate keeps the sheet inside the same printed
+        // booklet as the lobby instead of dropping to a flat surface.
+        AgedPaperBackground().ignoresSafeArea()
 
         VStack(spacing: SPSpacing.xl) {
           VStack(spacing: SPSpacing.sm) {
+            // Mustard burst-disc logo with ink panel border + hard offset
+            // shadow — same vocab as AuthFlowView and UsernameSetupView so
+            // every sheet header reads as the same stamp.
             ZStack {
-              Circle().fill(SPColors.accent.opacity(0.12)).frame(width: 80, height: 80)
-              Image(systemName: "number.circle.fill").font(.system(size: 40)).foregroundStyle(SPColors.accent)
+              Circle()
+                .fill(SPRetro.ink)
+                .frame(width: 80, height: 80)
+                .offset(x: 2.5, y: 3.5)
+              Circle()
+                .fill(SPRetro.mustard)
+                .frame(width: 80, height: 80)
+              Circle()
+                .strokeBorder(SPRetro.ink, lineWidth: 2.5)
+                .frame(width: 80, height: 80)
+              Image(systemName: "number")
+                .font(.system(size: 34, weight: .black))
+                .foregroundStyle(SPRetro.ink)
             }
             .padding(.top, SPSpacing.xl)
-            Text("Enter join code")
-              .font(SPFonts.headline(18)).foregroundStyle(SPColors.textPrimary)
+            Text("ENTER JOIN CODE")
+              .font(.custom("AmericanTypewriter-Bold", size: 22))
+              .tracking(0.8)
+              .foregroundStyle(SPRetro.ink)
             Text("Get the code from the table host")
-              .font(SPFonts.body(14)).foregroundStyle(SPColors.textSecondary)
+              .font(.custom("AmericanTypewriter", size: 13))
+              .foregroundStyle(SPRetro.inkMuted)
               .multilineTextAlignment(.center)
           }
 
@@ -58,7 +77,9 @@ struct JoinByCodeSheet: View {
             .padding(.horizontal, SPSpacing.md)
 
             Text("Virtual chips only — no real money")
-              .font(SPFonts.caption(11)).foregroundStyle(SPColors.textTertiary)
+              .font(.custom("AmericanTypewriter", size: 11))
+              .tracking(0.4)
+              .foregroundStyle(SPRetro.inkMuted)
           }
           .padding(.bottom, SPSpacing.xl)
         }
@@ -87,12 +108,18 @@ struct InvitesSheet: View {
   var body: some View {
     NavigationStack {
       ZStack {
-        SPColors.background.ignoresSafeArea()
+        AgedPaperBackground().ignoresSafeArea()
 
         if vm.pendingInvites.isEmpty {
+          // Retro empty-state: ink-soft envelope + AmericanTypewriter
+          // copy. Reads as a printed "no mail" note on the page.
           VStack(spacing: SPSpacing.md) {
-            Image(systemName: "envelope.open").font(.system(size: 44)).foregroundStyle(SPColors.textTertiary)
-            Text("No pending invites").font(SPFonts.body()).foregroundStyle(SPColors.textSecondary)
+            Image(systemName: "envelope.open")
+              .font(.system(size: 44))
+              .foregroundStyle(SPRetro.inkMuted)
+            Text("No pending invites")
+              .font(.custom("AmericanTypewriter", size: 14))
+              .foregroundStyle(SPRetro.inkMuted)
           }
         } else {
           List {
@@ -130,29 +157,53 @@ struct InviteRow: View {
   let onRespond: (Bool) -> Void
 
   var body: some View {
+    // Retro invite row: AmericanTypewriter typography on cream ground,
+    // accept/decline as ink-bordered sticker buttons (mustard tick / pop-
+    // red cross with hard offset shadows) — same vocab as the in-game
+    // action stamps so confirming an invite reads as the same gesture.
     HStack(spacing: SPSpacing.sm) {
       AvatarView(avatarId: invite.sender.avatarId, size: 40)
 
       VStack(alignment: .leading, spacing: 3) {
         Text("\(invite.sender.displayName) invited you")
-          .font(SPFonts.headline(14)).foregroundStyle(SPColors.textPrimary)
+          .font(.custom("AmericanTypewriter-Bold", size: 14))
+          .foregroundStyle(SPRetro.ink)
         Text("\(invite.table.name) · \(invite.table.blindsLabel) · \(invite.table.currentPlayers)/\(invite.table.maxPlayers)")
-          .font(SPFonts.caption(12)).foregroundStyle(SPColors.textSecondary)
+          .font(.custom("AmericanTypewriter", size: 12))
+          .foregroundStyle(SPRetro.inkMuted)
       }
 
       Spacer()
 
       HStack(spacing: SPSpacing.xs) {
+        // Decline — pop-red disc, ink border, hard offset shadow, paper X
         Button { onRespond(false) } label: {
-          Image(systemName: "xmark")
-            .font(.system(size: 12, weight: .bold)).foregroundStyle(SPColors.danger)
-            .padding(8).background(SPColors.danger.opacity(0.12)).clipShape(Circle())
+          ZStack {
+            Circle().fill(SPRetro.ink)
+              .frame(width: 30, height: 30).offset(x: 1.5, y: 2)
+            Circle().fill(SPRetro.popRed)
+              .frame(width: 30, height: 30)
+            Circle().strokeBorder(SPRetro.ink, lineWidth: 1.5)
+              .frame(width: 30, height: 30)
+            Image(systemName: "xmark")
+              .font(.system(size: 12, weight: .black))
+              .foregroundStyle(SPRetro.paper)
+          }
         }.buttonStyle(.plain)
 
+        // Accept — mustard disc, ink border, hard offset shadow, ink tick
         Button { onRespond(true) } label: {
-          Image(systemName: "checkmark")
-            .font(.system(size: 12, weight: .bold)).foregroundStyle(SPColors.success)
-            .padding(8).background(SPColors.success.opacity(0.12)).clipShape(Circle())
+          ZStack {
+            Circle().fill(SPRetro.ink)
+              .frame(width: 30, height: 30).offset(x: 1.5, y: 2)
+            Circle().fill(SPRetro.mustard)
+              .frame(width: 30, height: 30)
+            Circle().strokeBorder(SPRetro.ink, lineWidth: 1.5)
+              .frame(width: 30, height: 30)
+            Image(systemName: "checkmark")
+              .font(.system(size: 12, weight: .black))
+              .foregroundStyle(SPRetro.ink)
+          }
         }.buttonStyle(.plain)
       }
     }

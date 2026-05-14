@@ -9,8 +9,10 @@ struct TurnTimerArc: View {
 
     var body: some View {
         ZStack {
+            // Track ring — ink at low opacity so it reads as a soft printed
+            // outline on the cream avatar disc, not a glowing system ring.
             Circle()
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 3)
+                .strokeBorder(SPRetro.ink.opacity(0.18), lineWidth: 3)
                 .frame(width: size, height: size)
 
             Circle()
@@ -55,7 +57,12 @@ struct StreetIndicator: View {
         let order: [Street: Int] = [.preflop:0, .flop:1, .turn:2, .river:3]
         let current = order[street] ?? 0
         let idx     = order[s]     ?? 0
-        return idx < current ? SPColors.accent.opacity(0.4) : Color.white.opacity(0.15)
+        // Future streets fade to ink-soft at low opacity so the pill row
+        // reads as page-printed dashes on cream, not a translucent system
+        // overlay. Past streets retain the mustard accent at half intensity.
+        return idx < current
+            ? SPColors.accent.opacity(0.4)
+            : SPRetro.ink.opacity(0.15)
     }
 }
 
@@ -66,9 +73,12 @@ struct AnimatedPotView: View {
     @State private var displayed: Int = 0
 
     var body: some View {
+        // ChalkboardSE-Bold ink — same chip-amount idiom used on the table's
+        // StackPill so animated pot numbers look like printed chip counts
+        // rather than a system-rounded label.
         Text(formatChips(String(displayed)))
-            .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(SPColors.chipGold)
+            .font(.custom("ChalkboardSE-Bold", size: 15))
+            .foregroundStyle(SPRetro.ink)
             .contentTransition(.numericText())
             .onAppear {
                 withAnimation(.easeOut(duration: 0.6)) { displayed = amount }
@@ -89,18 +99,30 @@ struct WaitingForPlayersView: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            // Seat-fill dots — filled seats use muted teal (the retro
+            // success color); empty seats are ink dots at low opacity so
+            // the row reads as printed bullet points on the page.
             HStack(spacing: 6) {
                 ForEach(0..<required, id: \.self) { i in
                     Circle()
-                        .fill(i < seated ? SPColors.success : Color.white.opacity(0.2))
+                        .fill(i < seated
+                              ? SPColors.success
+                              : SPRetro.ink.opacity(0.2))
                         .frame(width: 10, height: 10)
+                        .overlay(
+                            Circle().strokeBorder(
+                                SPRetro.ink.opacity(0.6),
+                                lineWidth: 1
+                            )
+                        )
                         .scaleEffect(i < seated ? 1.2 : 1)
                         .animation(.spring(response: 0.3).delay(Double(i) * 0.05), value: seated)
                 }
             }
             Text("Waiting for players\(dots)")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.custom("AmericanTypewriter-Bold", size: 14))
+                .tracking(0.6)
+                .foregroundStyle(SPRetro.ink.opacity(0.7))
         }
         .onAppear {
             timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
@@ -118,33 +140,49 @@ struct HandResultBanner: View {
     let isVisible: Bool
 
     var body: some View {
+        // Retro comic banner: paper substrate, ink panel border, hard ink
+        // offset shadow (no blur), retro fonts. Winner row uses a mustard
+        // crown disc with ink border so the prize reads as a stamped seal
+        // on a printed result card.
         VStack(spacing: 8) {
             ForEach(Array(winners.enumerated()), id: \.element.playerId) { idx, winner in
                 HStack(spacing: 10) {
-                    // Trophy / crown
+                    // Trophy / crown — solid mustard disc with ink border
+                    // and a tiny hard offset shadow. Same vocabulary as the
+                    // lobby's burst CTAs and the +15s button.
                     ZStack {
                         Circle()
-                            .fill(SPColors.chipGold.opacity(0.2))
+                            .fill(SPRetro.ink)
+                            .frame(width: 36, height: 36)
+                            .offset(x: 1.2, y: 1.5)
+                        Circle()
+                            .fill(SPRetro.mustard)
+                            .frame(width: 36, height: 36)
+                        Circle()
+                            .strokeBorder(SPRetro.ink, lineWidth: 1.5)
                             .frame(width: 36, height: 36)
                         Image(systemName: winners.count > 1 ? "equal.circle.fill" : "crown.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(SPColors.chipGold)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(SPRetro.ink)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(winner.username)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
+                            .font(.custom("AmericanTypewriter-Bold", size: 14))
+                            .foregroundStyle(SPRetro.ink)
                         Text(winner.handName)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .font(.custom("AmericanTypewriter", size: 11))
+                            .foregroundStyle(SPRetro.inkMuted)
                     }
 
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 1) {
+                        // Prize amount — ChalkboardSE-Bold in muted teal
+                        // (success); the "+" prefix kept as a typographic
+                        // shorthand for the chip pickup.
                         Text("+\(formatChips(String(winner.amount)))")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(.custom("ChalkboardSE-Bold", size: 16))
                             .foregroundStyle(SPColors.success)
 
                         // Best hand cards (mini)
@@ -161,25 +199,30 @@ struct HandResultBanner: View {
                 .padding(.vertical, 10)
 
                 if idx < winners.count - 1 {
-                    Divider().background(Color.white.opacity(0.1))
+                    // Ink hairline between stacked winners — slightly heavier
+                    // than the SwiftUI default Divider so it carries the same
+                    // comic-panel weight as the rest of the page.
+                    Rectangle()
+                        .fill(SPRetro.ink.opacity(0.5))
+                        .frame(height: 1)
+                        .padding(.horizontal, 10)
                 }
             }
         }
         .background(
+            // Paper panel beneath the rows. The ink shadow below sits in
+            // an outer ZStack via .background so the shadow rectangle isn't
+            // clipped by the rounded paper card.
             ZStack {
-                Color.black.opacity(0.75)
-                LinearGradient(
-                    colors: [SPColors.chipGold.opacity(0.08), .clear],
-                    startPoint: .top, endPoint: .bottom
-                )
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(SPRetro.ink)
+                    .offset(x: 2.5, y: 4)
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(SPRetro.paper)
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(SPRetro.ink, lineWidth: 2)
             }
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(SPColors.chipGold.opacity(0.3), lineWidth: 1)
-        )
-        .shadow(color: SPColors.chipGold.opacity(0.15), radius: 20)
         .padding(.horizontal, 20)
         .scaleEffect(isVisible ? 1 : 0.8)
         .opacity(isVisible ? 1 : 0)

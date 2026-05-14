@@ -65,12 +65,20 @@ struct ReplayTableView: View {
                     // frames cross-fades instead of snapping characters.
                     Group {
                         if let action = frame.lastAction {
+                            // Retro last-action banner: paper pill + ink
+                            // border, AmericanTypewriter-Bold ink text.
+                            // Matches the in-game last-action chip.
                             Text("\(action.username) · \(verbForAction(action))")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.9))
+                                .font(.custom("AmericanTypewriter-Bold", size: 13))
+                                .foregroundStyle(SPRetro.ink)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 5)
-                                .background(Capsule().fill(Color.black.opacity(0.45)))
+                                .background(
+                                    ZStack {
+                                        Capsule().fill(SPRetro.paper)
+                                        Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+                                    }
+                                )
                                 .id("banner-\(actionKey(action))")
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         } else {
@@ -94,20 +102,27 @@ struct ReplayTableView: View {
                     }
                     .animation(.spring(response: 0.45, dampingFraction: 0.8), value: frame.communityCards.count)
 
-                    // Pot — animates the number transition via contentTransition
+                    // Retro pot pill: mustard sticker capsule with ink
+                    // border + ChalkboardSE-Bold ink chip count. Same
+                    // vocabulary as the in-game pot indicator.
                     HStack(spacing: 4) {
                         Image(systemName: "circle.hexagongrid.fill")
                             .font(.system(size: 10))
-                            .foregroundStyle(SPColors.chipGold)
+                            .foregroundStyle(SPRetro.ink)
                         Text("Pot \(formatChips(frame.pot))")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .font(.custom("ChalkboardSE-Bold", size: 13))
+                            .foregroundStyle(SPRetro.ink)
                             .contentTransition(.numericText())
                             .animation(.easeOut(duration: 0.3), value: frame.pot)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.black.opacity(0.45)))
+                    .background(
+                        ZStack {
+                            Capsule().fill(SPRetro.mustard)
+                            Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                        }
+                    )
                 }
 
                 // ── Seats around the edge ────────────────────────────────────
@@ -266,7 +281,14 @@ private extension PFSeat {
             isSmallBlind:     isSmallBlind,
             isBigBlind:       isBigBlind,
             timeBank:         0,
-            isConnected:      true
+            isConnected:      true,
+            // Replays never had this concept — historical hands are
+            // immutable, no one can "leave mid-hand" retroactively. Always nil.
+            pendingLeave:     nil,
+            // Same rationale as pendingLeave — mid-hand top-ups don't
+            // exist in replay land; persisted history shows post-apply
+            // stacks only.
+            pendingTopUp:     nil
         )
     }
 }
@@ -294,28 +316,32 @@ private struct ReplayCardView: View {
     let card: PFCard?
     let faceUp: Bool
 
+    // Retro community card chip: paper face + ChalkboardSE-Bold rank +
+    // ink hairline border. Face-down uses SPColors.cardBack (already
+    // retroed to the deck pattern), with a soft ink inset stroke as the
+    // back-pattern hint.
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 4)
-                .fill(faceUp && card != nil ? Color.white : SPColors.cardBack)
+                .fill(faceUp && card != nil ? SPRetro.paper : SPColors.cardBack)
             if faceUp, let card = card {
                 VStack(spacing: 0) {
                     Text(card.live.displayRank)
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .font(.custom("ChalkboardSE-Bold", size: 11))
                     Text(card.live.suitSymbol)
                         .font(.system(size: 10, weight: .bold))
                 }
                 .foregroundStyle(card.live.isRed ? SPColors.cardRed : SPColors.cardBlack)
             } else {
                 RoundedRectangle(cornerRadius: 3)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+                    .stroke(SPRetro.ink.opacity(0.25), lineWidth: 0.5)
                     .padding(2)
             }
         }
         .frame(width: 22, height: 30)
         .overlay(
             RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.black.opacity(0.30), lineWidth: 0.5)
+                .stroke(SPRetro.ink, lineWidth: 1)
         )
     }
 }

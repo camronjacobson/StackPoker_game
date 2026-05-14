@@ -77,6 +77,13 @@ struct RootView: View {
                     .animation(.spring(response: 0.4), value: appState.toastMessage?.id)
                     .zIndex(999)
             }
+
+            // Daily-bonus reveal overlay — sits above MainTabView so the
+            // celebration covers the entire screen (tab bar included), but
+            // below the toast so a critical toast can still cut through.
+            // Renders nothing while idle, so cost is zero outside of a claim.
+            DailyBonusRevealOverlay()
+                .zIndex(800)
         }
         .onAppear {
             Task {

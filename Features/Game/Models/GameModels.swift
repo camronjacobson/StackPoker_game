@@ -100,9 +100,23 @@ struct GameSeat: Decodable, Identifiable {
     let isBigBlind:      Bool
     let timeBank:        Int
     let isConnected:     Bool
+    // Server-side flag: the player tapped "leave" mid-hand and is waiting
+    // for the hand to finish before being booted. Optional because older
+    // server builds don't emit it — falls back to false. iOS greys out the
+    // avatar + shows a "Left" badge while this is true, then the seat just
+    // disappears from the next ClientGameState once the engine evicts it.
+    let pendingLeave:    Bool?
+    // Mid-hand top-up amount this seat has paid for but not yet received.
+    // Server omits the field when 0, so this is optional/nil on the
+    // common path; the UI renders a small "+N" pending badge near the
+    // stack pill when > 0. Drained into `stack` server-side at end of
+    // hand (see PokerGameEngine.applyPendingTopUps).
+    let pendingTopUp:    Int?
 
     var id: String { userId }
     var isActive: Bool { status == .active }
+    var isLeaving: Bool { pendingLeave == true }
+    var pendingTopUpAmount: Int { pendingTopUp ?? 0 }
     var hasCards: Bool { (holeCards?.count ?? cardCount) > 0 }
     // Convenience for the UI: empty array if server didn't emit the field.
     var revealed: [RevealedCard] { revealedCards ?? [] }
@@ -297,8 +311,31 @@ enum HandStrength {
     static func label(hole: [PokerCard], board: [PokerCard]) -> String? {
         guard hole.count == 2 || hole.count == 4 else { return nil }
         if board.isEmpty {
-            if hole.count == 4 { return ploPreflopLabel(hole) }
+            // PLO preflop: intentionally no label. The descriptive
+            // strings produced by `ploPreflopLabel` ("Ace Double Suited",
+            // "Premium", "Connected", etc.) aren't real poker hand
+            // strengths and confused testers into thinking the game was
+            // misreading their hand. NLH preflop keeps its "Pocket Aces /
+            // Suited Connectors / Ace High" labels because those are
+            // standard hole-card descriptors.
+            if hole.count == 4 { return nil }
             return preflopLabel(hole)
+        }
+        // PLO postflop: must use exactly 2 hole + 3 board. The NLH "all 7
+        // cards into madeHandLabel" path is wrong here because it would let
+        // (say) trips on the board + a hole-card pair form a full house even
+        // though PLO rules forbid using more than 2 hole cards. Branch into
+        // the enumeration-based PLO evaluator that walks every C(4,2)×C(B,3)
+        // combination and picks the strongest made hand.
+        if hole.count == 4 {
+            // PLO postflop is restricted to the canonical made-hand
+            // whitelist (no draws, no descriptive preflop strings). The
+            // enumerator returns one of madeHandLabel's exact strings or
+            // nil; nil → "High Card". The only rename is "Four of a Kind"
+            // → "Quads" because that's the term requested for the PLO UI
+            // (NLH still says "Four of a Kind" via its own path).
+            let raw = bestPLOMadeHandLabel(hole: hole, board: board) ?? "High Card"
+            return raw == "Four of a Kind" ? "Quads" : raw
         }
         let all = hole + board
         // On the river (5 community cards) the hand is final — there are no
@@ -310,6 +347,77 @@ enum HandStrength {
             return madeHandLabel(all) ?? "High Card"
         }
         return madeHandLabel(all) ?? drawLabel(hole: hole, board: board) ?? "High Card"
+    }
+
+    // Strength ordering for the human-readable made-hand strings produced by
+    // `madeHandLabel`. Used by the PLO enumerator to rank the 6×C(B,3) combos
+    // and pick the strongest. Kept tightly coupled to madeHandLabel's exact
+    // output strings on purpose — if you add a new tier there, add it here.
+    private static let madeHandRank: [String: Int] = [
+        "High Card":        1,
+        "One Pair":         2,
+        "Two Pair":         3,
+        "Three of a Kind":  4,
+        "Straight":         5,
+        "Flush":            6,
+        "Full House":       7,
+        "Four of a Kind":   8,
+        "Straight Flush":   9,
+        "Royal Flush":     10,
+    ]
+
+    // PLO label evaluator. Enumerates every valid (2 hole) × (3 board)
+    // combination, evaluates each as a 5-card NLH hand via the existing
+    // `madeHandLabel`, and returns the strongest by `madeHandRank`. Limited
+    // to 6×C(B,3) combos: 6 on the flop, 24 on the turn, 60 on the river —
+    // trivially cheap for a display-only label that re-evaluates only when
+    // the board or hole cards change.
+    //
+    // Returns nil only if every combination is High Card (caller treats
+    // that as "High Card" rather than hiding the label).
+    //
+    // Draws (flush draw / straight draw) are intentionally NOT surfaced
+    // here — the NLH `drawLabel` heuristic uses all hole+board cards and
+    // would over-report draws in PLO (e.g. 4 hole hearts + 1 board heart
+    // is NOT a flush draw under 2+3). Conservative: show made hand only.
+    private static func bestPLOMadeHandLabel(hole: [PokerCard], board: [PokerCard]) -> String? {
+        guard hole.count == 4, board.count >= 3 else { return nil }
+        let holePairs  = combinations(hole,  k: 2)
+        let boardTrios = combinations(board, k: 3)
+
+        var bestLabel: String? = nil
+        var bestRank:  Int     = 0
+        for h in holePairs {
+            for b in boardTrios {
+                guard let lbl = madeHandLabel(h + b) else { continue }
+                let r = madeHandRank[lbl] ?? 0
+                if r > bestRank {
+                    bestRank  = r
+                    bestLabel = lbl
+                }
+            }
+        }
+        return bestLabel
+    }
+
+    // k-combinations helper. Returns every length-k subset of `arr` (input
+    // order preserved within each subset). Tiny recursive enumeration —
+    // max depth 3 here (board trios), max breadth 10 (C(5,3) on the river)
+    // so the recursion overhead is negligible vs allocating a fancier
+    // iterator.
+    private static func combinations<T>(_ arr: [T], k: Int) -> [[T]] {
+        var out: [[T]] = []
+        var chosen: [T] = []
+        func recurse(_ start: Int) {
+            if chosen.count == k { out.append(chosen); return }
+            for i in start..<arr.count {
+                chosen.append(arr[i])
+                recurse(i + 1)
+                chosen.removeLast()
+            }
+        }
+        recurse(0)
+        return out
     }
 
     // PLO preflop labels

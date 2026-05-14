@@ -1,5 +1,17 @@
 import SwiftUI
 
+// MAP: LobbyView (retro 60s comic theme)
+// - LobbyView .................... main screen, paper bg + halftone
+// - lobbyHeader .................. "FOR YOU" speech bubble + chip pill
+// - featuredCarousel ............. retro FeaturedTableCard tiles
+// - filterPills .................. PokerChip discs w/ retro tints + speech caption
+// - activeGamesSection ........... comic-panel ActiveGameCards, fanned
+// - friendsSection / groupsSection comic headlines + friend bubbles
+// - FeaturedTableCard / ActiveGameCard ... comic-panel card silhouettes
+// - FilterDisc / LiveDot / FriendBubble .. small retro primitives
+// - InviteFriendsSheet / RejoinBanner .... sheets/banners (kept SPColors-themed
+//   until those flows get their own retro pass)
+
 struct LobbyView: View {
   @EnvironmentObject var vm: LobbyViewModel
   @StateObject private var fvm = FriendsViewModel()
@@ -8,6 +20,7 @@ struct LobbyView: View {
   @State private var showBuyInSheet:  TableListItem?
   @State private var showFriends      = false
   @State private var showSettings     = false
+  @State private var showTopUp        = false
   @State private var buyInInput       = ""
   @State private var featuredPage     = 0
 
@@ -29,11 +42,16 @@ struct LobbyView: View {
   var body: some View {
     NavigationStack {
       ZStack {
-        // Dark gradient background
-        LinearGradient(
-          colors: [Color(hex: "#0A0E1A"), Color(hex: "#0A0A0F")],
-          startPoint: .top, endPoint: .bottom
-        ).ignoresSafeArea()
+        // ── Page substrate ──────────────────────────────────────────────────
+        // Aged cream paper + a low-density halftone overlay. This replaces the
+        // previous navy gradient + FeltTexture combo and is the single biggest
+        // visual shift — every other element reads as "printed on this page"
+        // because of it. The halftone sits OUTSIDE the ScrollView so it stays
+        // pinned to the screen (mimics how a real magazine page doesn't slide
+        // its print pattern around as you turn the page).
+        AgedPaperBackground()
+        HalftoneOverlay(density: 44, tint: SPRetro.ink, opacity: 0.08)
+          .ignoresSafeArea()
 
         ScrollView(showsIndicators: false) {
           VStack(spacing: SPSpacing.lg) {
@@ -41,7 +59,8 @@ struct LobbyView: View {
             // Daily bonus banner — sits right under the header so it's the
             // first thing the user sees on app open. Self-contained: handles
             // its own claim/cooldown state and refreshes the chip balance via
-            // AuthViewModel on success.
+            // AuthViewModel on success. Not yet retro-skinned — the card has
+            // its own visual treatment we'll revisit in a later pass.
             DailyBonusCard()
             featuredCarousel
             filterPills
@@ -52,6 +71,12 @@ struct LobbyView: View {
           }
         }
         .refreshable { await vm.loadTables(); await fvm.load() }
+        // Tint the pull-to-refresh spinner with the retro maroon (same
+        // tone as "TAP A CARD TO SHOW" / Fold CTA). `.tint()` on the
+        // ScrollView is the SwiftUI hook that the system UIRefreshControl
+        // adopts, so the spinner reads as a printed red stamp on the
+        // paper page instead of a generic white indicator.
+        .tint(SPRetro.maroon)
       }
       .navigationBarHidden(true)
       .sheet(isPresented: $vm.showCreateSheet)  { CreateTableSheet(vm: vm) }
@@ -71,6 +96,9 @@ struct LobbyView: View {
       .sheet(isPresented: $showSettings) {
         SettingsSheet().environmentObject(authVM)
       }
+      .sheet(isPresented: $showTopUp) {
+        ChipStoreSheet().environmentObject(authVM)
+      }
       .fullScreenCover(item: $vm.joinedTable) { table in
         GamePlaceholderView(table: table) { vm.joinedTable = nil }
       }
@@ -81,52 +109,71 @@ struct LobbyView: View {
           }
         }
       }
-      .onAppear  { vm.onAppear(); Task { await fvm.load() } }
+      .onAppear  {
+        vm.onAppear()
+        Task { await fvm.load() }
+        // Pull a fresh user profile so the chip pill reflects any
+        // server-side balance change since the last visit — covers the
+        // soft-leave cash-out (Option C) where chips are returned to the
+        // wallet the moment the user taps Leave Table.
+        Task { await authVM.refreshProfile() }
+      }
       .onDisappear { vm.onDisappear() }
     }
   }
 
-  // ─── Header: avatar + "For You" + chip balance ─────────────────────────────
+  // ─── Header: avatar + "LOBBY" title + chip pill ────────────────────────────
 
   private var lobbyHeader: some View {
-    HStack(spacing: SPSpacing.sm) {
-      // Profile avatar — tap to open Settings
+    HStack(alignment: .center, spacing: SPSpacing.sm) {
+      // Profile avatar — wrapped in an ink ring so it sits inside the
+      // comic-page styling instead of floating loose. Tap → Settings.
       Button { showSettings = true } label: {
-        if let user = authVM.currentUser {
-          AvatarView(avatarId: user.avatarId, size: 40)
-        } else {
+        ZStack {
           Circle()
-            .fill(Color(hex: "#1A1A24"))
-            .frame(width: 40, height: 40)
+            .fill(SPRetro.paperShade)
+          if let user = authVM.currentUser {
+            AvatarView(avatarId: user.avatarId, size: 40)
+          }
         }
+        .frame(width: 46, height: 46)
+        .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 2.5))
+        .background(
+          Circle().fill(SPRetro.ink).offset(x: 2, y: 2)   // hard ink shadow
+        )
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Settings")
 
+      // "LOBBY" headline — uppercased, AmericanTypewriter-Bold so it reads
+      // like a comic title strip rather than a UI label. Tap is still
+      // Settings (kept the existing affordance from the previous design).
       Button { showSettings = true } label: {
-        Text("For You")
-          .font(.system(size: 28, weight: .bold, design: .rounded))
-          .foregroundStyle(.white)
+        Text("LOBBY")
+          .font(SPRetroFonts.headline(26))
+          .foregroundStyle(SPRetro.ink)
+          .tracking(1.5)
       }
       .buttonStyle(.plain)
 
+      // Decorative POW! burst — pure visual flourish establishing the comic
+      // tone. Tilted so the eye reads it as stamped onto the page rather
+      // than placed in a UI slot. Smaller than a hero burst so it shares
+      // the header without dominating it.
+      ComicBurst(text: "POW!",
+                 fill: SPRetro.popRed,
+                 textColor: SPRetro.paper,
+                 size: 42,
+                 rotation: -14)
+        .padding(.leading, -4)
+
       Spacer()
 
-      // Chip balance pill
-      if let user = authVM.currentUser {
-        HStack(spacing: 6) {
-          Image(systemName: "creditcard.fill")
-            .font(.system(size: 13))
-            .foregroundStyle(.white.opacity(0.7))
-          Text(user.formattedChips)
-            .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
+      if authVM.currentUser != nil {
+        RetroChipPill(amount: authVM.currentUser?.formattedChips ?? "0") {
+          showTopUp = true
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.08))
-        .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
+        .accessibilityLabel("Buy chips")
       }
     }
     .padding(.horizontal, SPSpacing.md)
@@ -153,40 +200,42 @@ struct LobbyView: View {
       if !featuredTables.isEmpty {
         TabView(selection: $featuredPage) {
           ForEach(Array(featuredTables.enumerated()), id: \.element.id) { idx, table in
-            FeaturedTableCard(table: table) { handleJoinTap(table) }
-            .tag(idx)
-            .padding(.horizontal, SPSpacing.md)
+            // isRejoin: same condition as the active-card row. Featured
+            // cards also need the maroon-burst CTA + REJOIN sticker so the
+            // user knows tapping JOIN here will skip the buy-in sheet.
+            FeaturedTableCard(
+              table: table,
+              isRejoin: vm.lastTable?.id == table.id
+            ) { handleJoinTap(table) }
+              .tag(idx)
+              .padding(.horizontal, SPSpacing.md)
           }
         }
         .tabViewStyle(.page(indexDisplayMode: .automatic))
-        .frame(height: 200)
+        .frame(height: 230)
       } else if vm.isLoadingTables {
-        RoundedRectangle(cornerRadius: SPRadius.xl)
-          .fill(Color(hex: "#13131A"))
+        RoundedRectangle(cornerRadius: 10)
+          .fill(SPRetro.paperShade)
           .frame(height: 200)
           .padding(.horizontal, SPSpacing.md)
           .shimmer()
       } else {
-        // Empty state card
+        // Empty state — paper card calling for "first table". Mustard plus
+        // icon + body type. Comic-panel border so the empty slot still
+        // belongs to the page.
         VStack(spacing: SPSpacing.md) {
-          Image(systemName: "plus.circle")
-            .font(.system(size: 36))
-            .foregroundStyle(Color(hex: "#6C5CE7").opacity(0.5))
-          Text("Create your first table")
-            .font(SPFonts.headline(16))
-            .foregroundStyle(SPColors.textSecondary)
+          Image(systemName: "plus.circle.fill")
+            .font(.system(size: 40, weight: .bold))
+            .foregroundStyle(SPRetro.maroon)
+          Text("Create your first table!")
+            .font(SPRetroFonts.headline(16))
+            .foregroundStyle(SPRetro.ink)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 180)
-        .background(
-          RoundedRectangle(cornerRadius: SPRadius.xl)
-            .fill(Color(hex: "#13131A"))
-            .overlay(
-              RoundedRectangle(cornerRadius: SPRadius.xl)
-                .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
-            )
-        )
+        .comicPanel(fill: SPRetro.paperShade, corner: 10)
         .padding(.horizontal, SPSpacing.md)
+        .padding(.trailing, 4)    // give the hard-ink shadow room
         .onTapGesture { vm.showCreateSheet = true }
       }
     }
@@ -195,14 +244,36 @@ struct LobbyView: View {
   // ─── Filter pills ──────────────────────────────────────────────────────────
 
   private var filterPills: some View {
-    HStack(spacing: SPSpacing.sm) {
-      FilterChip(label: "Hold'em", isSelected: vm.gameTypeFilter == nil || vm.gameTypeFilter == "TEXAS_HOLDEM") {
+    // Game-type chips with retro tints. We keep the PokerChip token-coin so
+    // the row still reads as "casino chips" (which is honest — these select
+    // the game type), but the caption underneath is now a small speech-bubble
+    // tag so the row visually belongs to the comic page.
+    HStack(spacing: 22) {
+      FilterDisc(
+        text: "NLH",
+        caption: "Hold'em",
+        tint: SPRetro.popRed,
+        textColor: SPRetro.paper,
+        isSelected: vm.gameTypeFilter == nil || vm.gameTypeFilter == "TEXAS_HOLDEM"
+      ) {
         withAnimation(.spring(response: 0.3)) {
           vm.gameTypeFilter = vm.gameTypeFilter == "TEXAS_HOLDEM" ? nil : "TEXAS_HOLDEM"
         }
       }
-      FilterChip(label: "SNG", isSelected: false) { }
-      FilterChip(label: "PLO4", isSelected: vm.gameTypeFilter == "PLO") {
+      FilterDisc(
+        text: "SNG",
+        caption: "SNG",
+        tint: SPRetro.ink,
+        textColor: SPRetro.paper,
+        isSelected: false
+      ) { }
+      FilterDisc(
+        text: "PLO",
+        caption: "PLO4",
+        tint: SPRetro.popBlue,
+        textColor: SPRetro.paper,
+        isSelected: vm.gameTypeFilter == "PLO"
+      ) {
         withAnimation(.spring(response: 0.3)) {
           vm.gameTypeFilter = vm.gameTypeFilter == "PLO" ? nil : "PLO"
         }
@@ -216,60 +287,70 @@ struct LobbyView: View {
 
   private var activeGamesSection: some View {
     VStack(alignment: .leading, spacing: SPSpacing.sm) {
-      HStack {
-        HStack(spacing: 4) {
-          Text("Active games")
-            .font(.system(size: 22, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-          Image(systemName: "chevron.right")
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(SPColors.textTertiary)
+      HStack(spacing: 10) {
+        // Section heading inside a speech bubble so it reads as a comic-panel
+        // caption rather than a UI subtitle. The bubble's tail points
+        // downward at the row, which subtly tells the eye "these cards
+        // belong to this caption".
+        SpeechBubble(fill: SPRetro.mustard) {
+          Text("ACTIVE GAMES!")
+            .font(SPRetroFonts.headline(16))
+            .foregroundStyle(SPRetro.ink)
+            .tracking(1)
+        }
+        if !activeTables.isEmpty {
+          LiveDot()
         }
         Spacer()
-        // Manual refresh — the 5s poll usually catches new tables, but on a
-        // flaky connection the user wants a way to force a load right now.
-        Button {
-          Task { await vm.loadTables() }
-        } label: {
-          Image(systemName: vm.isLoadingTables ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(SPColors.textSecondary)
-            .padding(8)
-            .background(Color.white.opacity(0.06))
-            .clipShape(Circle())
-            .rotationEffect(.degrees(vm.isLoadingTables ? 360 : 0))
-            .animation(vm.isLoadingTables
-                       ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-                       : .default,
-                       value: vm.isLoadingTables)
+        // Refresh control — kept the constant-size ZStack trick from the
+        // previous design (button + overlapping spinner) so the row geometry
+        // never reflows mid-refresh. Repainted in ink for the retro palette.
+        ZStack {
+          Button {
+            Task { await vm.loadTables() }
+          } label: {
+            Image(systemName: "arrow.clockwise")
+              .font(.system(size: 13, weight: .heavy))
+              .foregroundStyle(SPRetro.ink)
+              .opacity(vm.isLoadingTables ? 0 : 1)
+              .padding(8)
+              .background(SPRetro.paperShade)
+              .clipShape(Circle())
+              .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 1.5))
+          }
+          .buttonStyle(.plain)
+          .disabled(vm.isLoadingTables)
+
+          if vm.isLoadingTables {
+            ProgressView()
+              .progressViewStyle(.circular)
+              .controlSize(.mini)
+              .tint(SPRetro.ink)
+              .allowsHitTesting(false)
+          }
         }
-        .buttonStyle(.plain)
-        if !activeTables.isEmpty {
-          Text("See all (\(activeTables.count))")
-            .font(SPFonts.caption(13))
-            .foregroundStyle(SPColors.textSecondary)
-        }
+        .frame(width: 36, height: 36)
       }
       .padding(.horizontal, SPSpacing.md)
 
-      // Surface any load error so the user knows why the list is empty.
+      // Error surface — kept the same retry affordance but recolored to the
+      // retro palette so it doesn't read as a foreign Material-Design alert.
       if let err = vm.tablesError {
         HStack(spacing: 8) {
           Image(systemName: "exclamationmark.triangle.fill")
-            .foregroundStyle(SPColors.danger)
+            .foregroundStyle(SPRetro.maroon)
           Text(err)
-            .font(SPFonts.caption(12))
-            .foregroundStyle(SPColors.textSecondary)
+            .font(SPRetroFonts.body(13))
+            .foregroundStyle(SPRetro.inkSoft)
             .lineLimit(2)
           Spacer()
           Button("Retry") { Task { await vm.loadTables() } }
-            .font(SPFonts.caption(12))
-            .foregroundStyle(SPColors.accent)
+            .font(SPRetroFonts.callout(13))
+            .foregroundStyle(SPRetro.maroon)
         }
         .padding(.horizontal, SPSpacing.md)
         .padding(.vertical, 8)
-        .background(SPColors.danger.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
+        .comicPanel(fill: SPRetro.paperShade, corner: 6, lineWidth: 2, shadowOffset: 2)
         .padding(.horizontal, SPSpacing.md)
       }
 
@@ -278,12 +359,12 @@ struct LobbyView: View {
           Spacer()
           VStack(spacing: 6) {
             Text(vm.isLoadingTables ? "Loading tables…" : "No active games")
-              .font(SPFonts.body())
-              .foregroundStyle(SPColors.textTertiary)
+              .font(SPRetroFonts.body(14))
+              .foregroundStyle(SPRetro.inkSoft)
             if !vm.isLoadingTables && vm.tablesError == nil {
               Text("Pull down to refresh")
-                .font(SPFonts.caption(11))
-                .foregroundStyle(SPColors.textTertiary.opacity(0.7))
+                .font(SPRetroFonts.body(11))
+                .foregroundStyle(SPRetro.inkSoft.opacity(0.7))
             }
           }
           Spacer()
@@ -291,15 +372,33 @@ struct LobbyView: View {
         .frame(height: 100)
       } else {
         ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: SPSpacing.sm) {
-            ForEach(activeTables) { table in
-              ActiveGameCard(table: table) { handleJoinTap(table) }
+          // Fanned row of cards: each card gets a tiny alternating tilt so
+          // the strip reads as a hand of cards laid out on the page rather
+          // than a CSS tile grid. The rotation is small (±2°) — large
+          // enough to feel hand-placed, small enough that text stays
+          // readable. Vertical pad so rotated corners don't clip against
+          // the scroll's vertical bounds.
+          HStack(spacing: SPSpacing.sm + 4) {
+            ForEach(Array(activeTables.enumerated()), id: \.element.id) { idx, table in
+              // isRejoin lights up the maroon border + REJOIN sticker when
+              // this card is the user's last-active table — handleJoinTap()
+              // already routes that case to vm.rejoinTable() (no buy-in
+              // prompt), but without this flag the visual cue was missing.
+              ActiveGameCard(table: table, isRejoin: vm.lastTable?.id == table.id) { handleJoinTap(table) }
+                .rotationEffect(.degrees(fanAngle(forIndex: idx)))
+                .offset(y: idx.isMultiple(of: 2) ? 0 : -2)
             }
           }
           .padding(.horizontal, SPSpacing.md)
+          .padding(.vertical, 12)
         }
       }
     }
+  }
+
+  private func fanAngle(forIndex idx: Int) -> Double {
+    let pattern: [Double] = [-2.0, 1.5, -1.0, 2.0, -1.5, 1.0]
+    return pattern[idx % pattern.count]
   }
 
   // ─── Friends section ───────────────────────────────────────────────────────
@@ -307,20 +406,13 @@ struct LobbyView: View {
   private var friendsSection: some View {
     VStack(alignment: .leading, spacing: SPSpacing.sm) {
       HStack {
-        HStack(spacing: 4) {
-          Text("Friends")
-            .font(.system(size: 22, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-          Image(systemName: "chevron.right")
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(SPColors.textTertiary)
+        SpeechBubble(fill: SPRetro.popBlue) {
+          Text("FRIENDS")
+            .font(SPRetroFonts.headline(15))
+            .foregroundStyle(SPRetro.paper)
+            .tracking(1)
         }
         Spacer()
-        if !fvm.friends.isEmpty {
-          Text("See all (\(fvm.friends.count))")
-            .font(SPFonts.caption(13))
-            .foregroundStyle(SPColors.textSecondary)
-        }
       }
       .padding(.horizontal, SPSpacing.md)
 
@@ -328,9 +420,6 @@ struct LobbyView: View {
         HStack(spacing: SPSpacing.md) {
           ForEach(fvm.friends) { friend in
             FriendBubble(friend: friend)
-              // Tapping a friend bubble while you have an active table sends
-              // them an invite directly. Otherwise it falls back to the
-              // friends sheet so the action still feels meaningful.
               .onTapGesture {
                 if vm.canSendInvites {
                   vm.resetInviteSheet()
@@ -340,23 +429,24 @@ struct LobbyView: View {
                 }
               }
           }
-          // Invite button — opens the invite sheet for your current table,
-          // or falls back to the friends list if you aren't sitting at one.
+          // Invite affordance — mustard ink-bordered circle with a "+". Same
+          // tap behavior as before (opens invite sheet if you're seated at a
+          // table, otherwise the friends list).
           VStack(spacing: 6) {
-            Circle()
-              .strokeBorder(
-                vm.canSendInvites ? SPColors.accent.opacity(0.6) : Color.white.opacity(0.2),
-                lineWidth: 1.5
-              )
-              .frame(width: 60, height: 60)
-              .overlay(
-                Image(systemName: "person.crop.circle.badge.plus")
-                  .font(.system(size: 22, weight: .medium))
-                  .foregroundStyle(vm.canSendInvites ? SPColors.accent : Color.white.opacity(0.4))
-              )
-            Text(vm.canSendInvites ? "Invite" : "Invite")
-              .font(SPFonts.caption(11))
-              .foregroundStyle(vm.canSendInvites ? SPColors.accent : SPColors.textTertiary)
+            ZStack {
+              Circle()
+                .fill(vm.canSendInvites ? SPRetro.mustard : SPRetro.paperShade)
+              Image(systemName: "person.crop.circle.badge.plus")
+                .font(.system(size: 24, weight: .heavy))
+                .foregroundStyle(SPRetro.ink)
+            }
+            .frame(width: 60, height: 60)
+            .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 2.5))
+            .background(Circle().fill(SPRetro.ink).offset(x: 2, y: 2))
+
+            Text("Invite")
+              .font(SPRetroFonts.callout(11))
+              .foregroundStyle(SPRetro.ink)
           }
           .onTapGesture {
             if vm.canSendInvites {
@@ -368,6 +458,7 @@ struct LobbyView: View {
           }
         }
         .padding(.horizontal, SPSpacing.md)
+        .padding(.vertical, 6)
       }
     }
   }
@@ -377,18 +468,13 @@ struct LobbyView: View {
   private var groupsSection: some View {
     VStack(alignment: .leading, spacing: SPSpacing.sm) {
       HStack {
-        HStack(spacing: 4) {
-          Text("Groups")
-            .font(.system(size: 22, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-          Image(systemName: "chevron.right")
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(SPColors.textTertiary)
+        SpeechBubble(fill: SPRetro.maroon) {
+          Text("GROUPS")
+            .font(SPRetroFonts.headline(15))
+            .foregroundStyle(SPRetro.paper)
+            .tracking(1)
         }
         Spacer()
-        Text("My groups (0)")
-          .font(SPFonts.caption(13))
-          .foregroundStyle(SPColors.textSecondary)
       }
       .padding(.horizontal, SPSpacing.md)
 
@@ -396,205 +482,418 @@ struct LobbyView: View {
         Spacer()
         VStack(spacing: 6) {
           Image(systemName: "person.3.fill")
-            .font(.system(size: 24))
-            .foregroundStyle(SPColors.textTertiary.opacity(0.5))
+            .font(.system(size: 26, weight: .bold))
+            .foregroundStyle(SPRetro.inkSoft.opacity(0.5))
           Text("Join or create a group")
-            .font(SPFonts.body(13))
-            .foregroundStyle(SPColors.textTertiary)
+            .font(SPRetroFonts.body(13))
+            .foregroundStyle(SPRetro.inkSoft)
         }
         Spacer()
       }
-      .frame(height: 80)
+      .frame(height: 90)
+      .padding(.horizontal, SPSpacing.md)
     }
   }
 }
 
 // ─── Featured Table Card ─────────────────────────────────────────────────────
+//
+// Reskin of the previous navy-gradient playing-card silhouette. The card now
+// reads as a comic-cover panel: paper background, ink-thick border, hard-ink
+// offset shadow, mustard "JOIN!" burst-button, maroon corner badge. The
+// information hierarchy (blinds, label, seats, button) is preserved from the
+// previous design so the muscle memory of returning users still works.
 
 private struct FeaturedTableCard: View {
   let table: TableListItem
   let onJoin: () -> Void
+  // Same flag ActiveGameCard uses — true when this is the player's last
+  // active table. Drives the maroon-burst CTA + REJOIN sticker so the
+  // featured card's "this picks up where you left off" affordance is
+  // visible, not just implicit in the button handler.
+  var isRejoin: Bool = false
+
+  private var gameCode: String {
+    table.gameTypeLabel == "PLO" ? "PL" : "NL"
+  }
+  private var indexColor: Color {
+    table.gameTypeLabel == "PLO" ? SPRetro.popBlue : SPRetro.popRed
+  }
+
+  // Featured CTA label + fill swap on rejoin: maroon "REJOIN!" trumps the
+  // mustard "JOIN!/RESUME!" so it reads as the higher-affinity action.
+  private var ctaLabel: String {
+    if isRejoin { return "REJOIN!" }
+    return table.status == .inProgress ? "RESUME!" : "JOIN!"
+  }
+  private var ctaFill: Color { isRejoin ? SPRetro.maroon : SPRetro.mustard }
+  private var ctaTextColor: Color { isRejoin ? SPRetro.paper : SPRetro.ink }
 
   var body: some View {
-    VStack(spacing: SPSpacing.md) {
-      Spacer()
+    ZStack {
+      // ── Card face ─────────────────────────────────────────────────────────
+      // Paper fill, then a soft wash of the game-type color (red for NLH,
+      // blue for PLO) so the card visually echoes the chip pill above it
+      // and reads as "filled in" instead of just an empty paper slot. The
+      // halftone dots also swap tint to the same color, which keeps the
+      // wash from looking like a flat overlay — the dots and the wash blend
+      // into one coherent printed-page treatment.
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .fill(SPRetro.paper)
+        .overlay(
+          indexColor.opacity(0.16)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        )
+        .overlay(
+          HalftoneOverlay(density: 28, tint: indexColor, opacity: 0.18)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        )
 
-      // Blinds
-      Text(table.blindsLabel)
-        .font(.system(size: 14, weight: .medium))
-        .foregroundStyle(.white.opacity(0.6))
-
-      // Game type
-      Text(table.gameTypeLabel == "PLO" ? "Pot Limit Omaha" : "No Limit Hold'em")
-        .font(.system(size: 24, weight: .bold, design: .rounded))
-        .foregroundStyle(.white)
-
-      // Owner + seats
-      HStack(spacing: 6) {
-        Image(systemName: "lock.fill")
-          .font(.system(size: 11))
-          .foregroundStyle(.white.opacity(0.5))
-        Text(table.ownerUsername)
-          .font(SPFonts.caption(13))
-          .foregroundStyle(.white.opacity(0.6))
-        Text("  \(table.currentPlayers) seats open")
-          .font(SPFonts.caption(13))
-          .foregroundStyle(.white.opacity(0.6))
+      // ── Corner badge ─────────────────────────────────────────────────────
+      // Comic-style maroon/blue "NL"/"PL" tag in the top-left — replaces the
+      // previous gold-on-navy corner index. Reads as a stamped issue badge.
+      VStack {
+        HStack {
+          CornerIndex(code: gameCode, badgeColor: indexColor)
+          Spacer()
+        }
+        Spacer()
       }
+      .padding(12)
 
-      // Join / Resume button
-      Button(action: onJoin) {
-        Text(table.status == .inProgress ? "Resume Game" : "Join Game")
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundStyle(.white)
-          .frame(maxWidth: 220)
-          .padding(.vertical, 12)
-          .background(Color.white.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-          .overlay(
-            RoundedRectangle(cornerRadius: SPRadius.md)
-              .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-          )
+      // ── Center copy ───────────────────────────────────────────────────────
+      VStack(spacing: 8) {
+        Text(table.blindsLabel)
+          .font(SPRetroFonts.body(13))
+          .foregroundStyle(SPRetro.inkSoft)
+        Text(table.gameTypeLabel == "PLO" ? "POT LIMIT OMAHA" : "NO LIMIT HOLD'EM")
+          .font(SPRetroFonts.headline(20))
+          .foregroundStyle(SPRetro.ink)
+          .tracking(1)
+          .lineLimit(1)
+          .minimumScaleFactor(0.6)
+        HStack(spacing: 6) {
+          Image(systemName: "lock.fill")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(SPRetro.inkSoft)
+          Text(table.ownerUsername)
+            .font(SPRetroFonts.body(12))
+            .foregroundStyle(SPRetro.inkSoft)
+            .lineLimit(1)
+          Text("·").foregroundStyle(SPRetro.inkSoft.opacity(0.6))
+          Text("\(table.currentPlayers) seats")
+            .font(SPRetroFonts.body(12))
+            .foregroundStyle(SPRetro.inkSoft)
+        }
+
+        // Join / Resume button — comic-burst CTA on mustard so it reads as
+        // the primary "punch the button" action on the page. Hard ink border
+        // + offset shadow ties it to the rest of the comic-panel system.
+        // On rejoin, the fill flips to maroon and the label becomes "REJOIN!"
+        // so the user can SEE this isn't a fresh buy-in.
+        Button(action: onJoin) {
+          Text(ctaLabel)
+            .font(SPRetroFonts.display(18))
+            .foregroundStyle(ctaTextColor)
+            .tracking(1.5)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 10)
+            .comicPanel(fill: ctaFill, corner: 22, lineWidth: 2.5, shadowOffset: 3)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
       }
-      .buttonStyle(.plain)
-
-      Spacer()
+      .padding(.horizontal, 36)
     }
     .frame(maxWidth: .infinity)
-    .background(
-      ZStack {
-        RoundedRectangle(cornerRadius: SPRadius.xl)
-          .fill(
-            LinearGradient(
-              colors: [Color(hex: "#1A2744"), Color(hex: "#0D1525")],
-              startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-          )
-        // Subtle blue glow at top
-        RoundedRectangle(cornerRadius: SPRadius.xl)
-          .fill(
-            RadialGradient(
-              colors: [Color(hex: "#2563EB").opacity(0.15), Color.clear],
-              center: .top,
-              startRadius: 20,
-              endRadius: 200
-            )
-          )
-        RoundedRectangle(cornerRadius: SPRadius.xl)
-          .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+    .frame(height: 210)
+    .overlay(
+      // Border switches to maroon on rejoin so the featured slot reads as
+      // "this is YOUR table" the moment you open the lobby.
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .strokeBorder(isRejoin ? SPRetro.maroon : SPRetro.ink, lineWidth: 3)
+    )
+    .overlay(alignment: .topTrailing) {
+      // REJOIN sticker — mirrors the one on ActiveGameCard so users see the
+      // same affordance whether the table sits in the featured slot or in
+      // the active row. Rotated + offset shadow plate so it reads as a
+      // physical sticker, not a UI label.
+      if isRejoin {
+        ZStack {
+          Capsule()
+            .fill(SPRetro.ink)
+            .offset(x: 1.5, y: 2)
+          Capsule()
+            .fill(SPRetro.maroon)
+            .overlay(Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.5))
+        }
+        .frame(width: 72, height: 24)
+        .overlay(
+          Text("REJOIN")
+            .font(SPRetroFonts.headline(11))
+            .foregroundStyle(SPRetro.paper)
+            .tracking(1.3)
+        )
+        .rotationEffect(.degrees(8))
+        .offset(x: 10, y: -12)
       }
+    }
+    .background(
+      // Hard ink offset shadow — gives the comic-page punch where a blurred
+      // shadow would feel UI-y. Sits behind the entire card.
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .fill(SPRetro.ink)
+        .offset(x: 5, y: 5)
     )
   }
 }
 
+// Reusable corner badge for the featured + active cards. Now a real
+// rounded-square "issue stamp" with ink border, not just text + a dot.
+private struct CornerIndex: View {
+  let code:        String
+  let badgeColor:  Color
+
+  var body: some View {
+    Text(code)
+      .font(SPRetroFonts.display(14))
+      .foregroundStyle(SPRetro.paper)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
+      .background(badgeColor)
+      .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+          .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+      )
+  }
+}
+
 // ─── Active Game Card ────────────────────────────────────────────────────────
+//
+// Smaller comic-panel sibling of FeaturedTableCard for the horizontal scroller.
+// Same visual language: paper bg, ink border, hard offset shadow, maroon/blue
+// corner badge. Seat-fill ring uses ink stroke + mustard progress so the
+// "how full is this table" cue still reads at a glance.
 
 private struct ActiveGameCard: View {
   let table: TableListItem
   let onJoin: () -> Void
+  // True when this card refers to a table the player previously seated at
+  // and walked away from. The server still has their seat + stack, so
+  // tapping JOIN here actually rejoins (no buy-in prompt). We change the
+  // visual treatment so the user can SEE this is a rejoin, not a fresh
+  // buy-in — maroon border + a "REJOIN" sticker stamp in the corner.
+  var isRejoin: Bool = false
 
   private var seatProgress: CGFloat {
     guard table.maxPlayers > 0 else { return 0 }
     return CGFloat(table.currentPlayers) / CGFloat(table.maxPlayers)
   }
 
+  private var gameCode: String {
+    table.gameTypeLabel == "PLO" ? "PL" : "NL"
+  }
+  private var indexColor: Color {
+    table.gameTypeLabel == "PLO" ? SPRetro.popBlue : SPRetro.popRed
+  }
+
   var body: some View {
-    VStack(alignment: .leading, spacing: SPSpacing.sm) {
-      HStack {
-        // Game type
-        Text(table.gameTypeLabel)
-          .font(.system(size: 24, weight: .heavy, design: .rounded))
-          .foregroundStyle(.white)
-
-        Spacer()
-
-        // Seat count ring
-        ZStack {
-          Circle()
-            .stroke(Color.white.opacity(0.1), lineWidth: 3)
-          Circle()
-            .trim(from: 0, to: seatProgress)
-            .stroke(Color(hex: "#4A90E2"), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-            .rotationEffect(.degrees(-90))
-          VStack(spacing: 0) {
-            Text("\(table.currentPlayers)/\(table.maxPlayers)")
-              .font(.system(size: 11, weight: .bold))
-              .foregroundStyle(.white)
-            Text("seats")
-              .font(.system(size: 8, weight: .medium))
-              .foregroundStyle(.white.opacity(0.5))
-          }
-        }
-        .frame(width: 44, height: 44)
-      }
-
-      // Blinds
-      Text(table.blindsLabel)
-        .font(.system(size: 14, weight: .medium))
-        .foregroundStyle(.white.opacity(0.6))
-
-      Spacer()
-
-      // Owner badge
-      HStack(spacing: 4) {
-        Image(systemName: table.isPrivate ? "lock.fill" : "globe")
-          .font(.system(size: 9))
-          .foregroundStyle(.white.opacity(0.5))
-        Text(table.ownerUsername)
-          .font(SPFonts.caption(11))
-          .foregroundStyle(.white.opacity(0.6))
-          .lineLimit(1)
-      }
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
-      .background(Color.white.opacity(0.08))
-      .clipShape(Capsule())
-    }
-    .padding(SPSpacing.md)
-    .frame(width: 170, height: 160)
-    .background(
-      RoundedRectangle(cornerRadius: SPRadius.lg)
-        .fill(
-          LinearGradient(
-            colors: [Color(hex: "#1A2744"), Color(hex: "#0F1A2E")],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-          )
+    ZStack(alignment: .topLeading) {
+      // Card face — same paper + game-type-tinted wash + halftone treatment
+      // as FeaturedTableCard so the active-row cards read as "filled in"
+      // and color-match the chip pill above them (red = NLH, blue = PLO).
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .fill(SPRetro.paper)
+        .overlay(
+          indexColor.opacity(0.16)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         )
         .overlay(
-          RoundedRectangle(cornerRadius: SPRadius.lg)
-            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+          HalftoneOverlay(density: 22, tint: indexColor, opacity: 0.15)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         )
+
+      // ── Foreground content ──────────────────────────────────────────────
+      VStack(alignment: .leading, spacing: SPSpacing.sm) {
+        HStack(alignment: .top) {
+          CornerIndex(code: gameCode, badgeColor: indexColor)
+
+          Spacer()
+
+          // Seat-fill ring — ink track + mustard progress so the indicator
+          // matches the rest of the comic-page palette while still reading
+          // as "how full is the table" at a glance.
+          ZStack {
+            Circle()
+              .stroke(SPRetro.inkSoft.opacity(0.25), lineWidth: 3)
+            Circle()
+              .trim(from: 0, to: seatProgress)
+              .stroke(SPRetro.mustard,
+                      style: StrokeStyle(lineWidth: 3, lineCap: .round))
+              .rotationEffect(.degrees(-90))
+            VStack(spacing: 0) {
+              Text("\(table.currentPlayers)/\(table.maxPlayers)")
+                .font(SPRetroFonts.headline(11))
+                .foregroundStyle(SPRetro.ink)
+              Text("seats")
+                .font(SPRetroFonts.body(8))
+                .foregroundStyle(SPRetro.inkSoft)
+            }
+          }
+          .frame(width: 44, height: 44)
+        }
+
+        Spacer(minLength: 0)
+
+        Text(table.blindsLabel)
+          .font(SPRetroFonts.display(18))
+          .foregroundStyle(SPRetro.ink)
+
+        // Owner / privacy badge — mustard pill with ink border. Reads as a
+        // little "by-line" stamp at the foot of the card.
+        HStack(spacing: 4) {
+          Image(systemName: table.isPrivate ? "lock.fill" : "globe")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(SPRetro.ink)
+          Text(table.ownerUsername)
+            .font(SPRetroFonts.callout(11))
+            .foregroundStyle(SPRetro.ink)
+            .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(SPRetro.mustard)
+        .clipShape(Capsule())
+        .overlay(Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.5))
+      }
+      .padding(SPSpacing.md)
+    }
+    .frame(width: 180, height: 170)
+    .overlay(
+      // Border is maroon on rejoin tables so the card visually pops out
+      // of the row at a glance; otherwise standard ink.
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .strokeBorder(isRejoin ? SPRetro.maroon : SPRetro.ink, lineWidth: 3)
     )
+    .overlay(alignment: .topTrailing) {
+      // REJOIN sticker stamp — slightly rotated maroon pill with ink
+      // border and a hard ink offset shadow. Only renders when this is
+      // the user's last-active table. Designed to feel like a vintage
+      // "FRAGILE" or "RUSH" sticker slapped onto the card corner.
+      if isRejoin {
+        ZStack {
+          Capsule()
+            .fill(SPRetro.ink)
+            .offset(x: 1.5, y: 2)
+          Capsule()
+            .fill(SPRetro.maroon)
+            .overlay(Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.5))
+        }
+        .frame(width: 64, height: 22)
+        .overlay(
+          Text("REJOIN")
+            .font(SPRetroFonts.headline(10))
+            .foregroundStyle(SPRetro.paper)
+            .tracking(1.2)
+        )
+        .rotationEffect(.degrees(8))
+        .offset(x: 8, y: -10)
+      }
+    }
+    .background(
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .fill(SPRetro.ink)
+        .offset(x: 4, y: 4)
+    )
+    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     .onTapGesture(perform: onJoin)
   }
 }
 
-// ─── Filter Chip ─────────────────────────────────────────────────────────────
+// ─── Filter Disc ─────────────────────────────────────────────────────────────
+//
+// PokerChip token-coin in retro tints + a caption. Selected state still drives
+// saturation/opacity, but the selection ring is now ink-thick to match the
+// rest of the comic-panel system.
 
-private struct FilterChip: View {
-  let label: String
+private struct FilterDisc: View {
+  let text: String
+  let caption: String
+  let tint: Color
+  let textColor: Color
   let isSelected: Bool
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
-      Text(label)
-        .font(.system(size: 14, weight: .semibold))
-        .foregroundStyle(isSelected ? .white : SPColors.textSecondary)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(isSelected ? Color.white.opacity(0.12) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-        .overlay(
-          RoundedRectangle(cornerRadius: SPRadius.md)
-            .strokeBorder(isSelected ? Color.white.opacity(0.15) : Color.white.opacity(0.08), lineWidth: 1)
+      VStack(spacing: 6) {
+        PokerChip(
+          text: text,
+          tint: tint,
+          textColor: textColor,
+          size: 46
         )
+        .saturation(isSelected ? 1.0 : 0.55)
+        .opacity(isSelected ? 1.0 : 0.6)
+        .overlay(
+          Circle()
+            .stroke(SPRetro.ink, lineWidth: isSelected ? 2.5 : 1.5)
+        )
+        .background(
+          // Hard ink shadow — only when selected, since this is the same
+          // pattern we use for "primary tappable thing" elsewhere on the
+          // page (chip pill, join button, friend invite circle).
+          Circle()
+            .fill(SPRetro.ink)
+            .offset(x: 2, y: 2)
+            .opacity(isSelected ? 1 : 0)
+        )
+
+        Text(caption)
+          .font(SPRetroFonts.callout(11))
+          .foregroundStyle(isSelected ? SPRetro.ink : SPRetro.inkSoft.opacity(0.6))
+          .tracking(0.6)
+      }
     }
     .buttonStyle(.plain)
   }
 }
 
+// ─── Live Dot ────────────────────────────────────────────────────────────────
+//
+// Small pulsing pop-red indicator next to the active games caption.
+// Now ink-bordered so it reads as part of the comic-panel system.
+
+private struct LiveDot: View {
+  @State private var pulse = false
+
+  var body: some View {
+    ZStack {
+      Circle()
+        .fill(SPRetro.popRed.opacity(0.35))
+        .frame(width: 16, height: 16)
+        .scaleEffect(pulse ? 1.4 : 0.8)
+        .opacity(pulse ? 0.0 : 0.7)
+      Circle()
+        .fill(SPRetro.popRed)
+        .frame(width: 10, height: 10)
+        .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 1.5))
+    }
+    .onAppear {
+      withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) {
+        pulse = true
+      }
+    }
+    .accessibilityHidden(true)
+  }
+}
+
 // ─── Friend Bubble ───────────────────────────────────────────────────────────
+//
+// Avatar inside an ink ring with a hard offset shadow. Online state colors the
+// outer ring mustard (the "look here, they're up") instead of blue so the
+// online cue follows the rest of the retro palette.
 
 private struct FriendBubble: View {
   let friend: Friend
@@ -603,17 +902,16 @@ private struct FriendBubble: View {
     VStack(spacing: 6) {
       ZStack {
         Circle()
-          .strokeBorder(
-            friend.isOnline ? Color(hex: "#4A90E2") : Color.white.opacity(0.15),
-            lineWidth: 2
-          )
-          .frame(width: 64, height: 64)
-
-        AvatarView(avatarId: friend.avatarId, size: 56)
+          .fill(friend.isOnline ? SPRetro.mustard : SPRetro.paperShade)
+        AvatarView(avatarId: friend.avatarId, size: 52)
       }
+      .frame(width: 64, height: 64)
+      .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 2.5))
+      .background(Circle().fill(SPRetro.ink).offset(x: 2, y: 2))
+
       Text(friend.username.count > 9 ? String(friend.username.prefix(8)) + "..." : friend.username)
-        .font(SPFonts.caption(11))
-        .foregroundStyle(SPColors.textSecondary)
+        .font(SPRetroFonts.callout(11))
+        .foregroundStyle(SPRetro.ink)
         .lineLimit(1)
     }
   }
@@ -624,11 +922,23 @@ private struct FriendBubble: View {
 // `/tables/:id/invite` for the user's most-recent table. Tapped friends flip
 // to "Invited" and stay there for the lifetime of the sheet so the user
 // doesn't accidentally double-invite. A toast banner surfaces server errors.
+//
+// NOTE: Kept on the dark `SPColors` palette for now — this sheet is part of
+// the "table flow" surface that hasn't been retro'd yet. Will get its own
+// retro pass when we revisit the in-game flows.
 
 struct InviteFriendsSheet: View {
   @ObservedObject var vm: LobbyViewModel
   @ObservedObject var fvm: FriendsViewModel
   @Environment(\.dismiss) private var dismiss
+
+  var onlineOnly: Bool = false
+  var onAddBot: (() -> Void)? = nil
+  var addBotDisabled: Bool = false
+
+  private var visibleFriends: [Friend] {
+    onlineOnly ? fvm.friends.filter { $0.isOnline } : fvm.friends
+  }
 
   var body: some View {
     NavigationStack {
@@ -636,7 +946,6 @@ struct InviteFriendsSheet: View {
         SPColors.background.ignoresSafeArea()
 
         VStack(spacing: 0) {
-          // Context header — shows which table we're inviting to.
           if let table = vm.lastTable {
             HStack(spacing: SPSpacing.sm) {
               Image(systemName: "person.2.fill")
@@ -667,27 +976,74 @@ struct InviteFriendsSheet: View {
             SPDivider()
           }
 
-          if fvm.friends.isEmpty {
+          if let onAddBot {
+            Button {
+              if !addBotDisabled { onAddBot() }
+            } label: {
+              HStack(spacing: SPSpacing.md) {
+                ZStack {
+                  Circle()
+                    .fill(SPColors.surfaceElevated)
+                    .frame(width: 44, height: 44)
+                  Image(systemName: "cpu")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(addBotDisabled ? SPColors.textTertiary : SPColors.accent)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                  Text("Add Bot Player")
+                    .font(SPFonts.headline(14))
+                    .foregroundStyle(addBotDisabled ? SPColors.textTertiary : SPColors.textPrimary)
+                  Text(addBotDisabled
+                       ? "A bot is already seated at this table"
+                       : "Fill this seat with StackBot")
+                    .font(SPFonts.caption(12))
+                    .foregroundStyle(SPColors.textTertiary)
+                }
+                Spacer()
+                if !addBotDisabled {
+                  Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SPColors.textTertiary)
+                }
+              }
+              .padding(.horizontal, SPSpacing.md)
+              .padding(.vertical, SPSpacing.sm + 2)
+            }
+            .buttonStyle(.plain)
+            .disabled(addBotDisabled)
+            SPDivider()
+          }
+
+          if visibleFriends.isEmpty {
             VStack(spacing: SPSpacing.md) {
               Spacer()
               Image(systemName: "person.2.slash")
                 .font(.system(size: 40))
                 .foregroundStyle(SPColors.textTertiary)
-              Text("No friends to invite yet")
-                .font(SPFonts.body())
-                .foregroundStyle(SPColors.textSecondary)
-              Text("Add friends from the Friends tab first")
-                .font(SPFonts.caption(12))
-                .foregroundStyle(SPColors.textTertiary)
+              if fvm.friends.isEmpty {
+                Text("No friends to invite yet")
+                  .font(SPFonts.body())
+                  .foregroundStyle(SPColors.textSecondary)
+                Text("Add friends from the Friends tab first")
+                  .font(SPFonts.caption(12))
+                  .foregroundStyle(SPColors.textTertiary)
+              } else {
+                Text("No friends online right now")
+                  .font(SPFonts.body())
+                  .foregroundStyle(SPColors.textSecondary)
+                Text("Try again later or invite someone via share link")
+                  .font(SPFonts.caption(12))
+                  .foregroundStyle(SPColors.textTertiary)
+              }
               Spacer()
             }
             .frame(maxWidth: .infinity)
           } else {
             ScrollView(showsIndicators: false) {
               LazyVStack(spacing: 0) {
-                ForEach(fvm.friends) { friend in
+                ForEach(visibleFriends) { friend in
                   InviteFriendRow(friend: friend, vm: vm)
-                  if friend.id != fvm.friends.last?.id {
+                  if friend.id != visibleFriends.last?.id {
                     SPDivider().padding(.leading, 68)
                   }
                 }
@@ -697,7 +1053,6 @@ struct InviteFriendsSheet: View {
           }
         }
 
-        // Transient toast banner.
         if let toast = vm.inviteToast {
           Text(toast)
             .font(SPFonts.body(13))
@@ -710,7 +1065,6 @@ struct InviteFriendsSheet: View {
             .padding(.top, SPSpacing.md)
             .transition(.move(edge: .top).combined(with: .opacity))
             .onAppear {
-              // Auto-dismiss after 2.5s.
               Task {
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 withAnimation { vm.inviteToast = nil }
@@ -795,6 +1149,10 @@ private struct InviteFriendRow: View {
 }
 
 // ─── Rejoin Banner ───────────────────────────────────────────────────────────
+//
+// Reskinned to the retro palette since this banner appears AT the top of the
+// lobby (safeAreaInset) — leaving it dark would create a jarring stripe across
+// the cream page.
 
 struct RejoinBanner: View {
   let tableName: String
@@ -804,29 +1162,35 @@ struct RejoinBanner: View {
     Button(action: onRejoin) {
       HStack(spacing: SPSpacing.sm) {
         Image(systemName: "arrow.uturn.left.circle.fill")
-          .font(.system(size: 18))
-          .foregroundStyle(SPColors.accent)
+          .font(.system(size: 20, weight: .heavy))
+          .foregroundStyle(SPRetro.maroon)
         VStack(alignment: .leading, spacing: 1) {
           Text("Return to table")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(SPColors.textSecondary)
+            .font(SPRetroFonts.callout(11))
+            .foregroundStyle(SPRetro.inkSoft)
           Text(tableName)
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(SPColors.textPrimary)
+            .font(SPRetroFonts.headline(14))
+            .foregroundStyle(SPRetro.ink)
             .lineLimit(1)
         }
         Spacer()
-        Text("Rejoin")
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(.white)
+        Text("REJOIN!")
+          .font(SPRetroFonts.display(13))
+          .foregroundStyle(SPRetro.ink)
+          .tracking(1)
           .padding(.horizontal, 12)
           .padding(.vertical, 6)
-          .background(SPColors.accent)
+          .background(SPRetro.mustard)
           .clipShape(Capsule())
+          .overlay(Capsule().strokeBorder(SPRetro.ink, lineWidth: 2))
       }
       .padding(.horizontal, SPSpacing.md)
       .padding(.vertical, SPSpacing.sm)
-      .background(SPColors.surface)
+      .background(SPRetro.paperShade)
+      .overlay(
+        Rectangle().frame(height: 2).foregroundStyle(SPRetro.ink),
+        alignment: .bottom
+      )
     }
     .buttonStyle(.plain)
   }

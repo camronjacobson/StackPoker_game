@@ -2,10 +2,38 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Allow plain HTTP to the Debug LAN host. Production uses HTTPS via
+	     Railway; the dev IP in NetworkService.swift is http://192.168.x.x. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+
+	<!-- Live Activities (ActivityKit, iOS 16.1+).
+	     Without this key set to YES, Activity<T>.request(...) throws
+	     and the per-turn Live Activity will silently fail to start. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+
+	<!-- Custom URL scheme used to route Fold-from-Live-Activity taps back
+	     into the running app. The widget extension's App Intent opens
+	     `stackpoker://table/<id>/action/fold` and our .onOpenURL handler
+	     in StackPokerApp.swift parses and dispatches it via
+	     PokerActionDeepLink.parse(...). The scheme MUST match the value
+	     of `PokerActionDeepLink.scheme` in PokerActionAttributes.swift. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.stackpoker.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>stackpoker</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

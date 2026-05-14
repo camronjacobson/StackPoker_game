@@ -40,13 +40,14 @@ private enum HandFilter: String, CaseIterable, Identifiable {
 
     /// Tint per filter — only used when the chip is selected. Kept aligned
     /// with the per-row signaling colors so the same outcome reads in the
-    /// same color across the screen.
+    /// same color across the screen. All retroed to mustard / muted teal /
+    /// maroon (via SPColors tokens) so the chips feel painted on.
     var tint: Color {
         switch self {
-        case .all:        return SPColors.accentLight
-        case .wins:       return SPColors.success
-        case .losses:     return SPColors.danger
-        case .bookmarked: return SPColors.chipGold
+        case .all:        return SPRetro.mustard  // mustard
+        case .wins:       return SPColors.success       // muted teal
+        case .losses:     return SPColors.danger        // maroon
+        case .bookmarked: return SPRetro.mustard  // mustard
         }
     }
 }
@@ -126,7 +127,7 @@ struct HistoryListView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(SPColors.textPrimary)
+                                .foregroundStyle(SPRetro.ink)
                         }
                     }
                 }
@@ -156,6 +157,10 @@ struct HistoryListView: View {
         // counts are obvious from scrolling the list.
         let count: Int? = (f == .bookmarked) ? store.bookmarkedIds.count : nil
 
+        // Retro filter chip: ink-bordered capsule with a hard ink offset
+        // when selected (mustard-or-tint fill) and a flat paperShade idle
+        // state. AmericanTypewriter-Bold label + ink/inkSoft text. Same
+        // sticker vocab as the tab buttons in FriendsSheet.
         return Button {
             withAnimation(.easeInOut(duration: 0.15)) { filter = f }
         } label: {
@@ -163,32 +168,36 @@ struct HistoryListView: View {
                 Image(systemName: f.icon)
                     .font(.system(size: 11, weight: .bold))
                 Text(f.rawValue)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.custom("AmericanTypewriter-Bold", size: 12))
                 if let count, count > 0 {
                     Text("\(count)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(.custom("ChalkboardSE-Bold", size: 11))
+                        .foregroundStyle(SPRetro.ink)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(
-                            Capsule().fill(
-                                (isOn ? Color.black : f.tint).opacity(isOn ? 0.18 : 0.20)
-                            )
+                            ZStack {
+                                Capsule().fill(SPRetro.paper)
+                                Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+                            }
                         )
                 }
             }
-            .foregroundStyle(isOn ? Color.black : SPColors.textPrimary)
+            .foregroundStyle(SPRetro.ink)
             .padding(.horizontal, SPSpacing.sm + 2)
             .padding(.vertical, 6)
             .background(
-                Capsule().fill(
-                    isOn ? f.tint : SPColors.surfaceElevated
-                )
-            )
-            .overlay(
-                Capsule().strokeBorder(
-                    isOn ? f.tint.opacity(0.0) : Color.white.opacity(0.06),
-                    lineWidth: 0.5
-                )
+                ZStack {
+                    if isOn {
+                        Capsule()
+                            .fill(SPRetro.ink)
+                            .offset(x: 1.5, y: 2)
+                        Capsule().fill(f.tint)
+                    } else {
+                        Capsule().fill(SPRetro.paperShade)
+                    }
+                    Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                }
             )
         }
         .buttonStyle(.plain)
@@ -229,7 +238,7 @@ struct HistoryListView: View {
                                 Label("Star", systemImage: "star.fill")
                             }
                         }
-                        .tint(SPColors.chipGold)
+                        .tint(SPRetro.mustard)
                     }
                     // Trailing-edge swipe stays as the destructive delete.
                     .swipeActions(edge: .trailing) {
@@ -248,18 +257,19 @@ struct HistoryListView: View {
 
     // ─── Empty states ────────────────────────────────────────────────────────
 
-    /// True empty state — no hands recorded at all.
+    /// True empty state — no hands recorded at all. Retro: mustard icon,
+    /// ink title, ink-soft body. Sits on the paper substrate as a note.
     private var emptyState: some View {
         VStack(spacing: SPSpacing.md) {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.system(size: 48))
-                .foregroundStyle(SPColors.accent.opacity(0.5))
+                .foregroundStyle(SPRetro.mustardDark)
             Text("No hands yet")
-                .font(SPFonts.headline())
-                .foregroundStyle(SPColors.textPrimary)
+                .font(.custom("AmericanTypewriter-Bold", size: 18))
+                .foregroundStyle(SPRetro.ink)
             Text("Play a hand and it'll show up here for replay and review.")
-                .font(SPFonts.body(13))
-                .foregroundStyle(SPColors.textSecondary)
+                .font(.custom("AmericanTypewriter", size: 13))
+                .foregroundStyle(SPRetro.inkMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, SPSpacing.xl)
         }
@@ -267,18 +277,19 @@ struct HistoryListView: View {
 
     /// Filter-specific empty state. Hands exist, just none match the chip
     /// the user picked. We show a "Show all" shortcut so the user doesn't
-    /// have to find the chip row again to escape the dead end.
+    /// have to find the chip row again to escape the dead end. Retro CTA
+    /// uses the same mustard-sticker vocab as primary buttons.
     private var filteredEmptyState: some View {
         VStack(spacing: SPSpacing.md) {
             Image(systemName: filter.icon)
                 .font(.system(size: 40))
-                .foregroundStyle(filter.tint.opacity(0.5))
+                .foregroundStyle(filter.tint)
             Text(filteredEmptyTitle)
-                .font(SPFonts.headline(15))
-                .foregroundStyle(SPColors.textPrimary)
+                .font(.custom("AmericanTypewriter-Bold", size: 15))
+                .foregroundStyle(SPRetro.ink)
             Text(filteredEmptySubtitle)
-                .font(SPFonts.body(12))
-                .foregroundStyle(SPColors.textSecondary)
+                .font(.custom("AmericanTypewriter", size: 12))
+                .foregroundStyle(SPRetro.inkMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, SPSpacing.xl)
 
@@ -287,11 +298,19 @@ struct HistoryListView: View {
                     withAnimation(.easeInOut(duration: 0.15)) { filter = .all }
                 } label: {
                     Text("Show all hands")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .font(.custom("AmericanTypewriter-Bold", size: 12))
+                        .foregroundStyle(SPRetro.ink)
                         .padding(.horizontal, SPSpacing.md)
                         .padding(.vertical, 6)
-                        .background(Capsule().fill(SPColors.accentLight))
+                        .background(
+                            ZStack {
+                                Capsule()
+                                    .fill(SPRetro.ink)
+                                    .offset(x: 1.5, y: 2)
+                                Capsule().fill(SPRetro.mustard)
+                                Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                            }
+                        )
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 4)
@@ -353,8 +372,8 @@ struct HandHistoryRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(summary.tableName)
-                    .font(SPFonts.headline(14))
-                    .foregroundStyle(SPColors.textPrimary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 14))
+                    .foregroundStyle(SPRetro.ink)
                     .lineLimit(1)
 
                 // Tag-pill row: hand name + opponent count. Cleaner than free
@@ -363,16 +382,16 @@ struct HandHistoryRow: View {
                     if let name = summary.winningHandName {
                         rowTag(
                             text:  name,
-                            color: summary.iWon ? SPColors.success : SPColors.textSecondary
+                            color: summary.iWon ? SPColors.success : SPRetro.inkMuted
                         )
                     }
                     rowTag(
                         text:  "\(summary.opponentCount + 1)P",
-                        color: SPColors.textSecondary
+                        color: SPRetro.inkMuted
                     )
                     Text(relativeTime(summary.endedAt))
-                        .font(SPFonts.caption(11))
-                        .foregroundStyle(SPColors.textTertiary)
+                        .font(.custom("AmericanTypewriter", size: 11))
+                        .foregroundStyle(SPRetro.inkMuted)
                 }
             }
 
@@ -390,68 +409,62 @@ struct HandHistoryRow: View {
                 Text(summary.iWon
                      ? "+\(formatChips(summary.stackDelta))"
                      : formatChips(summary.stackDelta))
-                    .font(SPFonts.chips(15))
+                    .font(.custom("ChalkboardSE-Bold", size: 15))
                     .foregroundStyle(summary.iWon ? SPColors.success : SPColors.danger)
             }
         }
         .padding(.horizontal, SPSpacing.md)
         .padding(.vertical, SPSpacing.sm + 2)
         .background(
-            RoundedRectangle(cornerRadius: SPRadius.md)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "#1F2C4A"), Color(hex: "#0D1525")],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    // Thin top-edge highlight reads as a subtle bevel — sells
-                    // the card as elevated rather than painted onto the bg.
-                    RoundedRectangle(cornerRadius: SPRadius.md)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.18),
-                                    Color.white.opacity(0.04)
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            ),
-                            lineWidth: 1
-                        )
-                )
+            // Retro row card: paperShade with ink border + small ink offset
+            // shadow. Same printed-card vocab as the dashboard tiles so the
+            // list reads as a stack of stamped index cards.
+            ZStack {
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.ink)
+                    .offset(x: 1.5, y: 2.5)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .fill(SPRetro.paperShade)
+                RoundedRectangle(cornerRadius: SPRadius.md)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+            }
         )
-        // Bookmark indicator. A tiny gold star floated into the top-right
-        // corner so the bookmark state reads at a glance without taking up
-        // structural space in the row layout. Only renders when starred so
-        // unstarred rows stay visually quiet.
+        // Bookmark indicator. A tiny mustard star sticker (ink border +
+        // offset) floated into the top-right corner so the bookmark state
+        // reads at a glance without taking up structural space in the row
+        // layout. Only renders when starred so unstarred rows stay quiet.
         .overlay(alignment: .topTrailing) {
             if isBookmarked {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(SPColors.chipGold)
-                    .padding(5)
-                    .background(
-                        Circle()
-                            .fill(Color.black.opacity(0.45))
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(SPColors.chipGold.opacity(0.6), lineWidth: 0.5)
-                            )
-                    )
-                    .offset(x: -8, y: 8)
-                    .transition(.scale.combined(with: .opacity))
+                ZStack {
+                    Circle()
+                        .fill(SPRetro.ink)
+                        .frame(width: 22, height: 22)
+                        .offset(x: 1, y: 1.5)
+                    Circle()
+                        .fill(SPRetro.mustard)
+                        .frame(width: 22, height: 22)
+                    Circle()
+                        .strokeBorder(SPRetro.ink, lineWidth: 1)
+                        .frame(width: 22, height: 22)
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(SPRetro.ink)
+                }
+                .offset(x: -8, y: 8)
+                .transition(.scale.combined(with: .opacity))
             }
         }
-        .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
     }
 
+    /// Retro mini hole-card glyph: paper face + ink hairline border, no
+    /// soft drop shadow — flat printed-card look that matches the table.
     private func miniCard(_ c: PFCard) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 5)
-                .fill(Color.white)
+                .fill(SPRetro.paper)
             VStack(spacing: -1) {
                 Text(c.live.displayRank)
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .font(.custom("ChalkboardSE-Bold", size: 16))
                 Text(c.live.suitSymbol)
                     .font(.system(size: 13, weight: .bold))
             }
@@ -460,22 +473,23 @@ struct HandHistoryRow: View {
         .frame(width: 30, height: 42)
         .overlay(
             RoundedRectangle(cornerRadius: 5)
-                .stroke(Color.black.opacity(0.25), lineWidth: 0.6)
+                .stroke(SPRetro.ink, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.45), radius: 1.5, x: 0, y: 1)
     }
 
+    /// Retro row tag: paperShade pill with ink hairline border + tinted ink
+    /// label. Flat (no opacity wash) so the pills read as paper labels.
     private func rowTag(text: String, color: Color) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .font(.custom("AmericanTypewriter-Bold", size: 10))
             .foregroundStyle(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                Capsule().fill(color.opacity(0.15))
-            )
-            .overlay(
-                Capsule().strokeBorder(color.opacity(0.30), lineWidth: 0.5)
+                ZStack {
+                    Capsule().fill(SPRetro.paper)
+                    Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+                }
             )
             .lineLimit(1)
     }

@@ -51,18 +51,19 @@ struct EquityStripView: View {
         }
         .padding(.horizontal, SPSpacing.md)
         .padding(.vertical, SPSpacing.sm)
-        .background(SPColors.surface)
+        // Retro strip: solid paperShade band with ink top/bottom hairlines
+        // — same vocab as the TrialBanner, reads as a printed ribbon
+        // separating the controls from the analysis list.
+        .background(SPRetro.paperShade)
         .overlay(
-            // Hairline top + bottom rules so the strip reads as its own
-            // band rather than blending into the controls or the list.
-            VStack {
+            VStack(spacing: 0) {
                 Rectangle()
-                    .fill(SPColors.border.opacity(0.6))
-                    .frame(height: 0.5)
+                    .fill(SPRetro.ink)
+                    .frame(height: 1)
                 Spacer()
                 Rectangle()
-                    .fill(SPColors.border.opacity(0.6))
-                    .frame(height: 0.5)
+                    .fill(SPRetro.ink)
+                    .frame(height: 1)
             }
         )
         .animation(.easeInOut(duration: 0.3), value: vm.currentHeroDecision?.analysis.id)
@@ -93,32 +94,22 @@ struct EquityArcView: View {
     private var clamped: Double { max(0, min(1, equity)) }
 
     var body: some View {
+        // Retro equity dial: ink track + solid-tint arc (no glow), paper
+        // hub disc with ink border, ChalkboardSE-Bold ink numeral. Reads
+        // as a stamped gauge instead of a glowing iOS gauge.
         ZStack {
-            // Background track — full circle so even a 0% equity hand
-            // still has the gauge frame visible.
+            // Ink track — full circle so even a 0% equity hand still has
+            // the gauge frame visible.
             Circle()
-                .stroke(Color.white.opacity(0.10), lineWidth: 5)
+                .stroke(SPRetro.ink.opacity(0.25), lineWidth: 5)
 
             // Foreground arc — trimmed to the equity fraction. Rotated so
-            // the arc starts at 12 o'clock (visually expected for a gauge)
-            // and the round caps soften the start/end edges.
+            // the arc starts at 12 o'clock (visually expected for a gauge).
+            // Flat tint, no angular gradient — keeps the print/sticker look.
             Circle()
                 .trim(from: 0, to: clamped)
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            tint.opacity(0.55),
-                            tint,
-                            tint.opacity(0.85)
-                        ]),
-                        center: .center,
-                        startAngle: .degrees(0),
-                        endAngle:   .degrees(360 * clamped)
-                    ),
-                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                )
+                .stroke(tint, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: tint.opacity(0.45), radius: 4)
                 .animation(.easeInOut(duration: 0.45), value: clamped)
 
             // Numeric value. `.contentTransition(.numericText())` makes the
@@ -126,13 +117,13 @@ struct EquityArcView: View {
             // alive even when the user just steps one frame.
             VStack(spacing: -2) {
                 Text("\(Int((clamped * 100).rounded()))")
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(tint)
+                    .font(.custom("ChalkboardSE-Bold", size: 18))
+                    .foregroundStyle(SPRetro.ink)
                     .contentTransition(.numericText())
                     .animation(.easeInOut(duration: 0.3), value: clamped)
                 Text("%")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(SPColors.textSecondary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 9))
+                    .foregroundStyle(SPRetro.inkMuted)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -154,53 +145,47 @@ struct DecisionCompareView: View {
         HStack(spacing: 6) {
             // ── YOU card ────────────────────────────────────────────────────
             decisionCard(
-                heading:    "YOU",
-                value:      decision.actionLabel,
-                accent:     verdictColor,
-                fillOpacity: 0.18,
-                strokeOpacity: 0.40
+                heading: "YOU",
+                value:   decision.actionLabel,
+                accent:  verdictColor
             )
 
             // Tiny "vs" connector — purely decorative but communicates that
             // the two cards are in dialogue, not just adjacent.
             Image(systemName: "arrow.right")
                 .font(.system(size: 9, weight: .heavy))
-                .foregroundStyle(SPColors.textTertiary)
+                .foregroundStyle(SPRetro.inkMuted)
 
             // ── VERDICT / SUGGESTED card ────────────────────────────────────
             // If we managed to extract a suggested verb from the freeform
             // recommendation text, show it. Otherwise show the verdict label
             // (Solid / Fine / Borderline / Leak) — still useful at-a-glance.
             decisionCard(
-                heading:    decision.suggestedActionLabel != nil ? "TRY" : "VERDICT",
-                value:      decision.suggestedActionLabel ?? decision.analysis.verdict.label,
-                accent:     decision.suggestedActionLabel != nil
-                              ? SPColors.accentLight
-                              : verdictColor,
-                fillOpacity:  decision.suggestedActionLabel != nil ? 0.22 : 0.32,
-                strokeOpacity: decision.suggestedActionLabel != nil ? 0.45 : 0.60
+                heading: decision.suggestedActionLabel != nil ? "TRY" : "VERDICT",
+                value:   decision.suggestedActionLabel ?? decision.analysis.verdict.label,
+                accent:  decision.suggestedActionLabel != nil
+                            ? SPRetro.mustardDark
+                            : verdictColor
             )
         }
     }
 
-    /// Reusable two-line card used for both the YOU and TRY/VERDICT cells.
-    /// Centralized so the two cards stay visually paired (same height, same
-    /// padding, same typography hierarchy) — only color and label differ.
+    /// Retro decision card: paper face + ink border + accent-tinted heading
+    /// + ink body. Flat (no opacity wash) so both cards read as paper
+    /// labels stamped onto the strip.
     private func decisionCard(
         heading: String,
         value: String,
-        accent: Color,
-        fillOpacity: Double,
-        strokeOpacity: Double
+        accent: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(heading)
-                .font(.system(size: 9, weight: .heavy, design: .rounded))
+                .font(.custom("AmericanTypewriter-Bold", size: 9))
                 .foregroundStyle(accent)
-                .tracking(0.8)
+                .tracking(1.0)
             Text(value)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(SPColors.textPrimary)
+                .font(.custom("AmericanTypewriter-Bold", size: 13))
+                .foregroundStyle(SPRetro.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -208,12 +193,12 @@ struct DecisionCompareView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(accent.opacity(fillOpacity))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(accent.opacity(strokeOpacity), lineWidth: 0.7)
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(SPRetro.paper)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1)
+            }
         )
     }
 }
@@ -228,14 +213,17 @@ private struct HandStrengthLabel: View {
     let label: String
 
     var body: some View {
+        // Retro fallback panel: ink-soft "HAND STRENGTH" eyebrow over
+        // AmericanTypewriter-Bold ink label. No background — sits flat on
+        // the paperShade strip.
         VStack(alignment: .leading, spacing: 2) {
             Text("HAND STRENGTH")
-                .font(.system(size: 9, weight: .heavy, design: .rounded))
-                .foregroundStyle(SPColors.textSecondary)
-                .tracking(0.8)
+                .font(.custom("AmericanTypewriter-Bold", size: 9))
+                .foregroundStyle(SPRetro.inkMuted)
+                .tracking(1.0)
             Text(label)
-                .font(SPFonts.headline(14))
-                .foregroundStyle(SPColors.textPrimary)
+                .font(.custom("AmericanTypewriter-Bold", size: 14))
+                .foregroundStyle(SPRetro.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }

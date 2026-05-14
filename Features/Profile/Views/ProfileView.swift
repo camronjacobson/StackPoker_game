@@ -289,15 +289,24 @@ struct SettingsSheet: View {
                 }
 
                 if let toast = toastMessage {
+                    // Retro confirmation toast — paper pill with ink
+                    // border and hard offset shadow. Same vocab as the
+                    // global ToastView so success messages stay on-page.
                     VStack {
                         Spacer()
                         Text(toast)
-                            .font(SPFonts.body(14))
-                            .foregroundStyle(.white)
+                            .font(.custom("AmericanTypewriter-Bold", size: 14))
+                            .foregroundStyle(SPRetro.ink)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
-                            .background(SPColors.success.opacity(0.9))
-                            .clipShape(Capsule())
+                            .background(
+                                ZStack {
+                                    Capsule().fill(SPRetro.ink)
+                                        .offset(x: 1.5, y: 2.5)
+                                    Capsule().fill(SPRetro.paper)
+                                    Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                                }
+                            )
                             .padding(.bottom, 40)
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -347,12 +356,20 @@ struct SettingsSheet: View {
                 AvatarView(avatarId: user.avatarId, size: 88, showBorder: true)
                     .overlay(alignment: .bottomTrailing) {
                         if isSavingAvatar {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                                .padding(6)
-                                .background(SPColors.accent)
-                                .clipShape(Circle())
+                            // Retro saving badge: mustard disc with ink
+                            // hairline border + ink spinner so it reads
+                            // as a tiny ink-stamped progress sticker on
+                            // top of the avatar.
+                            ZStack {
+                                Circle()
+                                    .fill(SPRetro.mustard)
+                                Circle()
+                                    .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(SPRetro.ink)
+                            }
+                            .frame(width: 28, height: 28)
                         }
                     }
 
@@ -479,12 +496,20 @@ struct SettingsSheet: View {
                 .padding(.bottom, SPSpacing.sm)
 
             SPCard {
+                // Per-tap grant is intentionally small (10K) — testers tap
+                // repeatedly as needed during a session rather than minting a
+                // 10M lump sum in one shot. The button is debounced via
+                // `isGrantingChips` so a tap that's still in-flight can't
+                // double-fire, but as soon as the request resolves the row
+                // re-enables for the next tap. Server cap (10_000_000 in
+                // admin.service.ts) still applies per-call but is irrelevant
+                // at this size.
                 SettingsRow(
                     icon: "plus.circle.fill",
-                    label: isGrantingChips ? "Granting…" : "Top up chips (+10M)",
+                    label: isGrantingChips ? "Granting…" : "Top up chips (+10K)",
                     showChevron: false
                 ) {
-                    Task { await grantSelfChips(amount: 10_000_000) }
+                    Task { await grantSelfChips(amount: 10_000) }
                 }
                 .disabled(isGrantingChips)
             }
@@ -606,42 +631,47 @@ private struct TableThemeChip: View {
     let onTap: () -> Void
 
     var body: some View {
+        // Retro theme swatch: flat color tile (the actual theme color, no
+        // radial gradient or glow halo) with an ink panel border and hard
+        // offset shadow when selected. Mustard checkmark sticker marks
+        // the active theme — same checkmark vocab as AvatarGridCell.
         Button(action: onTap) {
             VStack(spacing: 6) {
                 ZStack {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(SPRetro.ink)
+                            .frame(width: 72, height: 54)
+                            .offset(x: 2, y: 3)
+                    }
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color(hex: theme.inner),
-                                    Color(hex: theme.mid),
-                                    Color(hex: theme.edge),
-                                ],
-                                center: .center,
-                                startRadius: 4,
-                                endRadius: 46
-                            )
-                        )
+                        .fill(Color(hex: theme.mid))
                         .frame(width: 72, height: 54)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(
-                                    isSelected ? SPColors.accent : Color.white.opacity(0.15),
-                                    lineWidth: isSelected ? 2 : 1
-                                )
-                        )
-                        .shadow(color: theme.primaryColor.opacity(0.35), radius: isSelected ? 8 : 3)
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(SPRetro.ink,
+                                      lineWidth: isSelected ? 2.5 : 1.2)
+                        .frame(width: 72, height: 54)
 
                     if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.5), radius: 2)
+                        ZStack {
+                            Circle().fill(SPRetro.ink)
+                                .frame(width: 22, height: 22).offset(x: 1, y: 1)
+                            Circle().fill(SPRetro.mustard)
+                                .frame(width: 22, height: 22)
+                            Circle().strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                                .frame(width: 22, height: 22)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .black))
+                                .foregroundStyle(SPRetro.ink)
+                        }
                     }
                 }
                 Text(theme.label)
-                    .font(SPFonts.caption(11))
-                    .foregroundStyle(isSelected ? SPColors.accent : SPColors.textSecondary)
+                    .font(.custom("AmericanTypewriter-Bold", size: 11))
+                    .tracking(0.4)
+                    .foregroundStyle(isSelected
+                                     ? SPRetro.ink
+                                     : SPRetro.inkMuted)
                     .lineLimit(1)
             }
             .scaleEffect(isSelected ? 1.04 : 1.0)

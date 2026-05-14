@@ -23,12 +23,10 @@ struct PaywallView: View {
 
     var body: some View {
         ZStack {
-            // Dark gradient background — matches the rest of the app's
-            // dark-mode aesthetic so the paywall feels native, not bolted-on.
-            LinearGradient(
-                colors: [Color(hex: "#0A0E1A"), Color(hex: "#0A0A0F")],
-                startPoint: .top, endPoint: .bottom
-            ).ignoresSafeArea()
+            // Aged-paper substrate — paywall now reads as a printed
+            // premium-club page in the same booklet as the lobby and
+            // game, rather than a dark "upsell" surface bolted on.
+            AgedPaperBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
@@ -54,32 +52,34 @@ struct PaywallView: View {
     // ─── Header ──────────────────────────────────────────────────────────────
 
     private var header: some View {
+        // Retro premium header — mustard burst-disc crown with ink panel
+        // border + hard offset shadow (same vocab as the lobby logo disc
+        // and the auth header), AmericanTypewriter-Bold ink title.
         VStack(spacing: 12) {
-            // Crown badge — gold gradient circle, signals "premium" without
-            // shouting. Sized to read at a glance without dominating the view.
             ZStack {
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#F5C842"), Color(hex: "#D4A02A")],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(SPRetro.ink)
                     .frame(width: 76, height: 76)
-                    .shadow(color: Color(hex: "#F5C842").opacity(0.5),
-                            radius: 18, y: 6)
+                    .offset(x: 2.5, y: 3.5)
+                Circle()
+                    .fill(SPRetro.mustard)
+                    .frame(width: 76, height: 76)
+                Circle()
+                    .strokeBorder(SPRetro.ink, lineWidth: 2.5)
+                    .frame(width: 76, height: 76)
                 Image(systemName: "crown.fill")
                     .font(.system(size: 34, weight: .black))
-                    .foregroundStyle(Color(hex: "#0D1B2A"))
+                    .foregroundStyle(SPRetro.ink)
             }
 
-            Text("Stack Premium")
-                .font(.system(size: 28, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+            Text("STACK PREMIUM")
+                .font(.custom("AmericanTypewriter-Bold", size: 28))
+                .tracking(1.2)
+                .foregroundStyle(SPRetro.ink)
 
             Text("Study your hands. Plug your leaks. Win more.")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.custom("AmericanTypewriter", size: 14))
+                .foregroundStyle(SPRetro.inkSoft)
                 .multilineTextAlignment(.center)
         }
     }
@@ -111,12 +111,14 @@ struct PaywallView: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color(hex: "#0D1B2A").opacity(0.85))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Color(hex: "#2A3D6A"), lineWidth: 1)
-                )
+            // Retro feature panel — paperShade card with ink panel
+            // border, no offset shadow (this is a body block, not a CTA).
+            ZStack {
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(SPRetro.paperShade)
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+            }
         )
     }
 
@@ -128,75 +130,76 @@ struct PaywallView: View {
     @ViewBuilder
     private var ctaStack: some View {
         VStack(spacing: 12) {
+            // Retro primary CTA: mustard pill with ink panel border and
+            // a hard offset shadow — same vocab as SPButton primary so
+            // the trial offer reads as the same stamped sticker the user
+            // taps everywhere else in the app.
             if !sub.trialUsed {
-                // Primary: free trial. Big gold pill — same color language as
-                // the daily bonus card so the user reads "free chips" energy.
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     sub.startTrial()
                 } label: {
                     VStack(spacing: 2) {
                         Text("Start 2-Day Free Trial")
-                            .font(.system(size: 17, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color(hex: "#0D1B2A"))
+                            .font(.custom("AmericanTypewriter-Bold", size: 17))
+                            .tracking(0.5)
+                            .foregroundStyle(SPRetro.ink)
                         Text("No card required")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#0D1B2A").opacity(0.6))
+                            .font(.custom("AmericanTypewriter", size: 11))
+                            .foregroundStyle(SPRetro.inkMuted)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
                     .background(
-                        LinearGradient(
-                            colors: [Color(hex: "#F5C842"), Color(hex: "#D4A02A")],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        )
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(SPRetro.ink)
+                                .offset(x: 2, y: 3)
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(SPRetro.mustard)
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(SPRetro.ink, lineWidth: 2)
+                        }
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: Color(hex: "#F5C842").opacity(0.4),
-                            radius: 12, y: 4)
                 }
                 .buttonStyle(.plain)
             }
 
-            // Subscription button — secondary when trial is available,
-            // primary when trial has been consumed. We don't actually swap
-            // the visual style yet; both states use the dark-pill treatment
-            // because StoreKit is stubbed and we don't want to over-promote
-            // a button that pops "Coming soon".
+            // Retro secondary CTA: paperShade pill with ink border and a
+            // small offset shadow. Mustard accent-dark price so it still
+            // reads as a price-button without competing with the primary.
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showStoreKitComingSoon = true
-                // TODO: when StoreKit is live, replace with:
-                //   Task { await sub.purchaseMonthly() }
             } label: {
                 HStack {
                     Text("Subscribe Monthly")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.custom("AmericanTypewriter-Bold", size: 16))
+                        .foregroundStyle(SPRetro.ink)
                     Spacer()
                     Text("\(monthlyPrice)/mo")
-                        .font(.system(size: 16, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color(hex: "#F5C842"))
+                        .font(.custom("ChalkboardSE-Bold", size: 16))
+                        .foregroundStyle(SPRetro.mustardDark)
                 }
-                .foregroundStyle(.white)
                 .padding(.horizontal, 18)
                 .frame(height: 56)
                 .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(hex: "#1A2744"))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(Color(hex: "#2A3D6A"), lineWidth: 1)
-                        )
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(SPRetro.ink)
+                            .offset(x: 1.5, y: 2.5)
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(SPRetro.paperShade)
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                    }
                 )
             }
             .buttonStyle(.plain)
 
-            // Fine print — required by the App Store to disclose
-            // auto-renewing-subscription terms. Even though we're stubbed,
-            // adding the language now means we don't forget at submission.
             Text("Auto-renews monthly. Cancel anytime in Settings.")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
+                .font(.custom("AmericanTypewriter", size: 11))
+                .foregroundStyle(SPRetro.inkMuted)
                 .multilineTextAlignment(.center)
                 .padding(.top, 4)
         }
@@ -213,9 +216,9 @@ struct PaywallView: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 12, weight: .semibold))
                 Text("Your free trial has ended.")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.custom("AmericanTypewriter-Bold", size: 13))
             }
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(SPRetro.inkMuted)
         }
     }
 }
@@ -231,19 +234,21 @@ private struct FeatureRow: View {
     let detail: String
 
     var body: some View {
+        // Retro feature row: mustard ink-stroke icon + ink title + ink-
+        // soft body, sits on paperShade panel from the parent.
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color(hex: "#F5C842"))
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(SPRetro.mustardDark)
                 .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(.custom("AmericanTypewriter-Bold", size: 15))
+                    .foregroundStyle(SPRetro.ink)
                 Text(detail)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .font(.custom("AmericanTypewriter", size: 12))
+                    .foregroundStyle(SPRetro.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -272,21 +277,29 @@ struct TrialBanner: View {
         let _ = nowTick
         let secs = sub.trialSecondsRemaining
         if sub.trialActive {
+            // Retro trial banner: solid mustard strip with ink top/bottom
+            // hairlines and AmericanTypewriter-Bold ink copy. Reads as a
+            // printed ribbon stamped across the top of the Review tab.
             HStack(spacing: 8) {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 12, weight: .heavy))
                 Text("Premium trial — \(formatRemaining(secs)) left")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .font(.custom("AmericanTypewriter-Bold", size: 12))
+                    .tracking(0.4)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(Color(hex: "#0D1B2A"))
+            .foregroundStyle(SPRetro.ink)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
-                LinearGradient(
-                    colors: [Color(hex: "#F5C842"), Color(hex: "#D4A02A")],
-                    startPoint: .leading, endPoint: .trailing
-                )
+                ZStack {
+                    Rectangle().fill(SPRetro.mustard)
+                    VStack(spacing: 0) {
+                        Rectangle().fill(SPRetro.ink).frame(height: 1)
+                        Spacer()
+                        Rectangle().fill(SPRetro.ink).frame(height: 1)
+                    }
+                }
             )
             .onReceive(ticker) { _ in nowTick &+= 1 }
         }

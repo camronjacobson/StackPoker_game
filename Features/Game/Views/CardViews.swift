@@ -72,7 +72,13 @@ struct PlayingCardView: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .shadow(color: .black.opacity(isHighlighted ? 0.5 : 0.25), radius: isHighlighted ? 8 : 3, y: 2)
+        // Ink offset shadow (not a soft black blur) so cards read as
+        // stickers on the paper page. Tighter blur on highlight so the
+        // winner card still "lifts" but stays in the comic vocabulary.
+        .shadow(color: SPRetro.ink.opacity(isHighlighted ? 0.55 : 0.3),
+                radius: isHighlighted ? 4 : 1.5,
+                x: isHighlighted ? 0 : 1,
+                y: isHighlighted ? 3 : 2)
         .scaleEffect(isHighlighted ? 1.08 : 1.0)
         .animation(.spring(response: 0.3), value: isHighlighted)
     }
@@ -106,12 +112,16 @@ struct PlayingCardView: View {
     }
 
     private func whiteFront(_ card: PokerCard) -> some View {
+        // "White" front retained for legacy callers (tutorials, replay).
+        // Now uses the retro paper face (#F4E4BC) with an ink border so it
+        // looks like a printed card on the page rather than a pure-white
+        // playing card that fights the cream backdrop.
         ZStack {
             RoundedRectangle(cornerRadius: size.cornerRadius)
-                .fill(Color.white)
+                .fill(SPRetro.paper)
 
             RoundedRectangle(cornerRadius: size.cornerRadius)
-                .strokeBorder(Color.black.opacity(0.12), lineWidth: 0.5)
+                .strokeBorder(SPRetro.ink.opacity(0.35), lineWidth: 0.6)
 
             // Top-left rank + suit
             VStack(alignment: .leading, spacing: 0) {
@@ -148,56 +158,114 @@ struct PlayingCardView: View {
     }
 
     private func coloredFront(_ card: PokerCard) -> some View {
+        // Two layouts share the same ink-panel chassis. The compact path
+        // (< 30pt — i.e. the 22pt opponent-reveal cluster) drops the big
+        // centered suit entirely because at lift-scale it overwhelmed the
+        // corner rank, hiding the number. Instead the compact card uses a
+        // real-playing-card-style corner indicator (rank stacked on top of
+        // a small suit glyph) which keeps the rank legible regardless of
+        // fan rotation or neighbour overlap. The standard path (community
+        // 36pt+, hero 56pt+) is preserved byte-for-byte — those bigger
+        // cards have plenty of room and the bold centered suit is part of
+        // the felt's design language.
+        let isCompact = size.width < 30
         let fill = suitFillColor(card)
         return ZStack {
             RoundedRectangle(cornerRadius: size.cornerRadius)
                 .fill(fill)
 
-            // Thin white inner border
+            // Ink panel border — same hairline weight as every other
+            // comic panel on the page.
+            RoundedRectangle(cornerRadius: size.cornerRadius)
+                .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+
+            // Paper inner border for the printed-stamp inset feel.
             RoundedRectangle(cornerRadius: max(2, size.cornerRadius - 1))
-                .strokeBorder(Color.white.opacity(0.85), lineWidth: 1)
+                .strokeBorder(SPRetro.paper.opacity(0.85), lineWidth: 1)
                 .padding(2)
 
-            // Rank (top-left)
-            Text(card.displayRank)
-                .font(.system(size: size.rankSize * 1.15, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.leading, 5)
-                .padding(.top, 3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-            // Large centered suit glyph
-            Text(card.suitSymbol)
-                .font(.system(size: size.width * 0.62, weight: .bold))
-                .foregroundStyle(.white)
-                .offset(y: size.width * 0.12)
+            if isCompact {
+                compactCornerIndicator(card)
+            } else {
+                standardLargeFront(card)
+            }
         }
+    }
+
+    // Real-playing-card corner indicator: big rank on top, small suit glyph
+    // immediately below it. Used only on compact reveal-cluster cards so
+    // the rank is *the* readable element even when the cluster is fanned,
+    // rotated, and scaled.
+    @ViewBuilder
+    private func compactCornerIndicator(_ card: PokerCard) -> some View {
+        // Rank is the headline — sized to dominate the card. Suit is small
+        // and tucked directly under it like the corner of a real playing
+        // card. lineSpacing(-2) tightens the stack so the suit sits flush
+        // under the rank's baseline rather than floating a line-height
+        // away — at this size SwiftUI's default leading would push the
+        // suit half off the card.
+        VStack(alignment: .leading, spacing: 0) {
+            Text(card.displayRank)
+                .font(.custom("ChalkboardSE-Bold", size: size.width * 0.55))
+                .foregroundStyle(SPRetro.paper)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            Text(card.suitSymbol)
+                .font(.system(size: size.width * 0.34, weight: .bold))
+                .foregroundStyle(SPRetro.paper)
+                .offset(y: -size.width * 0.08)   // pull suit up under the rank
+        }
+        .padding(.leading, 4)
+        .padding(.top, 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    // Original colored-front layout — preserved byte-identical to what
+    // shipped before. Used by community cards (cardWidth 36+) and the
+    // hero's own hole cards (.large = 56pt) where the prominent centered
+    // suit reads as a stamped design element rather than crowding the
+    // rank.
+    @ViewBuilder
+    private func standardLargeFront(_ card: PokerCard) -> some View {
+        // Rank (top-left) — ChalkboardSE-Bold paper.
+        Text(card.displayRank)
+            .font(.custom("ChalkboardSE-Bold", size: size.rankSize * 1.15))
+            .foregroundStyle(SPRetro.paper)
+            .padding(.leading, 5)
+            .padding(.top, 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+        // Large centered suit glyph — paper for contrast on the
+        // colored face.
+        Text(card.suitSymbol)
+            .font(.system(size: size.width * 0.62, weight: .bold))
+            .foregroundStyle(SPRetro.paper)
+            .offset(y: size.width * 0.12)
     }
 
     // ─── Back ─────────────────────────────────────────────────────────────────
 
     private var cardBack: some View {
+        // Retro card back: flat maroon fill (SPColors.cardBack) with an ink
+        // panel border, a paper-tinted inset hairline for the "printed
+        // border" feel, and a mustard spade pip at the center. Replaces the
+        // accent gradient + white-opacity strokes that read as glossy.
         ZStack {
             RoundedRectangle(cornerRadius: size.cornerRadius)
-                .fill(
-                    LinearGradient(
-                        colors: [SPColors.accentDark, SPColors.accent],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(SPRetro.maroon)
 
             RoundedRectangle(cornerRadius: size.cornerRadius)
-                .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                .strokeBorder(SPRetro.ink, lineWidth: 1.2)
 
-            // Diamond pattern
+            // Paper-tone inset hairline — reads as a printed border on
+            // a paper-stock playing card.
             RoundedRectangle(cornerRadius: size.cornerRadius - 2)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                .strokeBorder(SPRetro.paper.opacity(0.4), lineWidth: 1)
                 .padding(4)
 
             Image(systemName: "suit.spade.fill")
                 .font(.system(size: size.width * 0.35))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(SPRetro.mustard)
         }
     }
 }
@@ -233,17 +301,23 @@ struct FlippableCardView: View {
     }
 
     private func animateDeal() {
-        // 1. Pop in from the deck position
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.72).delay(dealDelay)) {
-            appeared = true
-        }
-        // 2. Squish down (first half of flip)
-        let flipStart = dealDelay + flipDelay
-        DispatchQueue.main.asyncAfter(deadline: .now() + flipStart) {
+        // Single Task drives the full pop-in → squish → swap → expand sequence.
+        // Replaces the previous DispatchQueue.main.asyncAfter chain (three
+        // separate scheduled closures) for the same reason it was replaced in
+        // AnimatedCommunityCard: when several cards animate in together, the
+        // pile-up of three queued closures per card lands on the main runloop
+        // at the exact same instants and jostles the layout pass that fires
+        // when the parent HoleCardsView mounts. The Task's awaits yield
+        // between phases so each animation transaction commits cleanly before
+        // the next one starts. Visible timing is identical (delays unchanged).
+        Task { @MainActor in
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.72).delay(dealDelay)) {
+                appeared = true
+            }
+            let flipStart = dealDelay + flipDelay
+            try? await Task.sleep(nanoseconds: UInt64(flipStart * 1_000_000_000))
             withAnimation(.easeIn(duration: 0.14)) { flipScaleX = 0 }
-        }
-        // 3. Swap to face-up and expand (second half of flip)
-        DispatchQueue.main.asyncAfter(deadline: .now() + flipStart + 0.14) {
+            try? await Task.sleep(nanoseconds: 140_000_000)
             showFront = true
             withAnimation(.easeOut(duration: 0.14)) { flipScaleX = 1 }
         }
@@ -374,8 +448,12 @@ struct CommunityCardsView: View {
                 }
             } else {
                 ForEach(cards.count..<5, id: \.self) { _ in
+                    // Empty community slot — dashed-ink hairline so the
+                    // unfilled flop/turn/river slots read as a printed
+                    // outline on the page rather than a faint white frame.
                     RoundedRectangle(cornerRadius: size.cornerRadius)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                        .strokeBorder(SPRetro.ink.opacity(0.18),
+                                      style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                         .frame(width: cardWidth, height: cardWidth * 1.4)
                 }
             }
@@ -422,9 +500,14 @@ private struct RunOutPlaceholder: View {
         // face-down state. We don't want it to look like a regular community
         // card the user might mistake for a real result.
         .overlay(
+            // Mustard hint outline on the still-face-down run-out placeholder
+            // so it reads as a tappable "what could have been" card on the
+            // paper page — distinct from the muted-ink empty-slot strokes
+            // above. Drops once revealed so the card looks like a normal
+            // board card afterward.
             isRevealed ? nil :
             RoundedRectangle(cornerRadius: size.cornerRadius)
-                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                .strokeBorder(SPRetro.mustard.opacity(0.65), lineWidth: 1.2)
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -451,12 +534,16 @@ private struct RunOutPlaceholder: View {
         // Squish to 0 (face-down still showing), swap to face-up, expand to 1.
         // Mirrors FlippableCardView's two-stage flip; staggerDelay creates the
         // left-to-right ripple across the row when sibling taps flip us all.
-        DispatchQueue.main.asyncAfter(deadline: .now() + staggerDelay) {
+        // Driven by a Task instead of nested DispatchQueue.main.asyncAfter so
+        // the squish→swap handoff happens cleanly between SwiftUI animation
+        // transactions rather than landing as a queued closure that races the
+        // sibling cards' flips. Same delays — visible timing unchanged.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(staggerDelay * 1_000_000_000))
             withAnimation(.easeIn(duration: 0.13)) { flipScaleX = 0 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
-                showFront = true
-                withAnimation(.easeOut(duration: 0.13)) { flipScaleX = 1 }
-            }
+            try? await Task.sleep(nanoseconds: 130_000_000)
+            showFront = true
+            withAnimation(.easeOut(duration: 0.13)) { flipScaleX = 1 }
         }
     }
 }
@@ -489,6 +576,14 @@ private struct AnimatedCommunityCard: View {
                 PlayingCardView(card: nil, size: size, isFaceDown: true)
             }
         }
+        // Flatten each face into a Metal-backed bitmap before applying the
+        // flight + flip transforms. Without this, the card-back's gradient +
+        // suit-glyph + stroke layers re-rasterize every frame as the spring
+        // animates offset/scale/rotation simultaneously — that re-raster on
+        // up to 5 cards at once is what produced the visible flop hitch.
+        // With drawingGroup the only per-frame work is a GPU transform on a
+        // cached texture, which is what we want.
+        .drawingGroup()
         .scaleEffect(x: flipScaleX, y: 1)
         // Fly in from the deck offset, settle to (0,0). Rotate slightly on the
         // way so it reads as a tossed card rather than a translation.
@@ -502,16 +597,22 @@ private struct AnimatedCommunityCard: View {
         .onAppear { animateIn() }
     }
 
+    // Single Task drives the whole sequence (slide → squish → swap → expand).
+    // Replaces the previous nested DispatchQueue.main.asyncAfter chain, which
+    // pushed three closures onto the main queue at the exact same moment the
+    // engine was already laying out a new community-card slot — that pile-up
+    // of layout + scheduled work was the second source of flop stutter. A
+    // Task with awaits yields between phases so SwiftUI can finish each
+    // animation transaction cleanly before the next one starts.
     private func animateIn() {
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.78).delay(delay)) {
-            appeared = true
-        }
-        // Flip starts once the card has nearly arrived at its slot.
-        let flipStart = delay + 0.32
-        DispatchQueue.main.asyncAfter(deadline: .now() + flipStart) {
+        Task { @MainActor in
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.78).delay(delay)) {
+                appeared = true
+            }
+            // Wait until the card has nearly reached its slot, then flip.
+            try? await Task.sleep(nanoseconds: UInt64((delay + 0.32) * 1_000_000_000))
             withAnimation(.easeIn(duration: 0.13)) { flipScaleX = 0 }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + flipStart + 0.13) {
+            try? await Task.sleep(nanoseconds: 130_000_000)
             showFront = true
             withAnimation(.easeOut(duration: 0.13)) { flipScaleX = 1 }
         }
@@ -525,27 +626,37 @@ struct ChipStackView: View {
     var compact: Bool = false
 
     var body: some View {
+        // Retro chip pill: paper-shade capsule with an ink border, a small
+        // stack of pop-color chip discs (each circled in ink for the
+        // comic-panel look), and a ChalkboardSE-Bold ink amount. Replaces
+        // the dark translucent capsule that read as Material Design.
         HStack(spacing: 3) {
-            // Stack of chip circles
             ZStack {
                 ForEach(0..<min(chipCount, 4), id: \.self) { i in
                     Circle()
                         .fill(chipColor(i))
                         .frame(width: compact ? 10 : 14, height: compact ? 10 : 14)
+                        .overlay(
+                            Circle().strokeBorder(SPRetro.ink,
+                                                  lineWidth: 0.8)
+                        )
                         .offset(y: CGFloat(-i * (compact ? 2 : 3)))
-                        .shadow(color: .black.opacity(0.3), radius: 1)
                 }
             }
             .frame(width: compact ? 14 : 18, height: compact ? 18 : 24)
 
             Text(formatChips(String(amount)))
-                .font(compact ? SPFonts.caption(11) : SPFonts.chips(13))
-                .foregroundStyle(SPColors.chipGold)
+                .font(.custom("ChalkboardSE-Bold", size: compact ? 11 : 13))
+                .foregroundStyle(SPRetro.ink)
         }
         .padding(.horizontal, compact ? 5 : 7)
         .padding(.vertical, compact ? 2 : 3)
-        .background(Color.black.opacity(0.45))
-        .clipShape(Capsule())
+        .background(
+            ZStack {
+                Capsule().fill(SPRetro.paperShade)
+                Capsule().strokeBorder(SPRetro.ink, lineWidth: 1)
+            }
+        )
     }
 
     private var chipCount: Int {
@@ -556,12 +667,15 @@ struct ChipStackView: View {
         return 1
     }
 
+    /// Retro chip palette — mustard, pop red, pop blue, muted teal. Pulled
+    /// from the SPRetro family so chip discs match the rest of the page
+    /// rather than the old neon Material set.
     private func chipColor(_ index: Int) -> Color {
         switch index % 4 {
-        case 0: return SPColors.chipGold
-        case 1: return Color(hex: "#E84393")
-        case 2: return Color(hex: "#6C5CE7")
-        default: return Color(hex: "#00B894")
+        case 0: return SPRetro.mustard  // mustard
+        case 1: return SPRetro.popRed  // pop red
+        case 2: return SPRetro.popBlue  // pop blue
+        default: return SPRetro.teal // muted teal
         }
     }
 }

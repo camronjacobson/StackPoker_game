@@ -1,11 +1,11 @@
 import Foundation
 
 // ─── Hand History Store ───────────────────────────────────────────────────────
-// On-disk JSON persistence under ~/Documents/HandHistory.
+// On-disk JSON persistence under ~/Documents/HandHistory/<userId>/.
 //
-//   index.json                  — array of RecordedHandSummary, newest first
-//   hands/<id>.json             — full RecordedHand (with all frames)
-//   bookmarks.json              — Set<String> of bookmarked hand IDs (PR 4)
+//   <userId>/index.json         — array of RecordedHandSummary, newest first
+//   <userId>/hands/<id>.json    — full RecordedHand (with all frames)
+//   <userId>/bookmarks.json     — Set<String> of bookmarked hand IDs (PR 4)
 //
 // Splitting summary from full hand keeps the list screen fast even after
 // hundreds of hands: we only load the summary array on launch and lazily
@@ -15,6 +15,13 @@ import Foundation
 // on RecordedHandSummary so existing on-disk hands stay backwards-compatible
 // (no Codable migration needed) and so toggling a bookmark doesn't have to
 // rewrite the whole index.json.
+//
+// Per-user scoping: the store starts in an "anonymous" state with no active
+// user and empty summaries. AuthViewModel calls `setActiveUser(_:)` on
+// login / session-restore / logout so the Review tab only ever surfaces the
+// signed-in user's hands. Without this, any hand recorded by a previous
+// account on the same device would still count against a freshly-registered
+// account's stats — the bug that motivated this scoping.
 
 @MainActor
 final class HandHistoryStore: ObservableObject {
@@ -26,6 +33,12 @@ final class HandHistoryStore: ObservableObject {
     /// the summary index so bookmark toggles don't require rewriting every
     /// summary, and so the persisted RecordedHand JSON stays untouched.
     @Published private(set) var bookmarkedIds: Set<String> = []
+
+    /// The user whose hand history is currently loaded into memory. `nil`
+    /// means "no one is signed in" — `summaries`/`bookmarkedIds` are empty
+    /// and `save()` is a no-op (writing without an owner would re-introduce
+    /// the cross-account leak this scoping was added to fix).
+    private(set) var activeUserId: String?
 
     private let fm = FileManager.default
     private let encoder: JSONEncoder = {
@@ -40,16 +53,49 @@ final class HandHistoryStore: ObservableObject {
     }()
 
     private init() {
-        try? ensureDirectories()
-        loadIndex()
-        loadBookmarks()
+        // One-time migration of any pre-scoping hands. Safe to run on every
+        // launch — it short-circuits when there's nothing legacy to move.
+        migrateLegacyIfNeeded()
+        // We deliberately do NOT load anything here. Wait for the auth layer
+        // to call setActiveUser(_:) — see the type-level note above.
+    }
+
+    // ─── Active user ──────────────────────────────────────────────────────────
+
+    /// Switch the store to a different user (or to "no user" with `nil`).
+    /// Reloads `summaries` and `bookmarkedIds` from that user's directory.
+    /// Idempotent — calling with the same id is a cheap no-op.
+    func setActiveUser(_ userId: String?) {
+        guard userId != activeUserId else { return }
+        activeUserId = userId
+
+        if userId != nil {
+            try? ensureDirectories()
+            loadIndex()
+            loadBookmarks()
+        } else {
+            // Signed out: drop in-memory state. On-disk data for the previous
+            // user stays intact for when they log back in.
+            summaries = []
+            bookmarkedIds = []
+        }
     }
 
     // ─── Paths ────────────────────────────────────────────────────────────────
 
-    private var rootDir: URL {
+    /// Top-level container that holds every user's per-user subdirectory.
+    /// Used by the migration helper; per-user reads/writes go through
+    /// `rootDir` instead.
+    private var containerDir: URL {
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
         return docs.appendingPathComponent("HandHistory", isDirectory: true)
+    }
+
+    /// Active user's directory. Force-unwraps `activeUserId` because every
+    /// path-using method below already guards on it; calling these without
+    /// an active user is a programmer error.
+    private var rootDir: URL {
+        containerDir.appendingPathComponent(activeUserId!, isDirectory: true)
     }
     private var handsDir: URL { rootDir.appendingPathComponent("hands", isDirectory: true) }
     private var indexURL: URL { rootDir.appendingPathComponent("index.json") }
@@ -62,6 +108,14 @@ final class HandHistoryStore: ObservableObject {
     // ─── Public API ───────────────────────────────────────────────────────────
 
     func save(_ hand: RecordedHand) {
+        // Refuse to write hands that don't belong to the active user, or
+        // when no one's signed in. Either case is a bug: it means the
+        // recorder fired without a matching auth context and writing would
+        // re-introduce cross-account stat leaks.
+        guard let activeUserId, hand.userId == activeUserId else {
+            print("[HandHistoryStore] save skipped — active=\(activeUserId ?? "nil") hand=\(hand.userId)")
+            return
+        }
         do {
             try ensureDirectories()
             let data = try encoder.encode(hand)
@@ -76,12 +130,14 @@ final class HandHistoryStore: ObservableObject {
     }
 
     func loadHand(id: String) -> RecordedHand? {
+        guard activeUserId != nil else { return nil }
         let url = handsDir.appendingPathComponent("\(id).json")
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? decoder.decode(RecordedHand.self, from: data)
     }
 
     func delete(id: String) {
+        guard activeUserId != nil else { return }
         let url = handsDir.appendingPathComponent("\(id).json")
         try? fm.removeItem(at: url)
         summaries.removeAll { $0.id == id }
@@ -94,6 +150,7 @@ final class HandHistoryStore: ObservableObject {
     }
 
     func deleteAll() {
+        guard activeUserId != nil else { return }
         try? fm.removeItem(at: handsDir)
         try? fm.removeItem(at: indexURL)
         try? fm.removeItem(at: bookmarksURL)
@@ -162,6 +219,87 @@ final class HandHistoryStore: ObservableObject {
             try data.write(to: bookmarksURL, options: [.atomic])
         } catch {
             print("[HandHistoryStore] persist bookmarks failed: \(error)")
+        }
+    }
+
+    // ─── Legacy migration ─────────────────────────────────────────────────────
+    // Before per-user scoping, hands lived directly under HandHistory/hands.
+    // This walks any leftover legacy files and moves each into its correct
+    // owner's per-user directory based on the `userId` baked into the hand
+    // JSON. Idempotent: once the legacy paths are gone the function returns
+    // immediately, so it's safe to run on every launch.
+
+    private var legacyHandsDir: URL { containerDir.appendingPathComponent("hands", isDirectory: true) }
+    private var legacyIndexURL: URL { containerDir.appendingPathComponent("index.json") }
+    private var legacyBookmarksURL: URL { containerDir.appendingPathComponent("bookmarks.json") }
+
+    private func migrateLegacyIfNeeded() {
+        // Fast path — nothing to do if the legacy hands directory doesn't exist.
+        guard fm.fileExists(atPath: legacyHandsDir.path) else { return }
+
+        // Track which user dirs got new content so we can rebuild their
+        // indices once instead of after every move.
+        var touchedUserIds = Set<String>()
+
+        if let urls = try? fm.contentsOfDirectory(at: legacyHandsDir, includingPropertiesForKeys: nil) {
+            for url in urls where url.pathExtension == "json" {
+                guard let data = try? Data(contentsOf: url),
+                      let hand = try? decoder.decode(RecordedHand.self, from: data) else {
+                    // Unreadable/corrupt — leave it; user can wipe manually.
+                    continue
+                }
+                let userDir = containerDir.appendingPathComponent(hand.userId, isDirectory: true)
+                let userHandsDir = userDir.appendingPathComponent("hands", isDirectory: true)
+                do {
+                    try fm.createDirectory(at: userHandsDir, withIntermediateDirectories: true)
+                    let dest = userHandsDir.appendingPathComponent(url.lastPathComponent)
+                    // If a file with the same id already exists in the target
+                    // (shouldn't, but be defensive), overwrite it.
+                    if fm.fileExists(atPath: dest.path) { try? fm.removeItem(at: dest) }
+                    try fm.moveItem(at: url, to: dest)
+                    touchedUserIds.insert(hand.userId)
+                } catch {
+                    print("[HandHistoryStore] migrate move failed for \(url.lastPathComponent): \(error)")
+                }
+            }
+        }
+
+        // Remove the legacy hands dir if it's now empty, plus the global
+        // index/bookmarks files (their content is now per-user-irrelevant).
+        if let remaining = try? fm.contentsOfDirectory(at: legacyHandsDir, includingPropertiesForKeys: nil),
+           remaining.isEmpty {
+            try? fm.removeItem(at: legacyHandsDir)
+        }
+        try? fm.removeItem(at: legacyIndexURL)
+        try? fm.removeItem(at: legacyBookmarksURL)
+
+        // Rebuild each touched user's index from their freshly-populated
+        // hands dir. Done out-of-band (without flipping activeUserId) so the
+        // currently-signed-in user — once setActiveUser() runs — sees a
+        // consistent index.
+        for uid in touchedUserIds {
+            rebuildIndexAt(userDir: containerDir.appendingPathComponent(uid, isDirectory: true))
+        }
+    }
+
+    /// Out-of-band index rebuild for an arbitrary user directory. Used by
+    /// the legacy migration; the active-user version goes through `rebuildIndex()`.
+    private func rebuildIndexAt(userDir: URL) {
+        let handsDir = userDir.appendingPathComponent("hands", isDirectory: true)
+        let indexURL = userDir.appendingPathComponent("index.json")
+        guard let urls = try? fm.contentsOfDirectory(at: handsDir, includingPropertiesForKeys: nil) else {
+            return
+        }
+        var rebuilt: [RecordedHandSummary] = []
+        for url in urls where url.pathExtension == "json" {
+            if let data = try? Data(contentsOf: url),
+               let hand = try? decoder.decode(RecordedHand.self, from: data) {
+                rebuilt.append(hand.summary)
+            }
+        }
+        rebuilt.sort { $0.endedAt > $1.endedAt }
+        if let data = try? encoder.encode(rebuilt) {
+            try? data.write(to: indexURL, options: [.atomic])
         }
     }
 

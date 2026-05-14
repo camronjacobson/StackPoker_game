@@ -67,16 +67,39 @@ struct TableLayout {
     // directly below the cards, then NLH/Blinds/Hosted by stack toward the
     // bottom. Watermark is tucked at the very bottom so it doesn't compete.
     var boardCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y - tableHeight * 0.12)
+        // y-offset reduced from 0.12 → 0.09 of tableHeight. The original
+        // 0.12 placed the leftmost/rightmost flop cards at the same vertical
+        // band as the upper-side seats (angles 210° / 330° in 6-max), and the
+        // avatar's name plate (avatarSize × 1.55 wide) clipped the right
+        // corner of the leftmost card by ~1pt on phone-sized felts — exactly
+        // where the rank glyph lives, so the number became unreadable. A
+        // 0.03 drop shifts the cards ~8pt downward (relative to a 280pt
+        // tableHeight), restoring clearance under the side seats while
+        // keeping a comfortable gap above the pot stack at potCenter
+        // (`tableHeight * 0.04` below center). Pure layout change, no
+        // animation interaction.
+        CGPoint(x: tableCenter.x, y: tableCenter.y - tableHeight * 0.09)
     }
     var potCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.04)
+        // Bumped from 0.04 → 0.10 of tableHeight. The pot VStack is taller
+        // than it looks at first glance — chip stack (up to ~73pt for big
+        // pots) plus the "Pot" + amount text below (~28pt) — so when it was
+        // centered at +0.04 the top of the chip stack reached ~34pt above
+        // table center, while the bottom edge of the community cards (at
+        // boardCenter -0.09) sat at ~+5pt. That ~40pt overlap was the chip
+        // stack visibly clipping the cards. 0.10 gives clean separation
+        // without crowding gamePillCenter (still at 0.19).
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.10)
     }
+    // gamePillCenter and blindsCenter pushed down (was 0.19 / 0.26) so the
+    // NLH pill + small/big-blind label sit visually closer to the bottom rim
+    // and don't crowd the pot stack. Kept the 0.07 gap between the two so
+    // the row spacing is unchanged.
     var gamePillCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.19)
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.24)
     }
     var blindsCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.26)
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.31)
     }
     var hostedByCenter: CGPoint {
         CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.34)
@@ -283,6 +306,32 @@ struct PokerTableView: View {
     // can fill the seat with a bot (or, when more options arrive, an invite).
     @State private var showOpenSeatSheet = false
 
+    // Tapping the "Invite Friends" action in the open-seat dialog opens the
+    // existing InviteFriendsSheet (the same one the lobby uses) constrained
+    // to currently-online friends. We use `.fullScreenCover`-friendly state
+    // here rather than the lobby VM's `showInviteFriendsSheet` because the
+    // game scene is itself presented as a fullScreenCover — chaining a
+    // sheet through that env ObservableObject would race with dismissal.
+    @State private var showInviteFriendsSheet = false
+
+    // Tapping an opponent seat opens the quick-profile popup. Identified by
+    // userId so we don't have to hold a stale GameSeat snapshot — the popup
+    // pulls fresh stats from the server keyed off the userId.
+    @State private var profilePopupUserId: String? = nil
+
+    // LobbyViewModel comes from the same env the lobby itself uses (set on
+    // MainTabView). We need it to access `lastTable` (the currently-joined
+    // table id used as the invite target) and the `inviteFriend` action.
+    // Available because fullScreenCover propagates @EnvironmentObject from
+    // the presenting view.
+    @EnvironmentObject private var lobbyVM: LobbyViewModel
+
+    // Friends list for the invite sheet. Owned locally because the lobby's
+    // FriendsViewModel is a @StateObject scoped to LobbyView and isn't in
+    // the env. The sheet's `.task` calls loadFriends() so the list arrives
+    // populated; nothing else in the game scene needs friends data.
+    @StateObject private var friendsVM = FriendsViewModel()
+
     private var hasBotSeated: Bool {
         vm.gameState?.seats.contains { $0.username == "StackBot" } ?? false
     }
@@ -299,18 +348,34 @@ struct PokerTableView: View {
 
             ZStack {
                 // ── Table layer (flat, no 3D tilt)
+                // PERF: The felt + brand are static during a hand. Wrapping
+                // them in their own ZStack lets us avoid hanging implicit
+                // animations on the rest of the layout from the (now-moved)
+                // .animation(value:) modifiers below — those used to live on
+                // the whole root ZStack which forced SwiftUI to walk every
+                // child (including the 520-dot felt Canvas) in the animation
+                // transaction whenever the pot, board, or bets changed.
                 feltOval(layout)
                 brandMark(layout)
                 potCluster(layout)
+                    // Pot scale-in / migrate happens on totalPot change.
+                    .animation(.easeInOut(duration: 0.3), value: vm.gameState?.totalPot)
                 communityBoard(layout)
+                    // Flop/turn/river deal animates communityBoard only.
+                    .animation(.easeInOut(duration: 0.3), value: vm.gameState?.communityCards.count)
                 // Replaces the previous trio (gamePill / blindsLabel /
                 // hostedByLabel). Game type + blinds in a single low-key
                 // pill keeps the bottom of the felt readable instead of
                 // stacking three separate text rows on top of each other.
                 tableInfoPill(layout)
-                dealerRailButton(layout)
                 blindRailChips(layout)
                 betChipsLayer(layout)
+                    // Slightly slower spring with lighter damping = chips
+                    // have "weight" as they migrate to the pot. Response
+                    // 0.65 gives a ~0.65s arc; damping 0.78 lets the pot
+                    // stack do a tiny settle overshoot when it scales in,
+                    // which reads as chips landing.
+                    .animation(.spring(response: 0.65, dampingFraction: 0.78), value: betsSignature)
                 // potFlowLayer removed — the pot stack itself now slides to
                 // the winner via potCluster's AwardingPotStack. Keeping the
                 // old separate flying-chip layer would double up animations.
@@ -319,31 +384,69 @@ struct PokerTableView: View {
                 // ── Seat overlay
                 seatOverlay(layout)
             }
-            .animation(.easeInOut(duration: 0.3), value: vm.gameState?.communityCards.count)
-            .animation(.easeInOut(duration: 0.3), value: vm.gameState?.totalPot)
-            // Slightly slower spring with lighter damping = chips have
-            // "weight" as they migrate to the pot. Response 0.65 gives a
-            // ~0.65s arc; damping 0.78 lets the pot stack do a tiny settle
-            // overshoot when it scales in, which reads as chips landing.
-            .animation(.spring(response: 0.65, dampingFraction: 0.78), value: betsSignature)
-            .confirmationDialog(
-                "Open Seat",
+            // Tapping an open seat now goes straight to a slide-up
+            // InviteFriendsSheet (online friends only). The previous
+            // confirmationDialog was a two-step UX — pick "Invite Friends"
+            // → sheet — and the "bots are disabled" copy lived in the
+            // dialog's message so users never saw it once we removed the
+            // dialog. Bot fallback now rides inside the sheet itself
+            // (via `onAddBot`) so a single sheet covers both paths.
+            //
+            // `showOpenSeatSheet` is still the binding fired from the
+            // empty-seat tap gesture; we just route it to the sheet
+            // directly. Resetting the lobby VM's "already-invited" set
+            // each time keeps multi-seat invite flows clean.
+            .sheet(
                 isPresented: $showOpenSeatSheet,
-                titleVisibility: .visible
+                onDismiss: { lobbyVM.resetInviteSheet() }
             ) {
-                if !hasBotSeated && botsAllowedHere {
-                    Button("Add Bot Player") { vm.addBot() }
-                }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                if !botsAllowedHere {
-                    Text("Bots are disabled for this table. Invite a friend from the lobby to fill this seat.")
-                } else if hasBotSeated {
-                    Text("A bot is already seated. Invite a friend from the lobby to fill more seats.")
-                } else {
-                    Text("Fill this seat with StackBot or invite a friend from the lobby.")
+                InviteFriendsSheet(
+                    vm: lobbyVM,
+                    fvm: friendsVM,
+                    // Show every friend regardless of presence. The previous
+                    // `onlineOnly: true` filter hid a freshly-accepted friend
+                    // any time they weren't connected — the user complaint
+                    // was "I added a friend, he's in Friends, but not in the
+                    // invite sheet". Push notifications wake offline
+                    // recipients, so excluding them just penalises new
+                    // friendships. Each row's invite button still works the
+                    // same; the recipient simply receives the notification
+                    // when they next launch the app.
+                    onAddBot: botsAllowedHere ? { [weak vm = vm] in
+                        vm?.addBot()
+                        showOpenSeatSheet = false
+                    } : nil,
+                    addBotDisabled: hasBotSeated
+                )
+            }
+            // Legacy binding kept around in case any other code path
+            // flips it; no-op now that the open-seat tap drives the
+            // sheet directly above. Safe to remove if a future audit
+            // confirms nothing else writes to it.
+            .sheet(isPresented: $showInviteFriendsSheet) {
+                InviteFriendsSheet(vm: lobbyVM, fvm: friendsVM)
+            }
+            // Quick-profile popup overlays the entire GeometryReader so the
+            // dimming scrim covers the whole table (not just the seat zone).
+            // We key the OpponentPopupView on userId so SwiftUI tears it down
+            // and rebuilds when switching from one opponent to another —
+            // otherwise the previous opponent's stats would briefly show
+            // before the new fetch resolves.
+            .overlay {
+                if let uid = profilePopupUserId {
+                    OpponentPopupView(
+                        userId: uid,
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                                profilePopupUserId = nil
+                            }
+                        }
+                    )
+                    .id(uid)
+                    .zIndex(100)
                 }
             }
+            .animation(.spring(response: 0.32, dampingFraction: 0.85), value: profilePopupUserId)
         }
     }
 
@@ -378,47 +481,73 @@ struct PokerTableView: View {
         // hidden by the rail (skirt has zero thickness up there). The
         // result is a natural "thicker at bottom, thinning to nothing at
         // the top" appearance with no per-side computed offsets needed.
-        let skirtDrop: CGFloat = 14
+        //
+        // Bumped from 14 → 22pt to push the table forward in space: a
+        // taller skirt reads as a thicker, more substantial piece of
+        // furniture instead of a flat decal. Paired with a stronger
+        // underside gradient below for additional depth.
+        let skirtDrop: CGFloat = 22
 
         return ZStack {
-            // 1. Cast shadow on the floor — soft, slightly offset down. Uses
-            //    the trapezoid shape so the floor-shadow silhouette tracks
-            //    the felt instead of betraying a rectangular underlay.
-            //    Pushed a touch further down to clear the new skirt so the
-            //    skirt reads as solid table edge, not as part of the shadow.
+            // 1. Cast shadow on the floor. Two-layer shadow for depth:
+            //    a soft blurred photographic shadow underneath gives the
+            //    table a sense of hovering above a surface, then the
+            //    hard-ink offset trapezoid on top keeps the comic-page
+            //    stamp visible. Together they read as a real piece of
+            //    furniture with weight rather than a flat sticker.
             TablePerspectiveShape(topRatio: tr)
-                .fill(Color.black.opacity(0.55))
-                .frame(width: outerW + 28, height: outerH + 28)
-                .blur(radius: 26)
-                .offset(y: 18 + skirtDrop)
+                .fill(Color.black.opacity(0.45))
+                .frame(width: outerW + 14, height: outerH + 14)
+                .offset(x: 4, y: 14)
+                .blur(radius: 16)
+                .allowsHitTesting(false)
+            TablePerspectiveShape(topRatio: tr)
+                .fill(SPRetro.ink.opacity(0.55))
+                .frame(width: outerW, height: outerH)
+                .offset(x: 3, y: 5)
                 .allowsHitTesting(false)
 
-            // 1b. Underside skirt. Dark wood/leather band that gives the
-            //     table apparent thickness. Top-to-bottom gradient: deepest
-            //     at the top (recessed under the rail), warmed slightly at
-            //     the bottom (catches indirect light from below). A faint
-            //     highlight stroke at the very bottom edge sells the front
-            //     lip of the table — tiny detail, big perceptual lift.
+            // 1b. Underside skirt. Flat ink band giving the table apparent
+            //     edge-thickness. We use ink tones (not dark wood) so the
+            //     skirt reads as a stamped panel edge on the paper page
+            //     rather than a photographed leather lip. Subtle top→bottom
+            //     ink-to-inkSoft gradient still gives a sense of depth.
             TablePerspectiveShape(topRatio: tr)
                 .fill(
+                    // Stronger top→bottom gradient. The top of the skirt
+                    // (in shadow under the rail) is now pure ink; the
+                    // bottom (front edge of the table) brightens to a
+                    // warm leather tone, simulating the front lip
+                    // catching room light. This gives the skirt a real
+                    // sense of edge thickness instead of reading flat.
                     LinearGradient(
-                        colors: [
-                            Color(hex: "#0A0502"),
-                            Color(hex: "#1B0F06"),
-                            Color(hex: "#241408"),
+                        stops: [
+                            .init(color: Color(hex: "#0F0B07"), location: 0.00),
+                            .init(color: Color(hex: "#241B14"), location: 0.45),
+                            .init(color: Color(hex: "#3A2818"), location: 0.85),
+                            .init(color: Color(hex: "#5C4028"), location: 1.00),
                         ],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
                 .frame(width: outerW, height: outerH)
                 .overlay(
-                    // Bottom-edge highlight — only the lower portion of this
-                    // stroke is visible (the rest is hidden behind the rail
-                    // once the offset moves the skirt down). Reads as a
-                    // thin lit lip running along the front curve of the
-                    // table.
+                    // Front-lip highlight — brighter warm hairline along
+                    // the bottom curve where light would catch the
+                    // forward-facing edge. Replaces the previous flat
+                    // tan stroke for more punch.
                     TablePerspectiveShape(topRatio: tr)
-                        .stroke(Color(hex: "#5A3C20").opacity(0.55), lineWidth: 1)
+                        .stroke(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: Color.clear,                           location: 0.55),
+                                    .init(color: Color(hex: "#8A6038").opacity(0.45),   location: 0.85),
+                                    .init(color: Color(hex: "#C9A574").opacity(0.85),   location: 1.00),
+                                ],
+                                startPoint: .top, endPoint: .bottom
+                            ),
+                            lineWidth: 1.2
+                        )
                         .frame(width: outerW, height: outerH)
                 )
                 .offset(y: skirtDrop)
@@ -427,19 +556,19 @@ struct PokerTableView: View {
             // 2. Padded leather rail
             railLayer(outerW: outerW, outerH: outerH, outerCR: outerCR, topRatio: tr)
 
-            // 3a. Inner bevel — DARK top edge / bright bottom edge. Same
-            //     reversal as the rail: with the table tilted back, the far
-            //     side of the bevel is in shadow under the rail, while the
-            //     near side catches a hint of light spilling off the felt.
-            //     Old top-bright bevel reinforced the "raised flap" look at
-            //     the top of the table.
+            // 3a. Inner bevel — retro version. White-highlight stop removed
+            //     because it conflicted with the paper substrate (read as a
+            //     stray gleam, not as the felt rim). Now an all-ink gradient,
+            //     deepest at top (under the rail) fading to a softer ink at
+            //     the bottom. Same line weight, same frame — only color tone
+            //     changed.
             TablePerspectiveShape(topRatio: tr)
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.black.opacity(0.55),
-                            Color.black.opacity(0.18),
-                            Color.white.opacity(0.16),
+                            SPRetro.ink.opacity(0.65),
+                            SPRetro.ink.opacity(0.30),
+                            SPRetro.inkMuted.opacity(0.20),
                         ],
                         startPoint: .top, endPoint: .bottom
                     ),
@@ -504,81 +633,58 @@ struct PokerTableView: View {
                            outerCR: CGFloat,
                            topRatio: CGFloat) -> some View {
         ZStack {
-            // Base leather — DARK at top (far end, foreshortened, in shadow),
-            // warmer/lighter at the bottom (near end, catches lamp light off
-            // the felt). Old gradient ran the opposite way, which painted the
-            // far rim brighter than the near rim and made the top of the
-            // table read as a "flap" sitting *above* the felt instead of
-            // receding away from the viewer.
+            // Base rail — warm-black leather body. Subtle top→bottom
+            // gradient (rather than the previous flat fill) gives the
+            // rail a hint of a rounded cushion: brighter at the top edge
+            // where it would catch overhead light, deeper at the bottom
+            // where it falls into shadow before meeting the felt.
             TablePerspectiveShape(topRatio: topRatio)
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(hex: "#0A0502"),
-                            Color(hex: "#1A0F06"),
-                            Color(hex: "#352213"),
+                            Color(hex: "#3A2818"),
+                            Color(hex: "#241814"),
+                            SPRetro.ink,
                         ],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
                 .frame(width: outerW, height: outerH)
 
-            // Bottom highlight — light grazing the front lip of the rail
-            // (closest to the viewer). Bottom-up gradient inverts what used
-            // to be a top-down "sheen" — the highlight now lives where the
-            // light source would actually hit on a tilted-back table, not on
-            // the recessed far edge. Greatly reduced opacity vs. the old top
-            // sheen so it reads as a subtle gleam, not a polished band.
-            TablePerspectiveShape(topRatio: topRatio)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.clear,
-                            Color.white.opacity(0.03),
-                            Color.white.opacity(0.12),
-                        ],
-                        startPoint: UnitPoint(x: 0.5, y: 0.55),
-                        endPoint:   .bottom
-                    )
-                )
-                .frame(width: outerW, height: outerH)
-                .blendMode(.plusLighter)
-
-            // Top depth fade — explicit darkening of the top third of the
-            // rail. Pushes the far end into noticeable shadow so the eye
-            // reads it as "further away" rather than "thicker." Falls off
-            // to clear by the rail's vertical midpoint, leaving the bottom
-            // half untouched.
-            TablePerspectiveShape(topRatio: topRatio)
-                .fill(
-                    LinearGradient(
-                        stops: [
-                            .init(color: Color.black.opacity(0.55), location: 0.00),
-                            .init(color: Color.black.opacity(0.22), location: 0.30),
-                            .init(color: Color.clear,               location: 0.55),
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-                .frame(width: outerW, height: outerH)
-
-            // Outer rail edge — dim at top (in shadow with the rail), bright
-            // at bottom (catches the front-lip highlight). Mirrors the
-            // gradient direction of the base leather so the silhouette stays
-            // consistent under the new lighting.
+            // Top-edge specular — narrow warm sheen biased to the very
+            // top of the rail simulating a light source above and behind
+            // the player. Reads as a leather lip catching light, which
+            // is what pushes the rail from "flat ink panel" toward
+            // "padded cushion you could rest your elbows on".
             TablePerspectiveShape(topRatio: topRatio)
                 .stroke(
                     LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.55),
-                            Color.black.opacity(0.20),
-                            Color.white.opacity(0.18),
+                        stops: [
+                            .init(color: Color(hex: "#C9A574").opacity(0.55), location: 0.00),
+                            .init(color: Color(hex: "#8A6038").opacity(0.20), location: 0.20),
+                            .init(color: Color.clear,                          location: 0.45),
                         ],
                         startPoint: .top, endPoint: .bottom
                     ),
-                    lineWidth: 1.5
+                    lineWidth: 2.5
                 )
-                .frame(width: outerW, height: outerH)
+                .frame(width: outerW - 2, height: outerH - 2)
+
+            // Bottom-edge ambient occlusion — subtle ink darkening along
+            // the lower rim where the rail meets the skirt. Sells the
+            // physical seam between the cushion and the underside.
+            TablePerspectiveShape(topRatio: topRatio)
+                .stroke(
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.clear,                       location: 0.55),
+                            .init(color: Color.black.opacity(0.45),         location: 1.00),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    ),
+                    lineWidth: 2
+                )
+                .frame(width: outerW - 1, height: outerH - 1)
         }
         .allowsHitTesting(false)
     }
@@ -590,10 +696,13 @@ struct PokerTableView: View {
 
         return TablePerspectiveShape(topRatio: tr)
             .fill(
-                // Sharper center-to-edge gradient than before. Tighter inner
-                // radius keeps the bright "spotlight" smaller, and pushing
-                // through `theme.edge` at the perimeter sells the bowl shape
-                // — a flat surface wouldn't have this much contrast.
+                // Retro 3-stop gradient. Themes are now same-hue triples
+                // (inner = lighter shade, mid = identity, edge = darker
+                // shade), so the radial reads as a coherent color block on
+                // the paper page rather than the old paper→theme→ink
+                // sequence that created a heavy vignette. Start radius
+                // widened from 3% → 14% so there's no bright pinprick
+                // spotlight at the center.
                 RadialGradient(
                     colors: [
                         Color(hex: theme.inner),
@@ -601,8 +710,8 @@ struct PokerTableView: View {
                         Color(hex: theme.edge),
                     ],
                     center: UnitPoint(x: 0.5, y: 0.42),
-                    startRadius: l.tableWidth * 0.03,
-                    endRadius: l.tableWidth * 0.72
+                    startRadius: l.tableWidth * 0.14,
+                    endRadius: l.tableWidth * 0.74
                 )
             )
             .frame(width: l.tableWidth, height: l.tableHeight)
@@ -617,73 +726,64 @@ struct PokerTableView: View {
             )
             .overlay(
                 ZStack {
-                    // ── Directional top-down lighting ────────────────────
-                    // Light from the upper-front. Brighter band across the
-                    // top third, then a subtle dim across the bottom. This
-                    // is what makes the felt look slightly *domed* rather
-                    // than perfectly flat.
+                    // ── Top-light highlight ──────────────────────────────
+                    // Soft white wash biased toward the upper portion of
+                    // the felt — simulates an overhead room light catching
+                    // the cloth's high point. This is what reads as a
+                    // concave bowl when paired with the perimeter darkening
+                    // below: bright center-top, dark edges = curvature.
                     TablePerspectiveShape(topRatio: tr)
                         .fill(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: Color.white.opacity(0.14),  location: 0.00),
-                                    .init(color: Color.white.opacity(0.04),  location: 0.35),
-                                    .init(color: Color.clear,                location: 0.55),
-                                    .init(color: Color.black.opacity(0.10),  location: 1.00),
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(0.18),
+                                    Color.white.opacity(0.06),
+                                    Color.clear,
                                 ],
-                                startPoint: .top,
-                                endPoint:   .bottom
+                                center: UnitPoint(x: 0.5, y: 0.30),
+                                startRadius: l.tableWidth * 0.05,
+                                endRadius: l.tableWidth * 0.55
                             )
                         )
                         .frame(width: l.tableWidth, height: l.tableHeight)
                         .blendMode(.plusLighter)
 
-                    // ── Stronger center-to-edge vignette ─────────────────
-                    // Was 0.22 max → now 0.42. Combined with the sharper base
-                    // gradient, the felt now has clear depth: bright concave
-                    // center, dark recessed perimeter. Pushes attention to
-                    // the community cards / pot.
+                    // Bowl vignette — stronger than the previous flat 0.20
+                    // ink wash. Pushes the edges into shadow so the felt
+                    // reads as a sunken concave surface, not a flat decal.
                     TablePerspectiveShape(topRatio: tr)
                         .fill(
                             RadialGradient(
-                                colors: [Color.clear, Color.black.opacity(0.42)],
-                                center: .center,
-                                startRadius: l.tableWidth * 0.28,
-                                endRadius: l.tableWidth * 0.66
+                                colors: [
+                                    Color.clear,
+                                    Color(hex: "#0F0A06").opacity(0.20),
+                                    Color(hex: "#0F0A06").opacity(0.55),
+                                ],
+                                center: UnitPoint(x: 0.5, y: 0.42),
+                                startRadius: l.tableWidth * 0.22,
+                                endRadius: l.tableWidth * 0.78
                             )
                         )
                         .frame(width: l.tableWidth, height: l.tableHeight)
 
-                    // ── Inner shadow at the rim (recessed felt) ──────────
-                    // Drawn as a thick stroke just inside the felt edge,
-                    // blurred so it fades softly toward the center. This is
-                    // the single most impactful 3D cue: the felt now reads
-                    // as *sunken below* the leather rail rather than sitting
-                    // flat at the same plane. Roughly mimics the inner-
-                    // shadow effect from CSS / Figma without needing a
-                    // bespoke shader.
+                    // Thin ink rim — flat hairline just inside the felt
+                    // edge. Reads as a stamped boundary between felt and
+                    // rail and anchors the bowl shape against the rail.
                     TablePerspectiveShape(topRatio: tr)
-                        .stroke(Color.black.opacity(0.65), lineWidth: 14)
-                        .blur(radius: 10)
-                        .frame(width: l.tableWidth, height: l.tableHeight)
-                        .mask(
-                            // Mask keeps the shadow only inside the felt
-                            // trapezoid — without this, the blurred stroke
-                            // would bleed onto the rail.
-                            TablePerspectiveShape(topRatio: tr)
-                                .frame(width: l.tableWidth, height: l.tableHeight)
-                        )
+                        .stroke(SPRetro.ink.opacity(0.65), lineWidth: 1.5)
+                        .frame(width: l.tableWidth - 2, height: l.tableHeight - 2)
 
-                    // ── Subtle bottom contact shadow ─────────────────────
-                    // The lower edge of the felt sits in a touch more
-                    // shadow than the top, mimicking a light source above.
-                    // Helps the 3D shape feel anchored to a "down" axis.
+                    // ── Directional contact shadow ───────────────────────
+                    // Light source above-front: the bottom (forward) edge
+                    // of the felt sits in heavier shadow than the top
+                    // (back) edge. Strengthened from 0.18 → 0.32 so the
+                    // bowl reads as physically receding from the viewer.
                     TablePerspectiveShape(topRatio: tr)
                         .fill(
                             LinearGradient(
                                 stops: [
-                                    .init(color: Color.clear,               location: 0.65),
-                                    .init(color: Color.black.opacity(0.18), location: 1.00),
+                                    .init(color: Color.clear,               location: 0.55),
+                                    .init(color: Color.black.opacity(0.32), location: 1.00),
                                 ],
                                 startPoint: .top,
                                 endPoint:   .bottom
@@ -812,29 +912,29 @@ struct PokerTableView: View {
             let game = state.gameType == "PLO" ? "PLO" : "NLH"
             let sb   = formatChips(String(state.smallBlind))
             let bb   = formatChips(String(state.bigBlind))
+            // Retro game-info pill — paper face + ink divider + ink text.
+            // Reads as a print-shop credit line below the pot.
             HStack(spacing: 8) {
                 Text(game)
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
-                    .tracking(1.2)
-                    .foregroundStyle(.white.opacity(0.65))
-                // Thin divider keeps the two halves visually distinct
-                // without adding extra pixels of vertical clutter.
+                    .font(.custom("AmericanTypewriter-Bold", size: 10))
+                    .tracking(1.5)
+                    .foregroundStyle(SPRetro.ink)
                 Rectangle()
-                    .fill(Color.white.opacity(0.18))
+                    .fill(SPRetro.ink.opacity(0.45))
                     .frame(width: 1, height: 10)
                 Text("\(sb) / \(bb)")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .font(.custom("AmericanTypewriter", size: 10))
+                    .foregroundStyle(SPRetro.inkSoft)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
             .background(
                 Capsule()
-                    .fill(Color.black.opacity(0.22))
+                    .fill(SPRetro.paper)
                     .overlay(
                         Capsule().strokeBorder(
-                            Color.white.opacity(0.06),
-                            lineWidth: 0.5
+                            SPRetro.ink,
+                            lineWidth: 1.5
                         )
                     )
             )
@@ -843,34 +943,6 @@ struct PokerTableView: View {
             .position(x: l.gamePillCenter.x, y: l.gamePillCenter.y)
             .allowsHitTesting(false)
         }
-    }
-
-    // ─── Dealer "D" button ───────────────────────────────────────────────────
-
-    @ViewBuilder
-    private func dealerRailButton(_ l: TableLayout) -> some View {
-        if let dealerIdx = dealerDisplayIndex {
-            let positions = l.seatPositions(count: maxSeats)
-            if dealerIdx < positions.count {
-                let seatPt = positions[dealerIdx]
-                let dx = l.tableCenter.x - seatPt.x
-                let dy = l.tableCenter.y - seatPt.y
-                let bx = seatPt.x + dx * 0.50
-                let by = seatPt.y + dy * 0.50
-
-                // Dealer button — classic ivory chip with bold "D".
-                PokerChip(text: "D",
-                          tint: Color(hex: "#F4ECDC"),
-                          textColor: Color(hex: "#1B1B1B"),
-                          size: 24)
-                    .tableSurfaceTilt()
-                    .position(x: bx, y: by)
-            }
-        }
-    }
-
-    private var dealerDisplayIndex: Int? {
-        seats.firstIndex(where: { $0.isDealer })
     }
 
     // ─── Blind markers (small ambient icons next to each seat) ──────────────
@@ -897,13 +969,16 @@ struct PokerTableView: View {
                 // location predictable for the player's eye.
                 let bx = seatPt.x - offset
                 let by = seatPt.y
+                // Retro SB/BB chips — pop blue (SB) / pop red (BB) on the
+                // paper felt. textColor = paper so the letters stay legible
+                // on the saturated chip face.
                 let tint = seat.isSmallBlind
-                    ? Color(hex: "#3B7DD8")
-                    : Color(hex: "#C9342B")
+                    ? SPRetro.popBlue
+                    : SPRetro.popRed
                 let label = seat.isSmallBlind ? "SB" : "BB"
                 PokerChip(text: label,
                           tint: tint,
-                          textColor: .white,
+                          textColor: SPRetro.paper,
                           size: markerSize,
                           muted: true)
                     .tableSurfaceTilt()
@@ -964,17 +1039,39 @@ struct PokerTableView: View {
                     let isMe = (idx == 0)
                     let isActive = vm.gameState?.activePlayerId == seat.userId
                     let isWinner = winnerIds.contains(seat.userId)
-                    TargetSeatView(
+                    // Every seat is wrapped in TickingSeat — the same
+                    // struct type at this position regardless of who is
+                    // currently active. SwiftUI keys @State to the view's
+                    // type + position in the tree, so a stable wrapper is
+                    // what preserves TargetSeatView's `@State bubble` when
+                    // a player transitions from active → not-active after
+                    // taking their action. Previously this slot branched
+                    // between TickingSeat and TargetSeatView, which SwiftUI
+                    // saw as two different types — every turn change tore
+                    // down/recreated the inner view, wiped its bubble
+                    // @State, and the bubble that should have popped up
+                    // for the just-acted player vanished before render.
+                    //
+                    // Perf cost of always-observing the clock: TickingSeat's
+                    // body re-evaluates at 5Hz for every seat (6 cheap
+                    // struct constructions/sec). The inner TargetSeatView
+                    // only re-evaluates when its stored inputs differ; for
+                    // non-active seats we pass constant `turnProgress: 1.0`
+                    // and `turnSecondsLeft: 0`, so SwiftUI's diff detects
+                    // no input change and skips the body. Same optimization
+                    // as the original split, without breaking @State
+                    // identity.
+                    TickingSeat(
+                        clock: vm.turnClock,
                         seat: seat,
                         isMe: isMe,
                         isMyTurn: isActive,
                         isWinner: isWinner,
-                        turnProgress: isActive ? vm.turnTimeRemaining : 1.0,
-                        turnSecondsLeft: isActive ? vm.turnSecondsLeft : 0,
                         lastAction: vm.gameState?.lastAction,
                         avatarSize: l.seatAvatarSize,
                         winningCardIds: winnerCardIds,
-                        anyWinnersDeclared: !winnerIds.isEmpty
+                        anyWinnersDeclared: !winnerIds.isEmpty,
+                        onProfileTap: { profilePopupUserId = seat.userId }
                     )
                     .position(x: positions[idx].x, y: positions[idx].y)
                     .zIndex(isWinner ? 20 : (isActive ? 10 : 1))
@@ -994,8 +1091,30 @@ struct PokerTableView: View {
     }
 
     private var winnerCardIds: Set<String> {
-        guard let winners = vm.gameState?.winners else { return [] }
+        // Only surface winning-card highlights when the hand was actually
+        // contested (≥ 2 seats reached showdown). On an uncontested win
+        // (everyone but one player folded) there's no showdown and no
+        // "better hand" to celebrate — lighting up the lone remaining
+        // player's cards reads as a glitch since there was nothing to beat.
+        guard isContestedShowdown,
+              let winners = vm.gameState?.winners else { return [] }
         return Set(winners.flatMap { $0.bestCards.map { $0.id } })
+    }
+
+    /// True when the hand reached a real showdown — at least two seats
+    /// finished the hand without folding. Uncontested wins (single non-
+    /// folded seat) flip this to false so the table suppresses the
+    /// winner gold ring / glow / card highlights, since "winning" by
+    /// fold-equity isn't a hand-vs-hand outcome to highlight.
+    private var isContestedShowdown: Bool {
+        guard let seats = vm.gameState?.seats else { return false }
+        // Status reflects each seat's posture at hand end. .active and
+        // .allIn both count as "in the pot at showdown"; sittingOut /
+        // waiting / disconnected / folded are out.
+        let inPot = seats.filter {
+            $0.status == .active || $0.status == .allIn
+        }
+        return inPot.count >= 2
     }
 
     // ─── Winning-hand-name banner ───────────────────────────────────────────
@@ -1010,35 +1129,56 @@ struct PokerTableView: View {
         if let winners = vm.gameState?.winners, !winners.isEmpty {
             // De-dupe hand names: chopped pots usually share one hand name
             // ("Two Pair") between both seats — show it once, not twice.
-            let names = winners.map(\.handName)
-            let unique = Array(NSOrderedSet(array: names)) as? [String] ?? names
+            // PERF: pre-joined into a single String so the de-dupe + join
+            // doesn't reallocate on every body invalidation while the
+            // banner is on-screen (which is also when chips are flying to
+            // winners — the hot path we're trying to keep smooth).
+            let joined = winningBannerLabel(winners: winners)
+            // Retro winning-hand banner — mustard paper pill with ink border
+            // and an ink "WINNING HAND" stamp above the hand name. Uses
+            // SPRetro tokens so the colors/fonts stay in lockstep with the
+            // rest of the retro surfaces (lobby pills, daily bonus, etc.)
+            // rather than drifting from hard-coded hex.
             VStack(spacing: 2) {
                 Text("WINNING HAND")
-                    .font(.system(size: 9, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .tracking(1.2)
-                Text(unique.joined(separator: " · "))
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(Color(hex: "#F5C842"))
+                    .font(SPRetroFonts.headline(9))
+                    .foregroundStyle(SPRetro.ink)
+                    .tracking(1.8)
+                Text(joined)
+                    .font(SPRetroFonts.display(16))
+                    .foregroundStyle(SPRetro.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .shadow(color: Color(hex: "#F5C842").opacity(0.5), radius: 6)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
+            // Background ZStack: ink "shadow plate" capsule offset behind
+            // the face capsule, instead of a `.shadow()` modifier on the
+            // whole VStack. `.shadow()` rasterizes the entire subtree —
+            // text glyphs included — which produced a "doubled text" look
+            // on "WINNING HAND" / hand-name. Shape-only offset gives the
+            // same comic-panel feel with crisp text.
             .background(
-                Capsule()
-                    .fill(Color.black.opacity(0.55))
-                    .overlay(
-                        Capsule().strokeBorder(
-                            Color(hex: "#F5C842").opacity(0.4),
-                            lineWidth: 1
+                ZStack {
+                    Capsule()
+                        .fill(SPRetro.ink.opacity(0.75))
+                        .offset(x: 2, y: 3)
+                    Capsule()
+                        .fill(SPRetro.mustard)
+                        .overlay(
+                            Capsule().strokeBorder(SPRetro.ink, lineWidth: 2)
                         )
-                    )
+                }
             )
+            // Lowered from `-tableHeight * 0.02` (just above center) to
+            // `+tableHeight * 0.05` (just below center) so the banner clears
+            // the bottom edge of the (enlarged) community board, which sits
+            // at `-tableHeight * 0.12`. Previously the banner's top edge
+            // grazed the board cards on tall tables and obscured the river
+            // card during the showdown reveal.
             .position(
                 x: l.tableCenter.x,
-                y: l.tableCenter.y - l.tableHeight * 0.02
+                y: l.tableCenter.y + l.tableHeight * 0.05
             )
             .transition(.scale(scale: 0.7).combined(with: .opacity))
             .zIndex(50)
@@ -1053,8 +1193,47 @@ struct PokerTableView: View {
     }
 
     private var winnerIds: Set<String> {
-        guard let winners = vm.gameState?.winners else { return [] }
+        // Same contested-showdown gate as winnerCardIds: don't mark a seat
+        // as a "winner" for visual purposes when it just outlasted folds.
+        // This collapses the gold avatar ring + winnerPulse + the
+        // OpponentHoleCardsView card glow back to their resting state on
+        // uncontested wins, all from a single source-of-truth check.
+        guard isContestedShowdown,
+              let winners = vm.gameState?.winners else { return [] }
         return Set(winners.map { $0.playerId })
+    }
+
+    // Show only the *best* hand name from the showdown, not every winning
+    // hand. In a side-pot scenario, two different players can each win a
+    // pot with different hand ranks (e.g. all-in full house wins main,
+    // larger flush wins side pot) — joining them produced confusing
+    // banners like "Flush · Full House" that imply a split.
+    //
+    // The backend builds payouts by iterating pots starting at the main
+    // pot (potManager.ts:distributePots), so winners[0] is always the
+    // main pot winner. By definition the main pot contests all eligible
+    // hands at showdown, so its winner has the highest-ranked hand.
+    //
+    // We recompute the label client-side via `HandStrength.label(hole:board:)`
+    // using the winner's hole cards + the community board. This is the *same*
+    // source the under-card subtitle reads from, so the banner and the text
+    // beneath the winning player's cards always match — including PLO's
+    // "Quads" rename (server still emits "Four of a Kind") and the PLO 2+3
+    // restriction that keeps a 3-hearts-in-hand / 2-on-board combo from being
+    // labeled "Flush". Falls back to `WinnerPayout.handName` if the winner's
+    // hole cards aren't available (shouldn't happen at showdown — server
+    // reveals them — but the fallback keeps the banner present rather than
+    // blank in that edge case).
+    private func winningBannerLabel(winners: [WinnerPayout]) -> String {
+        guard let top = winners.first else { return "" }
+        if let seat = vm.gameState?.seats.first(where: { $0.userId == top.playerId }),
+           let hole = seat.holeCards, !hole.isEmpty {
+            let board = vm.gameState?.communityCards ?? []
+            if let lbl = HandStrength.label(hole: hole, board: board) {
+                return lbl
+            }
+        }
+        return top.handName
     }
 }
 
@@ -1081,7 +1260,7 @@ enum ChipTier {
         case .blue:   return (Color(hex: "#4A90E2"), Color(hex: "#2D6CC0"), Color(hex: "#1A4F8F"))
         case .black:  return (Color(hex: "#3A3A3A"), Color(hex: "#222222"), Color(hex: "#111111"))
         case .purple: return (Color(hex: "#8B5CF6"), Color(hex: "#6C3CD8"), Color(hex: "#4A2B9E"))
-        case .gold:   return (Color(hex: "#F5C842"), Color(hex: "#D4A520"), Color(hex: "#B8860B"))
+        case .gold:   return (SPRetro.mustard, Color(hex: "#D4A520"), Color(hex: "#B8860B"))
         }
     }
 }
@@ -1123,7 +1302,11 @@ private func pokerChipIcon(diameter: CGFloat, amount: Int = 0) -> some View {
 //   8. Bold rounded text with a soft emboss shadow.
 //   9. A short top gloss arc suggesting a glossy ceramic finish.
 
-private struct PokerChip: View {
+// Exposed (was `private`) so the lobby's chip-balance pill and filter chips
+// can reuse the same physical-chip rendering instead of inventing a parallel
+// "circle with text" component. Internal — still scoped to the StackPoker
+// module, just visible across files.
+struct PokerChip: View {
     let text:      String
     let tint:      Color
     let textColor: Color
@@ -1493,27 +1676,78 @@ private struct PotChipStack: View {
             .frame(height: chipDiameter + CGFloat(chipCount - 1) * stackStep + 4)
 
             VStack(spacing: 1) {
-                Text("Pot")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .tracking(0.8)
+                // Retro pot pill — paper face + ink border + ink text.
+                // Tracking + AmericanTypewriter mimics the "POT" stamp on a
+                // 60s editorial print.
+                Text("POT")
+                    .font(.custom("AmericanTypewriter-Bold", size: 9))
+                    .foregroundStyle(SPRetro.ink)
+                    .tracking(1.5)
                 Text(formatChips(String(amount)))
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
-                    .foregroundStyle(ChipTier.forAmount(amount).colors.primary)
+                    .font(.custom("ChalkboardSE-Bold", size: 16))
+                    .foregroundStyle(SPRetro.ink)
                     .contentTransition(.numericText())
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 3)
-            .background(Color.black.opacity(0.45))
+            .background(SPRetro.paper)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(
-                        ChipTier.forAmount(amount).colors.primary.opacity(0.35),
-                        lineWidth: 0.5
-                    )
+                    .strokeBorder(SPRetro.ink, lineWidth: 2)
             )
         }
+    }
+}
+
+// ─── Ticking-seat wrapper ────────────────────────────────────────────────────
+// Tiny subview whose only job is to observe `vm.turnClock` and feed the live
+// progress / secondsLeft into a TargetSeatView. The wrapper lets the rest of
+// PokerTableView stay subscribed to the broader VM only — when the clock
+// ticks at 5Hz, just this view re-evaluates, not the whole table layout.
+// Used solely for the seat that is currently on-turn (one at a time).
+struct TickingSeat: View {
+    // Always observe the clock so this wrapper has stable view-tree type
+    // for every seat regardless of who is currently active (see the call
+    // site in seatOverlay for the @State-identity rationale). For non-
+    // active seats we substitute constant placeholders below so the inner
+    // TargetSeatView still diffs to a no-op when the clock ticks.
+    @ObservedObject var clock: TurnClock
+    let seat:           GameSeat
+    let isMe:           Bool
+    let isMyTurn:       Bool
+    let isWinner:       Bool
+    let lastAction:     LastAction?
+    let avatarSize:     CGFloat
+    let winningCardIds: Set<String>
+    let anyWinnersDeclared: Bool
+    let onProfileTap:   () -> Void
+
+    var body: some View {
+        TargetSeatView(
+            seat:               seat,
+            isMe:               isMe,
+            isMyTurn:           isMyTurn,
+            isWinner:           isWinner,
+            // Only feed the live clock values to the active seat. For
+            // non-active seats we hard-code the same placeholders the
+            // original branch used (turnProgress 1.0, no seconds left) so
+            // SwiftUI diffs an unchanged TargetSeatView and skips its
+            // body — same perf shape as before the merge.
+            turnProgress:       isMyTurn ? clock.progress    : 1.0,
+            turnSecondsLeft:    isMyTurn ? clock.secondsLeft : 0,
+            // Live deadline/duration drive the TimelineView-based ring
+            // for the active seat so the sweep runs at the display
+            // refresh rate. nil/0 on idle seats falls back to the
+            // static turnProgress path (no per-frame work).
+            turnDeadline:       isMyTurn ? clock.deadline    : nil,
+            turnDuration:       isMyTurn ? clock.duration    : 0,
+            lastAction:         lastAction,
+            avatarSize:         avatarSize,
+            winningCardIds:     winningCardIds,
+            anyWinnersDeclared: anyWinnersDeclared,
+            onProfileTap:       onProfileTap
+        )
     }
 }
 
@@ -1526,12 +1760,23 @@ struct TargetSeatView: View {
     var isWinner:     Bool = false
     let turnProgress: Double
     var turnSecondsLeft: Int = 0
+    // Absolute end-of-turn date + total span. When non-nil the ring uses
+    // these directly inside a TimelineView so the trim sweeps at the
+    // display refresh rate. Optional so replay/preview call sites that
+    // don't have a live clock can keep passing nil and the ring just
+    // falls back to the static `turnProgress` value.
+    var turnDeadline: Date? = nil
+    var turnDuration: Double = 0
     var lastAction:   LastAction?
     let avatarSize:   CGFloat
     // Showdown context — used by OpponentHoleCardsView to highlight the
     // cards in the winning combination once winners have been declared.
     var winningCardIds:     Set<String> = []
     var anyWinnersDeclared: Bool = false
+    // Tapping an opponent seat opens the quick-profile popup. Optional so
+    // ReplayTableView (and other read-only contexts) keep their non-tappable
+    // seats — only the live PokerTableView wires this up.
+    var onProfileTap: (() -> Void)? = nil
 
     @State private var allInPulse = false
     @State private var winnerPulse = false
@@ -1556,20 +1801,60 @@ struct TargetSeatView: View {
             // persistent "Folded" tag (if applicable) takes over so the
             // seat still reads as folded for the rest of the hand.
             if let kind = bubble {
+                // Retro action bubble — ChalkboardSE-Bold label on a tinted
+                // panel with ink border + hard offset shadow. Label color
+                // stays paper so the panel tint (call/raise/fold colors,
+                // remapped via actionBubbleKind below) reads as a stamp.
                 Text(kind.label)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(.custom("ChalkboardSE-Bold", size: 11))
+                    .foregroundStyle(SPRetro.paper)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(kind.color)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                    // Shape-only offset plate instead of `.shadow()` so the
+                    // action label text doesn't get rasterized into a
+                    // doubled glyph.
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(SPRetro.ink.opacity(0.7))
+                                .offset(x: 1.5, y: 2)
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(kind.color)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .strokeBorder(SPRetro.ink, lineWidth: 1.5)
+                                )
+                        }
+                    )
                     .padding(.bottom, 3)
                     .transition(.scale.combined(with: .opacity))
+            } else if seat.isLeaving {
+                // Mid-hand leave: server-side `pendingLeave` flag. Takes
+                // priority over the "Folded" badge so the rest of the
+                // table sees that the player has actually bailed (the
+                // engine auto-folds them on leave, but a generic
+                // "Folded" tag would be misleading — it implies a real
+                // poker decision rather than an exit). Seat disappears
+                // entirely on the next ClientGameState after endHand.
+                // Retro "Left" badge — ink-soft text on a faint paper chip.
+                Text("Left")
+                    .font(.custom("AmericanTypewriter-Bold", size: 11))
+                    .foregroundStyle(SPRetro.inkSoft)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(SPRetro.paper.opacity(0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(SPRetro.ink.opacity(0.5), lineWidth: 1)
+                    )
+                    .padding(.bottom, 3)
             } else if seat.status == .folded {
+                // "Folded" stamp — maroon ink so it reads as a struck-out
+                // print stamp on the paper page.
                 Text("Folded")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color(hex: "#E8A838"))
+                    .font(.custom("AmericanTypewriter-Bold", size: 11))
+                    .foregroundStyle(SPRetro.maroon)
                     .padding(.bottom, 3)
             }
 
@@ -1578,7 +1863,7 @@ struct TargetSeatView: View {
                 if isWinner {
                     Circle()
                         .strokeBorder(
-                            Color(hex: "#F5C842"),
+                            SPRetro.mustard,
                             lineWidth: winnerPulse ? 4 : 2
                         )
                         .frame(
@@ -1586,48 +1871,26 @@ struct TargetSeatView: View {
                             height: avatarSize + (winnerPulse ? 16 : 8)
                         )
                         .shadow(
-                            color: Color(hex: "#F5C842").opacity(winnerPulse ? 0.8 : 0.3),
+                            color: SPRetro.mustard.opacity(winnerPulse ? 0.8 : 0.3),
                             radius: winnerPulse ? 16 : 4
                         )
                 }
 
-                // Turn timer ring
-                if isMyTurn {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white.opacity(0.06), lineWidth: 3)
-                            .frame(width: avatarSize + 8, height: avatarSize + 8)
+                // Turn-timer animation lives on the stack pill below the
+                // avatar now (see StackPill's drain fill). The avatar
+                // identifies the active seat purely through the thicker
+                // ink border applied to the portrait circle below.
 
-                        Circle()
-                            .trim(from: 0, to: turnProgress)
-                            .stroke(
-                                AngularGradient(
-                                    gradient: Gradient(colors: [
-                                        timerColor.opacity(0.0),
-                                        timerColor.opacity(0.4),
-                                        timerColor,
-                                        Color.white
-                                    ]),
-                                    center: .center,
-                                    startAngle: .degrees(0),
-                                    endAngle:   .degrees(360 * turnProgress)
-                                ),
-                                style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: avatarSize + 8, height: avatarSize + 8)
-                            .shadow(color: timerColor.opacity(0.4), radius: 4)
-                            .animation(.linear(duration: 0.1), value: turnProgress)
-                    }
-                }
-
-                // Avatar circle
+                // Retro avatar circle — paper face + ink border. The ink
+                // border thickens when it's the player's turn (replaces the
+                // old white-on-navy highlight). Reads as a pasted-on
+                // newspaper portrait inside an ink panel.
                 Circle()
-                    .fill(Color(hex: "#1A2744"))
+                    .fill(SPRetro.paper)
                     .overlay(
                         Circle().strokeBorder(
-                            isMyTurn ? Color.white.opacity(0.6) : Color(hex: "#2A3D6A"),
-                            lineWidth: isMyTurn ? 2 : 1
+                            SPRetro.ink,
+                            lineWidth: isMyTurn ? 2.5 : 1.5
                         )
                     )
                     .frame(width: avatarSize, height: avatarSize)
@@ -1635,10 +1898,16 @@ struct TargetSeatView: View {
                         Text(AvatarOption.find(seat.avatarId).emoji)
                             .font(.system(size: avatarSize * 0.58))
                     )
-                    .opacity(seat.status == .folded ? 0.5 : 1.0)
+                    // Same dimmed treatment for `isLeaving` as for folded —
+                    // the player has already mentally checked out, so the
+                    // avatar should read as "not in play" regardless of
+                    // whether the underlying status is FOLDED (auto-folded
+                    // on leave) or ALL_IN (still entitled to showdown).
+                    .opacity(seat.status == .folded || seat.isLeaving ? 0.45 : 1.0)
+                    .saturation(seat.isLeaving ? 0 : 1)
                     .shadow(
                         color: seat.status == .allIn
-                            ? Color(hex: "#F5C842").opacity(allInPulse ? 0.7 : 0.15)
+                            ? SPRetro.mustard.opacity(allInPulse ? 0.7 : 0.15)
                             : Color.black.opacity(0.4),
                         radius: seat.status == .allIn ? (allInPulse ? 10 : 3) : 5,
                         y: 2
@@ -1648,10 +1917,13 @@ struct TargetSeatView: View {
                 // half opacity so it reads as a subtle urgency cue without
                 // competing with the timer ring.
                 if isMyTurn, turnSecondsLeft > 0, turnSecondsLeft <= 5 {
+                    // Retro urgency countdown — pop-red ChalkboardSE numeral
+                    // floating over the paper avatar. Pop red replaces the
+                    // washed-out white-on-dark so the urgency cue still
+                    // screams against the cream avatar face.
                     Text("\(turnSecondsLeft)")
-                        .font(.system(size: avatarSize * 0.7, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
+                        .font(.custom("ChalkboardSE-Bold", size: avatarSize * 0.7))
+                        .foregroundStyle(SPRetro.popRed.opacity(0.85))
                         .frame(width: avatarSize, height: avatarSize)
                         .transition(.scale.combined(with: .opacity))
                         .id(turnSecondsLeft) // retrigger transition each tick
@@ -1686,11 +1958,14 @@ struct TargetSeatView: View {
                         winningCardIds:     winningCardIds,
                         partialReveals:     seat.revealed
                     )
-                    // Tilt the cluster so the small face-down cards lie on
-                    // the felt at the same angle as the community board.
-                    // Applied before .offset so the card tilts in place
-                    // rather than swinging the whole cluster off the avatar.
-                    .tableSurfaceTilt()
+                    // Previously wrapped in `.tableSurfaceTilt()` to make
+                    // the cluster lie flat on the felt at the table's 26°
+                    // foreshortening angle. The user found the resulting
+                    // foreshortening read as "weirdly tilted" rather than
+                    // "lying flat" — at the small (22pt) cluster size the
+                    // 3D rotation just looks like a skew. Rendering them
+                    // upright (no tilt) keeps the cards readable as
+                    // standing-up cards next to the avatar.
                     .offset(x: -avatarSize * 0.52, y: -avatarSize * 0.15)
                     .zIndex(8)
                 }
@@ -1702,41 +1977,112 @@ struct TargetSeatView: View {
 
                 // Disconnect indicator
                 if !seat.isConnected {
+                    // Retro disconnect badge — pop-red disc with ink border
+                    // and paper "wifi.slash" glyph so it reads as a printed
+                    // warning stamp on the avatar.
                     Image(systemName: "wifi.slash")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(SPRetro.paper)
                         .padding(3)
-                        .background(Color.red.opacity(0.85))
+                        .background(SPRetro.popRed)
                         .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 1))
                         .offset(x: avatarSize * 0.38, y: -avatarSize * 0.38)
                 }
             }
             .frame(width: avatarSize + 10, height: avatarSize + 10)
+            // Tap on an opponent's avatar opens the quick-profile popup.
+            // Bounded to the avatar circle so we don't swallow taps targeted
+            // at neighboring chips, run-out cards, or the open-seat tile.
+            // contentShape MUST come before onTapGesture, otherwise the
+            // gesture only registers on opaque pixels (the emoji glyph).
+            .contentShape(Circle())
+            .onTapGesture {
+                // Allow self-tap so the player can read their own VPIP / hand
+                // count in the same popup opponents use. The popup itself
+                // hides the friend-action button when isSelf=true (server
+                // marks the row), so there's nothing dangerous about tapping
+                // your own seat — it just becomes a read-only stat card.
+                guard let cb = onProfileTap else { return }
+                cb()
+            }
 
-            // ── Name pill ─ slim, just the username
+            // Retro name plate — ink panel + paper username text. The pill
+            // sits directly under the avatar so the inverted color (paper
+            // text on ink) reads as a name *card* clipped to the portrait,
+            // matching the home-screen player tiles.
             Text(truncatedName)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.95))
+                .font(.custom("AmericanTypewriter-Bold", size: 11))
+                .foregroundStyle(SPRetro.paper)
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 2.5)
                 .frame(maxWidth: plateWidth)
+                // Shape-only offset plate (not `.shadow()`) so the player
+                // name doesn't render as doubled glyphs. The shadow plate
+                // is a slightly lighter ink so it's distinguishable from
+                // the dark name plate itself.
                 .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Color(hex: "#1C2030").opacity(0.92))
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(SPRetro.inkMuted.opacity(0.65))
+                            .offset(x: 1, y: 1.5)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(SPRetro.ink)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .strokeBorder(SPRetro.ink, lineWidth: 1)
+                            )
+                    }
                 )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
                 .offset(y: -4)
 
             // ── Stack pill ─ dedicated chip-amount area beneath the icon
             // Chip-tier-colored accents so the value reads at a glance and
             // ties visually to the chip stacks on the felt.
-            StackPill(amount: seat.stack, status: seat.status)
+            StackPill(
+                amount:       seat.stack,
+                status:       seat.status,
+                isMyTurn:     isMyTurn,
+                turnDeadline: turnDeadline,
+                turnDuration: turnDuration
+            )
                 .offset(y: -2)
+                .overlay(alignment: .topTrailing) {
+                    // "+N pending" badge for mid-hand top-ups. Sits above
+                    // the pill's top-right corner so it doesn't obstruct
+                    // the stack value or the avatar plate. Gold to read
+                    // as "incoming chips" without competing with the
+                    // green stack number, and small enough that it
+                    // disappears once the hand ends (server drops the
+                    // pendingTopUp field to nil at that point).
+                    if seat.pendingTopUpAmount > 0 {
+                        // Retro pending-topup badge — mustard pill with ink
+                        // border + hard offset shadow.
+                        Text("+\(formatChips(String(seat.pendingTopUpAmount)))")
+                            .font(.custom("ChalkboardSE-Bold", size: 9))
+                            .foregroundStyle(SPRetro.ink)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            // Shape-only offset plate — no `.shadow()` on
+                            // the badge so the "+N" digit stays crisp.
+                            .background(
+                                ZStack {
+                                    Capsule()
+                                        .fill(SPRetro.ink.opacity(0.6))
+                                        .offset(x: 1, y: 1)
+                                    Capsule()
+                                        .fill(SPRetro.mustard)
+                                        .overlay(
+                                            Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                                        )
+                                }
+                            )
+                            .offset(x: 8, y: -8)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .animation(.spring(response: 0.35), value: seat.pendingTopUpAmount)
         }
         .onAppear {
             if seat.status == .allIn { startAllInPulse() }
@@ -1803,19 +2149,16 @@ struct TargetSeatView: View {
         return n.count > 9 ? String(n.prefix(8)) + "..." : n
     }
 
+    // Retro stack/timer color — ink as the resting color, mustard for
+    // attention, pop-red for urgency. Replaces the old casino-green active /
+    // gold low / red-orange critical scheme.
     private var stackColor: Color {
         switch seat.status {
-        case .active:  return Color(hex: "#2ECC71")
-        case .folded:  return Color(hex: "#F5C842")
-        case .allIn:   return Color(hex: "#F5C842")
-        default:       return Color(hex: "#F5C842")
+        case .active:  return SPRetro.ink
+        case .folded:  return SPRetro.inkMuted
+        case .allIn:   return SPRetro.popRed
+        default:       return SPRetro.inkSoft
         }
-    }
-
-    private var timerColor: Color {
-        if turnProgress > 0.5  { return Color(hex: "#2ECC71") }
-        if turnProgress > 0.25 { return Color(hex: "#F5C842") }
-        return Color(hex: "#E05555")
     }
 
     private func startAllInPulse() {
@@ -1837,11 +2180,14 @@ struct TargetSeatView: View {
         // Fold — red, like the Fold button. Skipped for SB/BB posts so the
         // first actions of each hand don't trigger a fake "fold" bubble on
         // anyone (SB/BB are auto-posted, not player decisions).
-        case "FOLD":   return ActionKind(label: "Fold",   color: Color(hex: "#C8344A"))
-        case "CHECK":  return ActionKind(label: "Check",  color: Color(hex: "#2D8B3E"))
-        case "CALL":   return ActionKind(label: "Call",   color: Color(hex: "#2D8B3E"))
-        case "RAISE":  return ActionKind(label: "Raise",  color: Color(hex: "#4A90E2"))
-        case "ALL_IN": return ActionKind(label: "All In", color: Color(hex: "#F5C842"))
+        // Retro action-bubble colors — pulled into the retro palette so the
+        // floating stamps over each seat sit in the same pop-color system
+        // as the rest of the app (pop red / teal / pop blue / mustard).
+        case "FOLD":   return ActionKind(label: "Fold",   color: SPRetro.popRed)
+        case "CHECK":  return ActionKind(label: "Check",  color: SPRetro.teal)
+        case "CALL":   return ActionKind(label: "Call",   color: SPRetro.teal)
+        case "RAISE":  return ActionKind(label: "Raise",  color: SPRetro.popBlue)
+        case "ALL_IN": return ActionKind(label: "All In", color: SPRetro.mustard)
         default:       return nil
         }
     }
@@ -1855,25 +2201,52 @@ struct TargetSeatView: View {
 private struct StackPill: View {
     let amount: Int
     let status: PlayerStatus
+    // Turn-timer inputs — when isMyTurn is true and a live deadline is
+    // supplied, the pill's paper background gets a left-anchored color
+    // fill that drains as the turn elapses (replaces the old ring that
+    // hugged the avatar). Optional/default-nil so non-live call sites
+    // (and the rest of the table) can keep invoking StackPill the way
+    // they always have.
+    var isMyTurn:     Bool   = false
+    var turnDeadline: Date?  = nil
+    var turnDuration: Double = 0
 
     private var tier: ChipTier { ChipTier.forAmount(amount) }
 
+    // Same teal → mustard → pop-red thresholds the avatar ring used.
+    // Duplicated locally so StackPill doesn't need to reach into
+    // TargetSeatView's private helpers.
+    private func timerColor(for p: Double) -> Color {
+        if p > 0.5  { return SPRetro.teal }
+        if p > 0.25 { return SPRetro.mustard }
+        return SPRetro.popRed
+    }
+
+    private func currentTrim(at now: Date) -> Double {
+        guard let deadline = turnDeadline, turnDuration > 0 else { return 1 }
+        let remaining = deadline.timeIntervalSince(now)
+        return max(0, min(1, remaining / turnDuration))
+    }
+
+    // Retro palette — ink/maroon on paper. All-in lights up in pop red so
+    // it still screams against the cream pill, but the muted states are
+    // ink-soft instead of washed-out white-on-dark.
     private var amountColor: Color {
         switch status {
-        case .folded:       return Color.white.opacity(0.45)
+        case .folded:       return SPRetro.inkMuted.opacity(0.55)
         case .sittingOut,
-             .disconnected: return Color.white.opacity(0.55)
-        case .allIn:        return Color(hex: "#F5C842")
-        default:            return tier.colors.primary
+             .disconnected: return SPRetro.inkMuted.opacity(0.70)
+        case .allIn:        return SPRetro.popRed
+        default:            return SPRetro.ink
         }
     }
 
     private var borderColor: Color {
         switch status {
         case .folded, .sittingOut, .disconnected:
-            return Color.white.opacity(0.12)
+            return SPRetro.ink.opacity(0.35)
         default:
-            return tier.colors.primary.opacity(0.40)
+            return SPRetro.ink
         }
     }
 
@@ -1903,7 +2276,7 @@ private struct StackPill: View {
             .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
 
             Text(formatChips(String(amount)))
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.custom("ChalkboardSE-Bold", size: 12))
                 .foregroundStyle(amountColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
@@ -1911,15 +2284,51 @@ private struct StackPill: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
+        // Shape-only offset plate (not `.shadow()`) so the chip count
+        // digit doesn't rasterize into a doubled glyph.
+        //
+        // When it's this seat's turn, a left-anchored color fill drains
+        // through the paper background as the turn elapses. We layer it
+        // *under* the chip-amount text but *over* the paper fill so the
+        // value stays legible — paper → drain → border → text. Replaces
+        // the old ring that hugged the avatar (which got hidden behind
+        // overlapping seats on busy tables).
         .background(
-            Capsule()
-                .fill(Color(hex: "#0E1220").opacity(0.92))
+            ZStack {
+                Capsule()
+                    .fill(SPRetro.ink.opacity(0.6))
+                    .offset(x: 1, y: 1.5)
+                Capsule()
+                    .fill(SPRetro.paper)
+
+                // Live drain fill — only mounts on this seat's turn.
+                // TimelineView re-evaluates at the display refresh
+                // rate so the width sweep is smooth (not the 5Hz
+                // staircase from the old @Published progress value).
+                if isMyTurn, turnDeadline != nil, turnDuration > 0 {
+                    TimelineView(.animation) { context in
+                        let p = currentTrim(at: context.date)
+                        let c = timerColor(for: p)
+                        GeometryReader { geo in
+                            // Left-anchored rectangle, width proportional
+                            // to remaining time. Clipped to the capsule
+                            // so the edge follows the pill's rounded
+                            // ends rather than poking past them.
+                            Rectangle()
+                                .fill(c.opacity(0.45))
+                                .frame(width: geo.size.width * p,
+                                       height: geo.size.height,
+                                       alignment: .leading)
+                        }
+                    }
+                    .clipShape(Capsule())
+                    .allowsHitTesting(false)
+                }
+
+                Capsule()
+                    .strokeBorder(borderColor, lineWidth: 1.5)
+            }
         )
-        .overlay(
-            Capsule()
-                .strokeBorder(borderColor, lineWidth: 0.6)
-        )
-        .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
     }
 }
 
@@ -1950,6 +2359,14 @@ private struct OpponentHoleCardsView: View {
     @State private var glowPulse:  Bool    = false
 
     private var hasReveal: Bool { (revealedCards?.count ?? 0) > 0 }
+    // Either source of "this card face should be visible" — showdown reveal
+    // (`revealedCards`) OR a voluntary tap-to-show / bot-auto-show
+    // (`partialReveals`). The lift / enlarge state needs to trigger on
+    // EITHER, otherwise voluntary shows render at the tiny face-down
+    // geometry — small, overlapping (-6pt spacing), and tucked behind the
+    // avatar plate — which is exactly the "cards are blocked by the symbol"
+    // bug.
+    private var hasAnyReveal: Bool { hasReveal || !partialReveals.isEmpty }
     // Lookup helper — slot i → voluntarily-shown card if any. Used by
     // `cardSlot` to override the face-down placeholder when the owner has
     // tapped that slot.
@@ -1959,33 +2376,156 @@ private struct OpponentHoleCardsView: View {
     private let cardSize: PlayingCardView.CardSize = .custom(22)
 
     var body: some View {
-        HStack(spacing: -6) {
+        // Card layout shifts between two states:
+        //   Hidden (face-down): tight overlap (-6) + steeper fan (5° step) so
+        //     the cluster reads as a compact stacked deck next to the avatar.
+        //   Lifted (revealed/showing): positive spacing (3) so cards no longer
+        //     smush into each other, a flatter fan (3° step) so adjacent
+        //     rotated corners don't overlap the neighbouring face, and a bigger
+        //     visual scale (1.85). The scale anchor is .bottom so growing the
+        //     cluster pushes it UP away from the avatar rather than expanding
+        //     in all directions and intersecting the seat plate or the +15s /
+        //     wifi.slash badges that float around the avatar circle.
+        // PLO (4-card) geometry needs to be tighter than NLH (2-card) when
+        // lifted: at NLH's 2.1x scale a 4-card HStack is ~150pt wide, which
+        // extends past the felt's rounded edge and clips the outer card. We
+        // detect "this is a PLO-sized cluster" via displayCount==4 and switch
+        // to a more compact fan + a smaller lift-scale so the whole hand fits
+        // in the same horizontal footprint as the NLH version while still
+        // reading as visibly enlarged.
+        let isPLOWidth = displayCount == 4
+        // PLO fan needs MORE separation than NLH, not less — with 4 cards the
+        // eye has to distinguish more values, and the previous near-zero gap
+        // (`-1`) + 2.5° fan stacked them into an indistinguishable wedge. A
+        // 4.5° per-card step + 2.5pt positive spacing gives a true 13.5°
+        // spread across the cluster and ~2.5pt of visible felt between
+        // adjacent cards, so each rank/suit reads as its own card rather
+        // than a smushed pile. Total cluster width stays inside the felt:
+        // 4×16 + 3×2.5 = 71.5pt; ×1.55 scale ≈ 111pt — still narrower than
+        // the 130pt I had budget for with the earlier overflow check.
+        // Face-down (hidden) geometry: NLH uses 5° per-card step → 5° total
+        // spread for 2 cards. PLO uses HALF that step (2.5°) so 4 cards
+        // span only 7.5° total — close to NLH's overall tilt rather than
+        // the 15° dramatic fan we get with a matched step. Previous attempt
+        // matched NLH's per-card step (5°) and ended up with a -15°…0°
+        // rotation range that overlapped 4 dark card backs into an
+        // indistinguishable black wedge. Halving the step keeps the right-
+        // most card at 0° (still aligned with NLH's top card) but the
+        // leftmost tilts only to -7.5°, so individual cards remain visible.
+        //   NLH (count=2): rotations (-5°,    0°)             — 5° spread
+        //   PLO (count=4): rotations (-7.5°, -5°, -2.5°, 0°) — 7.5° spread
+        //                                  ^ matches NLH's leftmost card exactly
+        let fanStep:    Double  = lifted ? (isPLOWidth ? 4.5 : 3)   : (isPLOWidth ? 2.5 : 5)
+        let fanBase:    Double  = lifted ? (isPLOWidth ? 6.75 : 4.5) : (isPLOWidth ? 7.5 : 5)
+        let cardGap:    CGFloat = lifted ? (isPLOWidth ? 2.5 : 3)   : -6
+
+        HStack(spacing: cardGap) {
             ForEach(0..<displayCount, id: \.self) { i in
                 cardSlot(at: i)
-                    .rotationEffect(.degrees(Double(i) * 5 - 5))
+                    .rotationEffect(.degrees(Double(i) * fanStep - fanBase))
             }
         }
         .scaleEffect(x: flipScaleX, y: 1)
-        .scaleEffect(lifted ? 1.55 : 1.0)
-        .offset(y: lifted ? -10 : 0)
-        .shadow(color: .black.opacity(lifted ? 0.6 : 0.3),
-                radius: lifted ? 8 : 2,
-                y: lifted ? 4 : 1)
-        .shadow(color: (isWinner && glowPulse) ? Color(hex: "#F5C842").opacity(0.7) : .clear,
+        // Anchor the lift-scale at .bottom: when the cluster grows the bottom
+        // edge stays put and the cards rise upward, so the enlarged hand
+        // never punches into the avatar/name plate below. scaleEffect itself
+        // doesn't change the layout footprint, so siblings (badges, dealer
+        // chip, etc.) never reflow off this animation — only the in-place
+        // visual scale of the cluster changes.
+        //
+        // PLO scale is dialled back from 2.1 → 1.45 because the 4-card
+        // HStack is already twice as wide as the 2-card version; at 2.1x it
+        // overflowed the felt and clipped the rightmost card. 1.45x keeps
+        // the cluster readable while leaving room inside the screen on
+        // both left- and right-side seats.
+        // Face-down PLO uses the same 1.0x scale as NLH so individual cards
+        // are the same physical size. The visual difference is just "2 more
+        // cards on the left of the same cluster", not "the whole cluster
+        // shrinks/recenters". The 0.6x shrink that was here previously was
+        // wrong direction — the user wants PLO to read as four real-size
+        // cards stacked behind the avatar, matching NLH's two-card stack.
+        .scaleEffect(lifted ? (isPLOWidth ? 1.45 : 2.1) : 1.0, anchor: .bottom)
+        // Horizontal nudge intentionally LARGER for PLO (+22) than NLH (-6).
+        // Why: the parent seat layout pins this view with
+        // `.offset(x: -avatarSize * 0.52)` — i.e. the cluster is always
+        // anchored to the LEFT of the avatar. For NLH that's fine because
+        // 2 cards × 2.1x ≈ 74pt total — comfortably inside the screen even
+        // at the leftmost seat. For PLO the lifted cluster is ~132pt wide,
+        // so the leftmost-card extent on a left-side seat (avatar_center
+        // ≈ 80pt) was landing at x ≈ -14pt — clipped off-screen. Pushing
+        // the cluster +22pt to the right re-centers it near the avatar's
+        // horizontal axis, bringing the leftmost card back on-screen
+        // without pushing the rightmost card off the felt on right-side
+        // seats (whose rightmost extent moves from screen_edge to
+        // screen_edge - 22 = still well inside).
+        // Face-down PLO x-shift: counter the HStack's auto-centering.
+        // NLH HStack width = 2 * 22 + 1 * (-6) = 38pt → right edge at
+        //   parent_center + 19.
+        // PLO HStack width = 4 * 22 + 3 * (-6) = 70pt → right edge at
+        //   parent_center + 35 — 16pt further right than NLH.
+        // The user wants PLO's RIGHTMOST card at the same screen position
+        // as NLH's rightmost card (only the LEFT side should extend), so
+        // we shift the whole PLO cluster -16pt to bring the right edge
+        // back in line. The two extra cards naturally extend leftward
+        // from that re-anchored position.
+        .offset(x: lifted ? (isPLOWidth ? 22 : -6) : (isPLOWidth ? -16 : 0),
+                y: lifted ? (isPLOWidth ? -12 : -22) : 0)
+        .zIndex(lifted ? 5 : 0)
+        .shadow(color: .black.opacity(lifted ? 0.55 : 0.3),
+                radius: lifted ? 9 : 2,
+                y: lifted ? 5 : 1)
+        .shadow(color: (isWinner && glowPulse) ? SPRetro.mustard.opacity(0.7) : .clear,
                 radius: 14)
         .animation(.spring(response: 0.45, dampingFraction: 0.78), value: lifted)
         .onAppear {
             // Late-joiner safety: if the seat already has revealed cards when
-            // this view first mounts (e.g. user opened the app mid-showdown),
-            // jump straight to the revealed state without animating.
-            if hasReveal {
+            // this view first mounts (e.g. user opened the app mid-showdown
+            // OR mid-fold-show from the bot), jump straight to revealed +
+            // lifted without animating. Uses `hasAnyReveal` so voluntary
+            // partial reveals also trigger the enlarged state.
+            if hasAnyReveal {
                 revealed = true
                 lifted   = true
             }
             if isWinner { startGlowPulse() }
         }
         .onChange(of: hasReveal) { _, new in
-            if new { runRevealSequence() }
+            if new {
+                runRevealSequence()
+            } else if partialReveals.isEmpty {
+                // Showdown reveal cleared by the next hand starting (server
+                // wipes `revealedCards` when dealing). Without an explicit
+                // reset here, `revealed`/`lifted` stay true across the
+                // hand boundary and the new face-down cards render in the
+                // expanded fan geometry (spread spacing + 1.45/2.1x scale
+                // + offset) — exactly the "cards don't return to compact
+                // stack" bug. Guard on partialReveals.isEmpty so a
+                // voluntary show that survives the new hand keeps the
+                // lifted treatment.
+                revealed   = false
+                lifted     = false
+                flipScaleX = 1
+                glowPulse  = false
+            }
+        }
+        // Voluntary reveals (tap-to-show / bot fold-show) arrive via
+        // partialReveals and don't go through the showdown flip sequence.
+        // When the first one lands, lift the cluster so the shown faces
+        // render at the enlarged geometry (positive spacing, bigger scale,
+        // raised off the avatar plate). Watch `.count` rather than the
+        // array itself so the closure isn't forced to compare RevealedCard
+        // by identity.
+        .onChange(of: partialReveals.count) { _, count in
+            if count > 0 && !lifted {
+                lifted = true
+            } else if count == 0 && !hasReveal && lifted {
+                // Symmetric to the hasReveal reset: when the last
+                // voluntary reveal clears (typically next-hand wipe) and
+                // there's no showdown reveal keeping the cluster lifted,
+                // collapse back to the compact face-down geometry.
+                revealed = false
+                lifted   = false
+            }
         }
         .onChange(of: isWinner) { _, new in
             if new { startGlowPulse() } else { glowPulse = false }
@@ -1993,7 +2533,15 @@ private struct OpponentHoleCardsView: View {
     }
 
     private var displayCount: Int {
-        max(min(hasReveal ? (revealedCards?.count ?? 0) : cardCount, 4), 0)
+        // After a fold the seat's `cardCount` drops to 0 (mucked), but if
+        // the owner (or the bot) voluntarily shows cards we still need to
+        // render enough slots to host the highest revealed index. Take the
+        // max of the showdown-revealed count, the in-hand cardCount, and
+        // (highest partial-reveal index + 1) so any of the three reveal
+        // sources gets a slot to land in. Clamped to [0, 4] — PLO max.
+        let baseCount    = hasReveal ? (revealedCards?.count ?? 0) : cardCount
+        let partialMax   = partialReveals.map(\.index).max().map { $0 + 1 } ?? 0
+        return max(min(max(baseCount, partialMax), 4), 0)
     }
 
     @ViewBuilder
@@ -2015,7 +2563,14 @@ private struct OpponentHoleCardsView: View {
                 .transition(.scale(scale: 0.6).combined(with: .opacity))
         } else if revealed, let cards = revealedCards, i < cards.count {
             let card = cards[i]
-            let isWinningCard = winningCardIds.contains(card.id)
+            // Gate the gold highlight on `isWinner`. card.id is unique
+            // (rank+suit), so a loser's hole card can't match a winner's
+            // bestCards entry — but at a PLO river all-in showdown a user
+            // reported losing-side cards reading as highlighted. Anchoring
+            // on the seat-winner flag closes the door on any stale-state
+            // or future regression path (same defence as the local hero
+            // overlay in GameView.localPlayerOverlay).
+            let isWinningCard = isWinner && winningCardIds.contains(card.id)
             // Once winners are declared, dim cards that aren't part of the
             // winning hand so the gold-bordered ones pop.
             let dim = anyWinnersDeclared && !isWinningCard
@@ -2027,11 +2582,11 @@ private struct OpponentHoleCardsView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: cardSize.cornerRadius)
                         .strokeBorder(
-                            isWinningCard ? Color(hex: "#F5C842") : Color.clear,
+                            isWinningCard ? SPRetro.mustard : Color.clear,
                             lineWidth: 1.6
                         )
                 )
-                .shadow(color: isWinningCard ? Color(hex: "#F5C842").opacity(0.6) : .clear,
+                .shadow(color: isWinningCard ? SPRetro.mustard.opacity(0.6) : .clear,
                         radius: 5)
                 .saturation(dim ? 0.5 : 1.0)
                 .opacity(dim ? 0.55 : 1.0)
@@ -2136,25 +2691,39 @@ struct TableTheme: Identifiable, Equatable {
     let roomTop:    String
     let roomBottom: String
 
+    // Retro comic remap. All six themes keep their ids (so persisted user
+    // selections survive) but the values are now retro paper/ink variants
+    // instead of casino felts. The felt itself stays paper-toned across all
+    // themes — the differentiation lives in the rail/room edge color so each
+    // theme reads as a different printed page tint, not as a different
+    // synthetic felt. Inner = warm paper, mid = mustard or accent rim, edge
+    // = ink. Room top/bottom = slightly darker page so the table panel pops
+    // off the surrounding ZStack without going full black.
+    // Each theme is a same-hue triple: a lighter "lit" interior, the mid
+    // accent that defines the theme's identity, and a deeper rim of the
+    // same family (not pure ink). Previously every theme jumped paper →
+    // theme → black, which produced a heavy vignette that fought the
+    // paper background. Same-hue triples let the felt read as a stamped
+    // color block on the comic page.
     static let all: [TableTheme] = [
-        TableTheme(id: "classic_blue", label: "Classic Blue",
-                   inner: "#1E5BA8", mid: "#143E7A", edge: "#0C2850",
-                   roomTop: "#05070D", roomBottom: "#0A1F44"),
-        TableTheme(id: "emerald", label: "Emerald",
-                   inner: "#1E8A5F", mid: "#0F5E3E", edge: "#08351F",
-                   roomTop: "#060B08", roomBottom: "#0B2A1C"),
-        TableTheme(id: "crimson", label: "Crimson",
-                   inner: "#B0394A", mid: "#7A1F2B", edge: "#3F0A12",
-                   roomTop: "#0D0406", roomBottom: "#2A0B11"),
-        TableTheme(id: "royal_purple", label: "Royal Purple",
-                   inner: "#6B4CC5", mid: "#44288F", edge: "#1F1252",
-                   roomTop: "#07060D", roomBottom: "#1E1640"),
-        TableTheme(id: "midnight", label: "Midnight",
-                   inner: "#2D3847", mid: "#1A222E", edge: "#0A0F17",
-                   roomTop: "#030506", roomBottom: "#0B1219"),
-        TableTheme(id: "bourbon", label: "Bourbon",
-                   inner: "#C68E3C", mid: "#8A5A1E", edge: "#3F2807",
-                   roomTop: "#0C0805", roomBottom: "#2A1B08"),
+        TableTheme(id: "classic_blue", label: "Pop Blue",
+                   inner: "#3F87C9", mid: "#2A6DB5", edge: "#143961",
+                   roomTop: "#DCC58A", roomBottom: "#B89A6A"),
+        TableTheme(id: "emerald", label: "Muted Teal",
+                   inner: "#4093A3", mid: "#2E7C8B", edge: "#1A4651",
+                   roomTop: "#DCC58A", roomBottom: "#B89A6A"),
+        TableTheme(id: "crimson", label: "Maroon",
+                   inner: "#A53939", mid: "#8B2C2C", edge: "#4A1717",
+                   roomTop: "#DCC58A", roomBottom: "#B89A6A"),
+        TableTheme(id: "royal_purple", label: "Pop Red",
+                   inner: "#E04848", mid: "#D33232", edge: "#7A1A1A",
+                   roomTop: "#DCC58A", roomBottom: "#B89A6A"),
+        TableTheme(id: "midnight", label: "Ink",
+                   inner: "#5C4838", mid: "#3A2E22", edge: "#1A1410",
+                   roomTop: "#DCC58A", roomBottom: "#B89A6A"),
+        TableTheme(id: "bourbon", label: "Mustard",
+                   inner: "#F0CC4D", mid: "#E8B923", edge: "#8A6D14",
+                   roomTop: "#DCC58A", roomBottom: "#B89A6A"),
     ]
 
     static func find(_ id: String) -> TableTheme {
@@ -2171,7 +2740,11 @@ struct TableTheme: Identifiable, Equatable {
 // across renders and identical for every table). The result is a subtle noise
 // that breaks up the gradient and reads as fabric instead of plastic.
 
-private struct FeltTexture: View {
+// Exposed (was `private`) so non-felt screens (e.g. the lobby background)
+// can reuse the same procedural cloth weave at low opacity for an
+// at-the-table aesthetic without re-implementing the deterministic dot
+// pattern. Internal — still scoped to the StackPoker module.
+struct FeltTexture: View {
     private struct Dot { let x: CGFloat; let y: CGFloat; let alpha: Double; let size: CGFloat; let light: Bool }
 
     private static let dots: [Dot] = {
@@ -2210,6 +2783,13 @@ private struct FeltTexture: View {
                 ctx.fill(Path(ellipseIn: rect), with: .color(color))
             }
         }
+        // PERF: rasterize the 520-dot weave to a Metal texture once, so
+        // unrelated body invalidations elsewhere on the table (pot updates,
+        // bet changes, winner reveal) don't re-run all 520 ellipse fills.
+        // .drawingGroup() must come BEFORE .blendMode() so the blend
+        // applies to the rasterized layer against the felt below, not
+        // against each individual dot — same visual, far less CPU.
+        .drawingGroup()
         .blendMode(.overlay)
         .opacity(0.85)
     }

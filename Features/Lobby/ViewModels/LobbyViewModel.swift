@@ -27,6 +27,12 @@ final class LobbyViewModel: ObservableObject {
 
   @Published var tables: [TableListItem] = []
   @Published var isLoadingTables = false
+  // Flips true after the *first* successful fetch. Used to suppress the
+  // `isLoadingTables = true` flicker on background polls — without this,
+  // every 5s poll on an empty lobby would briefly show "Loading…" and
+  // swap the featured-carousel placeholder height (180 → 200 → 180),
+  // making the whole screen visibly bounce.
+  private var hasFetchedTables = false
   @Published var tablesError: String?
   @Published var selectedTable: TableDetail?
 
@@ -106,22 +112,104 @@ final class LobbyViewModel: ObservableObject {
         guard !Task.isCancelled else { return }
         await loadTables()
         await loadInvites()
+        // Also re-validate the rejoin banner's target table. The lobby's
+        // /tables endpoint filters to (status=WAITING, isPrivate=false),
+        // so it won't tell us whether the user's IN_PROGRESS or private
+        // table still exists. The dedicated detail probe handles closed
+        // tables / 404s / private-table membership checks server-side.
+        await refreshLastTable()
       }
+    }
+  }
+
+  // ─── Rejoin-target validation ──────────────────────────────────────────────
+  // Called from the polling loop to keep the top-of-lobby rejoin banner
+  // honest. The banner is gated on `lastTable != nil`, but `lastTable`
+  // used to be set on join/create and *never cleared*, so after the
+  // table closed (owner closed it, server reaped it, etc.) the banner
+  // would persist and tapping it would route the user into a dead
+  // table. We re-fetch the table detail; if the table is gone, marked
+  // CLOSED, or the user is no longer in its active players list, we
+  // drop `lastTable` so the banner disappears on the next render.
+  //
+  // We deliberately do NOT clear `lastTable` for status==PAUSED or
+  // IN_PROGRESS even with stack==0 — busted players are parked at
+  // SITTING_OUT and can still rejoin to top up. Only true unreachable
+  // states clear the banner.
+  private func refreshLastTable() async {
+    guard let cached = lastTable else { return }
+    do {
+      let detail: TableDetail = try await network.request(
+        .tableDetail(id: cached.id), method: .GET
+      )
+      // Table got closed — drop the rejoin target.
+      if detail.status == .closed {
+        lastTable = nil
+        return
+      }
+      // User is no longer seated with an active session (e.g. server
+      // reaped them, or they were kicked). `players` reflects
+      // tableSession rows with isActive=true; absence here means rejoin
+      // would 4xx.
+      let userId = KeychainManager.shared.userId ?? ""
+      let stillSeated = detail.players.contains { $0.userId == userId && $0.isActive }
+      if !stillSeated {
+        lastTable = nil
+        return
+      }
+      // Otherwise refresh the cache with the latest detail so the
+      // banner shows the current table name / blinds.
+      lastTable = detail
+    } catch let err as NetworkError {
+      // Treat NOT_FOUND / FORBIDDEN as "table is gone for this user" and
+      // drop the rejoin target. Transient network failures (timeouts,
+      // 5xx) keep the cache so a single bad poll doesn't hide a still-
+      // valid banner.
+      switch err {
+      case .notFound:
+        lastTable = nil
+      case .serverError(let code, _) where code == "NOT_FOUND" || code == "FORBIDDEN":
+        lastTable = nil
+      default:
+        break
+      }
+    } catch {
+      // Unknown error type — leave the cache alone.
     }
   }
 
   // ─── Load Tables ───────────────────────────────────────────────────────────
 
   func loadTables() async {
-    isLoadingTables = tables.isEmpty
+    // Only show the "Loading…" placeholder on the *initial* fetch when the
+    // list is still empty. Background polls (every 5s) would otherwise
+    // toggle isLoadingTables true→false and bounce the featured-carousel
+    // placeholder height (180→200→180), making the whole lobby jump.
+    if !hasFetchedTables && tables.isEmpty {
+      isLoadingTables = true
+    }
     tablesError = nil
     do {
       let response: TableListResponse = try await network.request(
         .tables, method: .GET
       )
       tables = response.tables
+      hasFetchedTables = true
     } catch let err as NetworkError {
-      tablesError = err.localizedDescription
+      // Don't surface a banner for *transient* refresh failures when we
+      // already have a cached list of tables to show. The 5s background
+      // poll (LobbyViewModel.startPolling at L113) and pull-to-refresh
+      // both call this; one blip on either path used to flash a red
+      // "Server Error" banner over a perfectly usable lobby, which is the
+      // bug the user hit on 2026-05-13. We still surface the error on the
+      // *initial* load (when there's nothing to fall back to) so the user
+      // gets the Retry button and isn't staring at an empty screen.
+      if tables.isEmpty {
+        tablesError = err.localizedDescription
+      }
+      // Else: silently drop. The next successful poll will refresh data
+      // and `tablesError = nil` at the top of this function will keep the
+      // banner cleared even if a future call partially fails.
     } catch {}
     isLoadingTables = false
   }

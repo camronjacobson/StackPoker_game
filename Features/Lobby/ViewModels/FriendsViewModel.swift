@@ -56,7 +56,7 @@ final class FriendsViewModel: ObservableObject {
   func loadRequests() async {
     isLoadingRequests = true
     do {
-      let response: FriendRequestsResponse = try await network.request(.friends)
+      let response: FriendRequestsResponse = try await network.request(.friendRequests)
       pendingRequests = response.requests
       requestBadge = response.requests.count
     } catch {}
@@ -129,7 +129,7 @@ final class FriendsViewModel: ObservableObject {
   func removeFriend(_ friend: Friend) async {
     do {
       struct Empty: Decodable {}
-      let _: Empty = try await network.request(.friends, method: .DELETE) // placeholder
+      let _: Empty = try await network.request(.removeFriend(id: friend.friendshipId), method: .DELETE)
       friends.removeAll { $0.friendshipId == friend.friendshipId }
     } catch {}
   }

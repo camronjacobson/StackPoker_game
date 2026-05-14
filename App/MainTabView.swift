@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // ─── Tab bar visibility coordinator ──────────────────────────────────────────
 // Lets pushed views (e.g. HandReplayView) hide the custom bottom bar so their
@@ -46,7 +47,11 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            SPColors.background.ignoresSafeArea()
+            // Paper substrate — same base as LobbyView so the bg under the
+            // tab bar reads continuous with the home screen. Each tab's
+            // content view still draws its own bg on top, so this only
+            // peeks through at the bottom edge behind the bar.
+            AgedPaperBackground()
 
             // Content
             Group {
@@ -98,56 +103,85 @@ struct PokerTabBar: View {
     @Binding var selectedTab: MainTabView.AppTab
     let onCreateTap: () -> Void
 
+    // Bundled Kenney UI click + light impact haptic, fired together on
+    // every tab icon tap (Home / Review / + / Alerts / Friends). Kept as
+    // a private helper so all five buttons share the exact same cue —
+    // tapping different tabs shouldn't feel or sound subtly different.
+    // .light matches Apple's own tab-bar selection feel; .medium felt
+    // too heavy for a navigation action.
+    private func tabTapFeedback() {
+        SoundManager.shared.play(.menuTap)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(MainTabView.AppTab.allCases, id: \.self) { tab in
                 if tab == .create {
-                    // Center "+" button
+                    // Center "+" — mustard burst-circle with ink border and a
+                    // hard ink offset shadow. Same comic-panel language as the
+                    // lobby's JOIN! CTA so this button reads as the same
+                    // family of "punch this" actions.
                     Button {
+                        tabTapFeedback()
                         onCreateTap()
                     } label: {
                         ZStack {
+                            // Hard ink offset shadow (no blur — comic pages
+                            // don't blur).
                             Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color(hex: "#6C5CE7"), Color(hex: "#4A3AB4")],
-                                        startPoint: .topLeading, endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 52, height: 52)
-                                .shadow(color: Color(hex: "#6C5CE7").opacity(0.4), radius: 8, y: 2)
+                                .fill(SPRetro.ink)
+                                .frame(width: 54, height: 54)
+                                .offset(x: 2, y: 3)
+                            Circle()
+                                .fill(SPRetro.mustard)
+                                .frame(width: 54, height: 54)
+                            Circle()
+                                .strokeBorder(SPRetro.ink, lineWidth: 2.5)
+                                .frame(width: 54, height: 54)
 
                             Image(systemName: "plus")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundStyle(.white)
+                                .font(.system(size: 24, weight: .black))
+                                .foregroundStyle(SPRetro.ink)
                         }
                         .offset(y: -10)
                     }
                     .frame(maxWidth: .infinity)
                 } else {
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedTab = tab
-                        }
+                        tabTapFeedback()
+                        // Was `withAnimation(.spring(...)) { selectedTab = tab }`.
+                        // The spring made the switch-Group in MainTabView.body
+                        // cross-fade between tabs, and since each tab paints its
+                        // own paper background on top of MainTabView's
+                        // AgedPaperBackground, the two semi-transparent paper
+                        // layers combined at intermediate opacities during the
+                        // ~300ms transition produced a brief darker/yellower
+                        // flash. Native iOS tab switching is instant; matching
+                        // that removes the flash entirely — fixed 2026-05-13.
+                        selectedTab = tab
                     } label: {
                         VStack(spacing: 3) {
                             ZStack {
                                 Image(systemName: tab.icon)
-                                    .font(.system(size: 20, weight: selectedTab == tab ? .semibold : .regular))
-                                    .foregroundStyle(selectedTab == tab ? .white : Color.white.opacity(0.35))
+                                    .font(.system(size: 20, weight: selectedTab == tab ? .black : .bold))
+                                    .foregroundStyle(selectedTab == tab ? SPRetro.ink : SPRetro.inkSoft.opacity(0.55))
 
-                                // Alert badge
+                                // Alert badge — pop red with an ink border so
+                                // it sits in the comic-panel system rather
+                                // than reading as a Material-Design dot.
                                 if tab == .alerts {
                                     Circle()
-                                        .fill(Color(hex: "#E05555"))
-                                        .frame(width: 8, height: 8)
+                                        .fill(SPRetro.popRed)
+                                        .frame(width: 9, height: 9)
+                                        .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 1))
                                         .offset(x: 10, y: -8)
                                 }
                             }
 
                             Text(tab.label)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(selectedTab == tab ? .white : Color.white.opacity(0.35))
+                                .font(SPRetroFonts.callout(10))
+                                .foregroundStyle(selectedTab == tab ? SPRetro.ink : SPRetro.inkSoft.opacity(0.55))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, SPSpacing.xs)
@@ -157,15 +191,31 @@ struct PokerTabBar: View {
         }
         .padding(.horizontal, SPSpacing.sm)
         .padding(.top, SPSpacing.sm)
-        .padding(.bottom, SPSpacing.md + 10)
+        // Was `SPSpacing.md + 10` (~26pt) which pushed the icons far above
+        // the home indicator and left a visible gap. The bottom safe-area
+        // on home-indicator devices is already ~34pt, so a minimal extra
+        // pad of `xs` is enough — icons now sit close to the bottom edge
+        // without overlapping the swipe-up indicator.
+        .padding(.bottom, SPSpacing.xs)
         .background(
             ZStack {
-                Color(hex: "#0D0D14")
+                SPRetro.paperShade
+                // Ink hairline along the top — reads as the page fold
+                // separating the tab bar from the content above. Slightly
+                // thicker than a normal 0.5 divider so it carries the
+                // comic-panel weight of the rest of the page.
                 Rectangle()
-                    .fill(Color.white.opacity(0.04))
-                    .frame(height: 0.5)
+                    .fill(SPRetro.ink)
+                    .frame(height: 2.5)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
+            // Extend the background fill through the bottom safe-area
+            // (home indicator region). Without this, the paper substrate
+            // shows through below the bar and reads as a "weird gap"
+            // between the tab bar and the bottom of the screen. Icons
+            // themselves stay above the indicator via the bottom padding
+            // above — only the paperShade fill stretches down.
+            .ignoresSafeArea(edges: .bottom)
         )
     }
 }
@@ -188,22 +238,59 @@ struct AlertsPlaceholderView: View {
     }
 }
 
+// FriendsTabView used to be a placeholder showing only an icon and the word
+// "Friends", which is why mutual friends never appeared in the bottom-bar tab
+// even though they showed up in LobbyView's friends section. Now it renders
+// the same Friends / Requests / Find sub-views the FriendsSheet uses, but
+// embedded as a tab (no dismiss button, no presentationDetents). Reusing the
+// existing FriendsTabBar / FriendsListTab / FriendRequestsTab / FriendSearchTab
+// keeps the UX identical between the modal sheet and the dedicated tab.
 struct FriendsTabView: View {
     @StateObject private var fvm = FriendsViewModel()
 
     var body: some View {
-        ZStack {
-            SPColors.background.ignoresSafeArea()
-            VStack(spacing: SPSpacing.md) {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(SPColors.accent.opacity(0.5))
-                Text("Friends")
-                    .font(SPFonts.headline())
-                    .foregroundStyle(SPColors.textSecondary)
+        NavigationStack {
+            ZStack {
+                SPColors.background.ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    FriendsTabBar(vm: fvm)
+                        .padding(.horizontal, SPSpacing.md)
+                        .padding(.top, SPSpacing.sm)
+                        .padding(.bottom, SPSpacing.md)
+
+                    SPDivider()
+
+                    Group {
+                        switch fvm.activeTab {
+                        case .friends:  FriendsListTab(vm: fvm)
+                        case .requests: FriendRequestsTab(vm: fvm)
+                        case .search:   FriendSearchTab(vm: fvm)
+                        }
+                    }
+                    .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+                    .animation(.easeInOut(duration: 0.18), value: fvm.activeTab)
+                }
+                // Reserve space for the custom tab bar that sits above this
+                // view in MainTabView. Without this, the bottom of the
+                // friends list slips behind the tab bar's pill background.
+                .padding(.bottom, 60)
+            }
+            .navigationTitle("Friends")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(SPColors.surface, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        withAnimation { fvm.activeTab = .search }
+                    } label: {
+                        Image(systemName: "person.badge.plus")
+                            .foregroundStyle(SPColors.accent)
+                    }
+                }
             }
         }
-        .onAppear { Task { await fvm.load() } }
+        .task { await fvm.load() }
     }
 }
 

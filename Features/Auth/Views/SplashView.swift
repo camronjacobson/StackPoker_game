@@ -24,6 +24,13 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
+            // Black background to match the new contrast intro asset. The
+            // video's design background is essentially pure black (sampled
+            // dominant pixel values of (4,4,4) / (8,8,8)) and its embedded
+            // letterbox bars are pure (0,0,0) — both blend invisibly into
+            // a black SwiftUI background, so we no longer need the white-
+            // strip overlay workaround that was used with the previous
+            // light asset.
             Color.black.ignoresSafeArea()
 
             IntroVideoPlayer(
@@ -50,10 +57,9 @@ struct SplashView: View {
 //   2. `updateUIView` no-ops; player state is push-driven from inside.
 //   3. `Coordinator.deinit` removes the observer to prevent leaks.
 //
-// Audio session: the video has no soundtrack to worry about for this
-// asset, but we still set `.ambient` / `.mixWithOthers` so playback
-// doesn't stomp on the user's music if they had something playing when
-// they opened the app.
+// The intro currently has no soundtrack. The video file itself is silent
+// and we don't layer any foley over it — keeping splash launch dead
+// quiet so we don't fight whatever audio the user already had playing.
 
 private struct IntroVideoPlayer: UIViewRepresentable {
     let resourceName: String
@@ -82,18 +88,10 @@ private struct IntroVideoPlayer: UIViewRepresentable {
             return view
         }
 
-        // Don't fight the user's music if they had any playing.
-        try? AVAudioSession.sharedInstance().setCategory(
-            .ambient, options: [.mixWithOthers]
-        )
-
         let item   = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: item)
         player.actionAtItemEnd = .pause      // freeze on the last frame
-        player.isMuted = false               // asset has no soundtrack;
-                                             // muting wouldn't change UX
-                                             // but leaving unmuted lets a
-                                             // future asset use audio.
+        player.isMuted = true                // intro is silent; no track to play
         view.player = player
 
         // Fire onFinished exactly once when this specific item ends.
@@ -162,10 +160,13 @@ final class PlayerHostView: UIView {
         get { playerLayer.player }
         set {
             playerLayer.player = newValue
-            // Fill the screen so the portrait asset reads edge-to-edge.
-            // Minor crop on tall devices is preferable to black bars on
-            // either side of the chip-walking character.
-            playerLayer.videoGravity = .resizeAspectFill
+            // Show the full video frame, letterboxed if needed, instead of
+            // cropping to fill. `.resizeAspectFill` was zooming aggressively
+            // and clipping the design — the user couldn't see the whole
+            // composition. `.resizeAspect` preserves aspect AND shows the
+            // entire frame; black bars (matching the surrounding ZStack) fill
+            // any unused space.
+            playerLayer.videoGravity = .resizeAspect
         }
     }
 }
