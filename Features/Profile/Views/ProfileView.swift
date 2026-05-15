@@ -1,9 +1,14 @@
 import SwiftUI
+import Combine
 
 struct ProfileView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var cosmetics: CosmeticsContainer
     @State private var showLogoutConfirm = false
+    /// Drives the cosmetics store sheet from the Account section row.
+    /// Local @State — purely view lifecycle.
+    @State private var showCosmeticsStore = false
 
     var body: some View {
         NavigationStack {
@@ -126,10 +131,41 @@ struct ProfileView: View {
                     SettingsRow(icon: "bell", label: "Notifications", showChevron: true)
                     SPDivider()
                     SettingsRow(icon: "shield", label: "Privacy & Security", showChevron: true)
+                    SPDivider()
+                    // Cosmetics store entry point #2. Surfaced under
+                    // Account so players who never tap into the Chips
+                    // tab still have a path to the store. Wrapped in a
+                    // Button so the existing SettingsRow visual styling
+                    // stays consistent across rows (chevron + icon).
+                    Button { showCosmeticsStore = true } label: {
+                        SettingsRow(icon: "sparkles", label: "Cosmetics Store", showChevron: true)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
         .padding(.horizontal, SPSpacing.md)
+        .sheet(isPresented: $showCosmeticsStore) {
+            StoreView(vm: makeStoreViewModel(entryPoint: .profileRow))
+        }
+    }
+
+    /// Builds a StoreViewModel scoped to this entry point. Identical
+    /// pattern to ChipsView's factory — kept here (not extracted) because
+    /// the two are the only callers in Phase 2 and pulling a 12-line
+    /// helper into a shared file would add an import surface without
+    /// reducing maintenance load.
+    private func makeStoreViewModel(entryPoint: StoreEntryPoint) -> StoreViewModel {
+        let balancePublisher = authVM.$currentUser
+            .map { profile -> ChipAmount in
+                ChipAmount(serverString: profile?.chipBalance ?? "0") ?? .zero
+            }
+            .eraseToAnyPublisher()
+        return StoreViewModel(
+            container:        cosmetics,
+            balancePublisher: balancePublisher,
+            entryPoint:       entryPoint
+        )
     }
 
     // ─── Legal Section ─────────────────────────────────────────────────────────

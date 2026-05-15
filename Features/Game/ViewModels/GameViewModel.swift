@@ -166,6 +166,53 @@ final class GameViewModel: ObservableObject {
     // owner name). Loaded lazily the first time the menu is opened.
     @Published var tableDetail: TableInfoSnapshot?
 
+    // ── Store peek-tab + slide-down panel ────────────────────────────────────
+    //
+    // The cosmetics store at the table is surfaced via a small persistent
+    // tab anchored to the top safe-area inset (StorePeekTab). Tapping
+    // the tab — or dragging it downward — slides StorePanelDrawer down
+    // from the top of the screen. The drawer is a custom SwiftUI overlay
+    // (not a system .sheet) because iOS sheets only slide from the bottom.
+    //
+    // Visibility model — a *single* gate `showsStoreTab` whose default is
+    // `true` while the user is on the table view. It is flipped to false
+    // by anything that needs the top region clear (showdown reveal, all-
+    // in dramatics, panel fully open). New hides can be added by toggling
+    // this bool from the relevant code path — no enum needed.
+    //
+    // Why not derive it from `showWinners || isAllInRunout || …`?
+    //   - Those flags are owned by different subsystems and their lifecycle
+    //     boundaries don't line up perfectly with "hide the store tab".
+    //     A dedicated bool gives the table view a single, explicit knob.
+    //   - Keeps the rule discoverable from one place.
+
+    /// Master visibility gate for the peek-tab. True by default; flip to
+    /// false during showdown / all-in dramatics. Sheet presentation is
+    /// gated separately by `isStorePanelOpen`.
+    @Published var showsStoreTab: Bool = true
+
+    /// Open/closed state for the cosmetics-store drawer. The drawer
+    /// itself owns the drag and snap logic via local @State, mirroring
+    /// final state back into this flag so the rest of the app can
+    /// observe it (showdown gating, deep links, etc.). Setting this
+    /// from outside the drawer also works — the drawer watches for
+    /// external changes and animates accordingly.
+    @Published var isStorePanelOpen: Bool = false
+
+    /// Red-dot indicator on the peek-tab — true when there's a limited-time
+    /// drop the user hasn't seen yet. Cleared on first panel open.
+    /// TODO(post-phase-5): wire to `CosmeticsCatalog.hasUnviewedLimitedDrop`
+    /// keyed on UserDefaults("lastStoreOpenAt" per-user). Stubbed at false
+    /// for now so the dot doesn't flash on launch before the catalog has
+    /// resolved.
+    @Published var hasUnviewedDrop: Bool = false
+
+    /// Called the first time the panel opens after a new drop. The view-
+    /// level call site is the peek-tab's `onPanelOpen` hook.
+    func markStoreTabViewed() {
+        if hasUnviewedDrop { hasUnviewedDrop = false }
+    }
+
     // ─── Dependencies ─────────────────────────────────────────────────────────
 
     let tableId:  String
@@ -246,6 +293,13 @@ final class GameViewModel: ObservableObject {
                 guard let self else { return }
                 self.winnerPayouts = payouts
                 withAnimation(.spring(response: 0.5)) { self.showWinners = true }
+                // Showdown hide rule for the cosmetics peek-tab: clear the
+                // top region while winner cards/badges animate in. Restored
+                // below when showWinners flips back to false.
+                // TODO: also hide on all-in dramatics once that animation
+                //       state exists in code (see GameViewModel visibility
+                //       comment block ~L177).
+                self.showsStoreTab = false
                 // Only play/haptic on wins — losing a hand should be silent.
                 if payouts.contains(where: { $0.playerId == self.userId }) {
                     SoundManager.shared.play(.win)
@@ -268,6 +322,8 @@ final class GameViewModel: ObservableObject {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     guard let self else { return }
                     withAnimation { self.showWinners = false }
+                    // Restore peek-tab once the showdown reveal clears.
+                    self.showsStoreTab = true
                 }
             }
             .store(in: &cancellables)

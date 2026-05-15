@@ -71,8 +71,7 @@ final class CosmeticsCatalog: CosmeticsCatalogProtocol {
     /// recoverable state, so we let it crash on app launch.
     convenience init(bundle: Bundle = .main, fileName: String = "cosmetics_catalog") {
         guard let url = bundle.url(forResource: fileName, withExtension: "json") else {
-            os_log("Catalog JSON not found in bundle (resource: %{public}@.json). " +
-                   "Check that the file is added to the StackPoker target's Copy Bundle Resources phase.",
+            os_log("Catalog JSON not found in bundle (resource: %{public}@.json). Check that the file is added to the StackPoker target's Copy Bundle Resources phase.",
                    log: CosmeticsCatalog.log, type: .fault, fileName)
             fatalError("Missing cosmetics catalog resource: \(fileName).json")
         }

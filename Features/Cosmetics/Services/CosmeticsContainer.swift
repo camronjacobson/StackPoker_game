@@ -26,15 +26,21 @@ final class CosmeticsContainer: ObservableObject {
     let catalog: CosmeticsCatalogProtocol
     let inventory: InventoryRepositoryProtocol
     let purchaseService: StorePurchaseServiceProtocol
+    /// Optional progress feed for achievement-gated cosmetics. Phase 2
+    /// ships a stub that always returns nil; Phase 5 supplies a real
+    /// implementation backed by the achievements store.
+    let achievementProgress: AchievementProgressSource
 
     private var cancellables: Set<AnyCancellable> = []
 
     init(catalog: CosmeticsCatalogProtocol,
          inventory: InventoryRepositoryProtocol,
-         purchaseService: StorePurchaseServiceProtocol) {
+         purchaseService: StorePurchaseServiceProtocol,
+         achievementProgress: AchievementProgressSource = StubAchievementProgressSource()) {
         self.catalog = catalog
         self.inventory = inventory
         self.purchaseService = purchaseService
+        self.achievementProgress = achievementProgress
     }
 
     /// Convenience factory for the production wire-up. Loads the bundled

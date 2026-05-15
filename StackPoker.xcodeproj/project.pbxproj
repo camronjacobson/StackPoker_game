@@ -78,6 +78,26 @@
 		36C91FA72F80020000697E42 /* PokerActionAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91FA12F80020000697E42 /* PokerActionAttributes.swift */; };
 		AAAAAA012F7F5B8B00697E42 /* OpponentPopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAA002F7F5B8A00697E42 /* OpponentPopupView.swift */; };
 		AAAAAA032F7F5B8C00697E42 /* TopUpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAA022F7F5B8C00697E42 /* TopUpSheet.swift */; };
+		B11D000100000000C05E51C1 /* Cosmetic.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000100000000C05E51C1 /* Cosmetic.swift */; };
+		B11D000200000000C05E51C1 /* PlayerInventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000200000000C05E51C1 /* PlayerInventory.swift */; };
+		B11D000300000000C05E51C1 /* CosmeticsCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000300000000C05E51C1 /* CosmeticsCatalog.swift */; };
+		B11D000400000000C05E51C1 /* InventoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000400000000C05E51C1 /* InventoryRepository.swift */; };
+		B11D000500000000C05E51C1 /* StorePurchaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000500000000C05E51C1 /* StorePurchaseService.swift */; };
+		B11D000600000000C05E51C1 /* NetworkPurchasePort+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000600000000C05E51C1 /* NetworkPurchasePort+Live.swift */; };
+		B11D000700000000C05E51C1 /* CosmeticsContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000700000000C05E51C1 /* CosmeticsContainer.swift */; };
+		B11D000800000000C05E51C1 /* CosmeticImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000800000000C05E51C1 /* CosmeticImageView.swift */; };
+		B11D000900000000C05E51C1 /* cosmetics_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F11E000900000000C05E51C1 /* cosmetics_catalog.json */; };
+		B11D000A00000000C05E51C1 /* CosmeticsCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000A00000000C05E51C1 /* CosmeticsCatalogTests.swift */; };
+		B11D000B00000000C05E51C1 /* InventoryRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000B00000000C05E51C1 /* InventoryRepositoryTests.swift */; };
+		B11D000C00000000C05E51C1 /* StorePurchaseServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000C00000000C05E51C1 /* StorePurchaseServiceTests.swift */; };
+		B11D000D00000000C05E51C1 /* ChipAmount.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000D00000000C05E51C1 /* ChipAmount.swift */; };
+		B11D000E00000000C05E51C1 /* AchievementProgressSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000E00000000C05E51C1 /* AchievementProgressSource.swift */; };
+		B11D000F00000000C05E51C1 /* StoreViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E000F00000000C05E51C1 /* StoreViewModel.swift */; };
+		B11D001000000000C05E51C1 /* StoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001000000000C05E51C1 /* StoreView.swift */; };
+		B11D001100000000C05E51C1 /* PurchaseConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001100000000C05E51C1 /* PurchaseConfettiView.swift */; };
+		B11D001200000000C05E51C1 /* ChipAmountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001200000000C05E51C1 /* ChipAmountTests.swift */; };
+		B11D001300000000C05E51C1 /* StorePeekTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001300000000C05E51C1 /* StorePeekTab.swift */; };
+		B11D001400000000C05E51C1 /* StorePanelDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001400000000C05E51C1 /* StorePanelDrawer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -192,6 +212,26 @@
 		36C91FA52F80020000697E42 /* PokerActionDeepLinkRouter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PokerActionDeepLinkRouter.swift; sourceTree = "<group>"; };
 		AAAAAA002F7F5B8A00697E42 /* OpponentPopupView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OpponentPopupView.swift; sourceTree = "<group>"; };
 		AAAAAA022F7F5B8C00697E42 /* TopUpSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TopUpSheet.swift; sourceTree = "<group>"; };
+		F11E000100000000C05E51C1 /* Cosmetic.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Cosmetic.swift; sourceTree = "<group>"; };
+		F11E000200000000C05E51C1 /* PlayerInventory.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlayerInventory.swift; sourceTree = "<group>"; };
+		F11E000300000000C05E51C1 /* CosmeticsCatalog.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CosmeticsCatalog.swift; sourceTree = "<group>"; };
+		F11E000400000000C05E51C1 /* InventoryRepository.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InventoryRepository.swift; sourceTree = "<group>"; };
+		F11E000500000000C05E51C1 /* StorePurchaseService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePurchaseService.swift; sourceTree = "<group>"; };
+		F11E000600000000C05E51C1 /* NetworkPurchasePort+Live.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NetworkPurchasePort+Live.swift"; sourceTree = "<group>"; };
+		F11E000700000000C05E51C1 /* CosmeticsContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CosmeticsContainer.swift; sourceTree = "<group>"; };
+		F11E000800000000C05E51C1 /* CosmeticImageView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CosmeticImageView.swift; sourceTree = "<group>"; };
+		F11E000900000000C05E51C1 /* cosmetics_catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = cosmetics_catalog.json; sourceTree = "<group>"; };
+		F11E000A00000000C05E51C1 /* CosmeticsCatalogTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CosmeticsCatalogTests.swift; sourceTree = "<group>"; };
+		F11E000B00000000C05E51C1 /* InventoryRepositoryTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InventoryRepositoryTests.swift; sourceTree = "<group>"; };
+		F11E000C00000000C05E51C1 /* StorePurchaseServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePurchaseServiceTests.swift; sourceTree = "<group>"; };
+		F11E000D00000000C05E51C1 /* ChipAmount.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipAmount.swift; sourceTree = "<group>"; };
+		F11E000E00000000C05E51C1 /* AchievementProgressSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AchievementProgressSource.swift; sourceTree = "<group>"; };
+		F11E000F00000000C05E51C1 /* StoreViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StoreViewModel.swift; sourceTree = "<group>"; };
+		F11E001000000000C05E51C1 /* StoreView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StoreView.swift; sourceTree = "<group>"; };
+		F11E001100000000C05E51C1 /* PurchaseConfettiView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PurchaseConfettiView.swift; sourceTree = "<group>"; };
+		F11E001300000000C05E51C1 /* StorePeekTab.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePeekTab.swift; sourceTree = "<group>"; };
+		F11E001400000000C05E51C1 /* StorePanelDrawer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePanelDrawer.swift; sourceTree = "<group>"; };
+		F11E001200000000C05E51C1 /* ChipAmountTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipAmountTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -284,6 +324,10 @@
 			isa = PBXGroup;
 			children = (
 				36C91CD12F7F592A00697E42 /* StackPokerTests.swift */,
+				F11E000A00000000C05E51C1 /* CosmeticsCatalogTests.swift */,
+				F11E001200000000C05E51C1 /* ChipAmountTests.swift */,
+				F11E000B00000000C05E51C1 /* InventoryRepositoryTests.swift */,
+				F11E000C00000000C05E51C1 /* StorePurchaseServiceTests.swift */,
 			);
 			path = StackPokerTests;
 			sourceTree = "<group>";
@@ -568,6 +612,7 @@
 			children = (
 				36C91D032F7F5B8A00697E42 /* Auth */,
 				36C91D052F7F5B8A00697E42 /* Clubs */,
+				6011000100000000C05E51C1 /* Cosmetics */,
 				36C91D152F7F5B8A00697E42 /* Game */,
 				36C91D222F7F5B8A00697E42 /* Lobby */,
 				36C91D292F7F5B8A00697E42 /* Profile */,
@@ -696,6 +741,69 @@
 				36C91FA52F80020000697E42 /* PokerActionDeepLinkRouter.swift */,
 			);
 			path = LiveActivity;
+			sourceTree = "<group>";
+		};
+		6011000100000000C05E51C1 /* Cosmetics */ = {
+			isa = PBXGroup;
+			children = (
+				6011000200000000C05E51C1 /* Models */,
+				6011000500000000C05E51C1 /* Resources */,
+				6011000300000000C05E51C1 /* Services */,
+				6011000600000000C05E51C1 /* ViewModels */,
+				6011000400000000C05E51C1 /* Views */,
+			);
+			path = Cosmetics;
+			sourceTree = "<group>";
+		};
+		6011000200000000C05E51C1 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F11E000D00000000C05E51C1 /* ChipAmount.swift */,
+				F11E000100000000C05E51C1 /* Cosmetic.swift */,
+				F11E000200000000C05E51C1 /* PlayerInventory.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		6011000300000000C05E51C1 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F11E000E00000000C05E51C1 /* AchievementProgressSource.swift */,
+				F11E000300000000C05E51C1 /* CosmeticsCatalog.swift */,
+				F11E000700000000C05E51C1 /* CosmeticsContainer.swift */,
+				F11E000400000000C05E51C1 /* InventoryRepository.swift */,
+				F11E000600000000C05E51C1 /* NetworkPurchasePort+Live.swift */,
+				F11E000500000000C05E51C1 /* StorePurchaseService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		6011000400000000C05E51C1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F11E000800000000C05E51C1 /* CosmeticImageView.swift */,
+				F11E001100000000C05E51C1 /* PurchaseConfettiView.swift */,
+				F11E001300000000C05E51C1 /* StorePeekTab.swift */,
+				F11E001400000000C05E51C1 /* StorePanelDrawer.swift */,
+				F11E001000000000C05E51C1 /* StoreView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		6011000600000000C05E51C1 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				F11E000F00000000C05E51C1 /* StoreViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		6011000500000000C05E51C1 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F11E000900000000C05E51C1 /* cosmetics_catalog.json */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -840,6 +948,7 @@
 				36C91E012F80000000697E42 /* StackPoker/Sounds in Resources */,
 				36C91E022F80000000697E43 /* StackPoker/Videos in Resources */,
 				36C91F212F80000000697E42 /* StackPoker/Assets.xcassets in Resources */,
+				B11D000900000000C05E51C1 /* cosmetics_catalog.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -933,6 +1042,21 @@
 				36C91FA22F80020000697E42 /* PokerActionAttributes.swift in Sources */,
 				36C91FA42F80020000697E42 /* PokerActionActivityManager.swift in Sources */,
 				36C91FA62F80020000697E42 /* PokerActionDeepLinkRouter.swift in Sources */,
+				B11D000100000000C05E51C1 /* Cosmetic.swift in Sources */,
+				B11D000200000000C05E51C1 /* PlayerInventory.swift in Sources */,
+				B11D000300000000C05E51C1 /* CosmeticsCatalog.swift in Sources */,
+				B11D000400000000C05E51C1 /* InventoryRepository.swift in Sources */,
+				B11D000500000000C05E51C1 /* StorePurchaseService.swift in Sources */,
+				B11D000600000000C05E51C1 /* NetworkPurchasePort+Live.swift in Sources */,
+				B11D000700000000C05E51C1 /* CosmeticsContainer.swift in Sources */,
+				B11D000800000000C05E51C1 /* CosmeticImageView.swift in Sources */,
+				B11D000D00000000C05E51C1 /* ChipAmount.swift in Sources */,
+				B11D000E00000000C05E51C1 /* AchievementProgressSource.swift in Sources */,
+				B11D000F00000000C05E51C1 /* StoreViewModel.swift in Sources */,
+				B11D001000000000C05E51C1 /* StoreView.swift in Sources */,
+				B11D001100000000C05E51C1 /* PurchaseConfettiView.swift in Sources */,
+				B11D001300000000C05E51C1 /* StorePeekTab.swift in Sources */,
+				B11D001400000000C05E51C1 /* StorePanelDrawer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -941,6 +1065,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				36C91CD22F7F592A00697E42 /* StackPokerTests.swift in Sources */,
+				B11D000A00000000C05E51C1 /* CosmeticsCatalogTests.swift in Sources */,
+				B11D001200000000C05E51C1 /* ChipAmountTests.swift in Sources */,
+				B11D000B00000000C05E51C1 /* InventoryRepositoryTests.swift in Sources */,
+				B11D000C00000000C05E51C1 /* StorePurchaseServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -992,7 +1120,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.32;
+				MARKETING_VERSION = 3.33;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker.PokerActionWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1023,7 +1151,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.32;
+				MARKETING_VERSION = 3.33;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker.PokerActionWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

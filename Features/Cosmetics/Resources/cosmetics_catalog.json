@@ -1,7 +1,8 @@
 {
   "_meta": {
     "schemaVersion": 1,
-    "_comment": "Seed catalog for Phase 1. Daily bonus = 1000 chips; common 0.5-2x, rare 5-15x, epic 25-60x, legendary 100-250x, mythic = unobtainable-via-purchase. Edit freely — no recompile required. previewAssetName uses cosmetic_<category>_<id> convention; missing assets fall back to programmatic placeholders per CosmeticImageView."
+    "_comment": "Seed catalog for Phase 1+2. Daily bonus = 1000 chips; common 0.5-2x, rare 5-15x, epic 25-60x, legendary 100-250x, mythic = unobtainable-via-purchase. Edit freely — no recompile required. previewAssetName uses cosmetic_<category>_<id> convention; missing assets fall back to programmatic placeholders per CosmeticImageView.",
+    "_migrationNote": "TODO Phase-5: catalog moves server-side for true LiveOps rotation. Until then, isLimitedTime items below are staggered with ~10 weeks of runway from 2026-05-14. When runway shrinks to <3 weeks, ship a TestFlight build with extended dates. Migration path: RemoteCosmeticsCatalog conforming to CosmeticsCatalogProtocol; swap in CosmeticsContainer.makeProduction()."
   },
   "cosmetics": [
     {
@@ -37,6 +38,8 @@
       "category": "cardBack",
       "rarity": "rare",
       "priceChips": 7500,
+      "isLimitedTime": true,
+      "availableUntil": "2026-05-28T23:59:59Z",
       "previewAssetName": "cosmetic_cardBack_vegas_neon",
       "unlockCondition": "purchase"
     },
@@ -91,6 +94,8 @@
       "category": "chipSet",
       "rarity": "rare",
       "priceChips": 8500,
+      "isLimitedTime": true,
+      "availableUntil": "2026-06-04T23:59:59Z",
       "previewAssetName": "cosmetic_chipSet_monte_carlo_pearl",
       "unlockCondition": "purchase"
     },
@@ -173,6 +178,8 @@
       "category": "avatarFrame",
       "rarity": "epic",
       "priceChips": 45000,
+      "isLimitedTime": true,
+      "availableUntil": "2026-06-11T23:59:59Z",
       "previewAssetName": "cosmetic_avatarFrame_diamond",
       "unlockCondition": "purchase"
     },
@@ -226,6 +233,8 @@
       "category": "tableFelt",
       "rarity": "rare",
       "priceChips": 14000,
+      "isLimitedTime": true,
+      "availableUntil": "2026-06-18T23:59:59Z",
       "previewAssetName": "cosmetic_tableFelt_neon_tokyo",
       "unlockCondition": "purchase"
     },
@@ -263,6 +272,8 @@
       "category": "cardFace",
       "rarity": "rare",
       "priceChips": 12500,
+      "isLimitedTime": true,
+      "availableUntil": "2026-06-25T23:59:59Z",
       "previewAssetName": "cosmetic_cardFace_art_deco",
       "unlockCondition": "purchase"
     },
@@ -309,6 +320,8 @@
       "category": "dealAnimation",
       "rarity": "epic",
       "priceChips": 35000,
+      "isLimitedTime": true,
+      "availableUntil": "2026-07-02T23:59:59Z",
       "previewAssetName": "cosmetic_dealAnimation_lightning",
       "unlockCondition": "purchase"
     },
@@ -346,6 +359,8 @@
       "category": "winAnimation",
       "rarity": "epic",
       "priceChips": 38000,
+      "isLimitedTime": true,
+      "availableUntil": "2026-07-16T23:59:59Z",
       "previewAssetName": "cosmetic_winAnimation_gold_rain",
       "unlockCondition": "purchase"
     },
@@ -446,6 +461,8 @@
       "category": "emote",
       "rarity": "rare",
       "priceChips": 8000,
+      "isLimitedTime": true,
+      "availableUntil": "2026-07-23T23:59:59Z",
       "previewAssetName": "cosmetic_emote_fire",
       "unlockCondition": "purchase"
     },

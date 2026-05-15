@@ -1,8 +1,14 @@
 import SwiftUI
+import Combine
 
 struct ChipsView: View {
     @StateObject private var vm = ChipsViewModel()
     @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var cosmetics: CosmeticsContainer
+    /// Drives the cosmetics store sheet presentation. Local @State (not
+    /// in ChipsViewModel) because the sheet's lifecycle is purely view-
+    /// owned — nothing in the VM needs to know whether the store is open.
+    @State private var showCosmeticsStore = false
 
     var body: some View {
         NavigationStack {
@@ -59,15 +65,46 @@ struct ChipsView: View {
     // ─── Actions row ──────────────────────────────────────────────────────────
 
     private var actionsRow: some View {
-        HStack(spacing: SPSpacing.sm) {
-            SPButton("Daily Bonus", icon: "gift.fill", isLoading: vm.isClaiming) {
-                Task { await vm.claimDailyBonus() }
+        VStack(spacing: SPSpacing.sm) {
+            HStack(spacing: SPSpacing.sm) {
+                SPButton("Daily Bonus", icon: "gift.fill", isLoading: vm.isClaiming) {
+                    Task { await vm.claimDailyBonus() }
+                }
+                SPButton("Transfer", style: .secondary, icon: "arrow.left.arrow.right") {
+                    vm.showTransferSheet = true
+                }
             }
-            SPButton("Transfer", style: .secondary, icon: "arrow.left.arrow.right") {
-                vm.showTransferSheet = true
+            // Cosmetics store entry point #1. Full-width secondary button
+            // sits below the primary two so it's discoverable but doesn't
+            // compete with Daily Bonus for first-tap real estate. The
+            // store sheet is sized large (.large detent) because the
+            // store needs vertical breathing room for the rails.
+            SPButton("Cosmetics Store", style: .secondary, icon: "sparkles") {
+                showCosmeticsStore = true
             }
         }
         .padding(.horizontal, SPSpacing.md)
+        .sheet(isPresented: $showCosmeticsStore) {
+            StoreView(vm: makeStoreViewModel(entryPoint: .chipsView))
+        }
+    }
+
+    /// Factory for the store VM. Builds the balance publisher from the
+    /// auth VM's `currentUser` stream so the in-store balance pill
+    /// reflects any chip changes (daily bonus, transfer, purchase) in
+    /// real time. ChipAmount parses the BigInt-as-String safely; bad
+    /// payloads fall back to .zero rather than displaying a stale value.
+    private func makeStoreViewModel(entryPoint: StoreEntryPoint) -> StoreViewModel {
+        let balancePublisher = authVM.$currentUser
+            .map { profile -> ChipAmount in
+                ChipAmount(serverString: profile?.chipBalance ?? "0") ?? .zero
+            }
+            .eraseToAnyPublisher()
+        return StoreViewModel(
+            container:        cosmetics,
+            balancePublisher: balancePublisher,
+            entryPoint:       entryPoint
+        )
     }
 
     // ─── History section ──────────────────────────────────────────────────────

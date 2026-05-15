@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 @main
 struct StackPokerApp: App {
@@ -12,6 +13,12 @@ struct StackPokerApp: App {
     // overlay can sit above MainTabView (covers the tab bar) and outside
     // the lobby's ScrollView clip.
     @StateObject private var dailyBonusPresenter = DailyBonusRevealPresenter()
+    // Cosmetics DI container. Single instance for the app process; the
+    // bound-to-active-user subscription below pumps the auth userId into
+    // InventoryRepository so the per-user inventory key swaps cleanly on
+    // login/logout. Created via the production factory (real catalog +
+    // UserDefaults inventory + remote purchase service).
+    @StateObject private var cosmetics = CosmeticsContainer.makeProduction()
 
     // PERF: warm up SoundManager off the main thread at app launch so the
     // first in-game sound effect (check / fold / call / etc.) doesn't pay
@@ -33,7 +40,20 @@ struct StackPokerApp: App {
                 .environmentObject(authViewModel)
                 .environmentObject(subscriptionManager)
                 .environmentObject(dailyBonusPresenter)
+                .environmentObject(cosmetics)
                 .preferredColorScheme(.dark)
+                // Bridge the Auth → Cosmetics seam. We forward the current
+                // userId publisher into the inventory repo so cosmetics
+                // state automatically scopes to whoever is signed in.
+                // Subscribing on appear (not init) so authViewModel's
+                // `@Published currentUser` is fully wired before we sink.
+                .onAppear {
+                    cosmetics.bindToActiveUser(
+                        authViewModel.$currentUser
+                            .map { $0?.id }
+                            .eraseToAnyPublisher()
+                    )
+                }
                 // ─── Live Activity → app deep-link bridge ──────────────────
                 // The Fold button in the Live Activity fires
                 // FoldFromActivityIntent (an `OpenIntent`), which asks iOS to

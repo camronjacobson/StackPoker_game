@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // ─── Game View ────────────────────────────────────────────────────────────────
 // Full-screen poker table. Replaces the placeholder from Phase 2.
@@ -25,6 +26,14 @@ struct GameView: View {
     // the waiting-overlay invite button (lastTable, canSendInvites,
     // resetInviteSheet) and the invite POST inside InviteFriendsSheet.
     @EnvironmentObject private var lobbyVM: LobbyViewModel
+
+    // Inherited from RootView via the fullScreenCover boundary. Needed
+    // for the table-side store panel: AuthViewModel exposes the balance
+    // publisher StoreViewModel listens to, CosmeticsContainer is the DI
+    // container the store reads its catalog + inventory from. Both are
+    // injected at app root in StackPokerApp.
+    @EnvironmentObject private var authViewModel: AuthViewModel
+    @EnvironmentObject private var cosmetics: CosmeticsContainer
 
     // Local FriendsViewModel for the invite sheet — same pattern PokerTableView
     // uses. The sheet's own .task triggers loadFriends() so we don't preload.
@@ -108,6 +117,109 @@ struct GameView: View {
                     TopUpSheet(vm: vm)
                         .transition(.opacity)
                         .zIndex(70)
+                }
+
+                // ── Cosmetics store: scrim ──────────────────────────
+                // Dim black overlay behind the panel when open. Provides
+                // the third dismiss path (tap-outside-the-panel to
+                // close) and visually anchors the panel as a modal
+                // layer.
+                //
+                // .allowsHitTesting(vm.isStorePanelOpen) so the table
+                // (poker actions, seat taps) remains interactive when
+                // the panel is closed — without this gate, the scrim's
+                // full-screen frame would silently eat all taps even
+                // at opacity 0.
+                //
+                // 0.4 black matches the iOS native sheet scrim density.
+                // Animation duration intentionally shorter than the
+                // panel spring (0.2s vs 0.32s) so the scrim feels
+                // tightly coupled to the panel's snap.
+                Color.black
+                    .opacity(vm.isStorePanelOpen ? 0.4 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(vm.isStorePanelOpen)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+                            vm.isStorePanelOpen = false
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.2), value: vm.isStorePanelOpen)
+                    .zIndex(64)
+
+                // ── Cosmetics store slide-down panel ──────────────────
+                // Panel-only overlay. Tab + scrim are siblings mounted
+                // separately so the z-order can be: scrim(64) < panel(65)
+                // < tab(66). This z-stack is the entire reason the tab
+                // is a separate overlay rather than living in `topBar`
+                // (which sits at default zIndex(0) and would be covered
+                // by the panel when open, blocking tap-to-close).
+                //
+                // safeTop / screenHeight come from THIS GeometryReader
+                // (the outer one — has correct safe-area reporting
+                // since it doesn't ignore the safe area).
+                StorePanelDrawer(
+                    vm: vm,
+                    makeStoreVM: makeStoreViewModel,
+                    safeTop: geo.safeAreaInsets.top,
+                    screenHeight: geo.size.height
+                )
+                .zIndex(65)
+
+                // ── Cosmetics store: peek tab (overlay) ────────────
+                // Tap-to-toggle + drag-up-to-close handle. Mounted at
+                // zIndex(66) above the panel so it remains tappable
+                // when the panel is open — primary dismiss path.
+                //
+                // Positioning: outer VStack pins the HStack to the top
+                // of the safe-area-respecting region (no .ignoresSafeArea
+                // here, so the natural top of the VStack is at safe
+                // area inset). The .padding(.top, 4) + .padding(.horizontal, 14)
+                // match topBar's exact padding so the tab sits visually
+                // identical to a topBar-HStack member.
+                //
+                // The tab is wrapped in a Color.clear frame with
+                // .allowsHitTesting(false) so only the tab's visible
+                // pill (its own .contentShape) intercepts touches —
+                // the empty area around it lets taps pass through to
+                // the scrim/panel below.
+                if vm.showsStoreTab || vm.isStorePanelOpen {
+                    VStack(spacing: 0) {
+                        HStack {
+                            Spacer()
+                            StorePeekTab(
+                                progress: vm.isStorePanelOpen ? 1 : 0,
+                                hasUnviewedDrop: vm.hasUnviewedDrop
+                            )
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+                                    vm.isStorePanelOpen.toggle()
+                                }
+                            }
+                            .gesture(
+                                // Drag-up to close — only fires while
+                                // open, so it doesn't compete with the
+                                // tap-to-open path when closed.
+                                DragGesture(minimumDistance: 8)
+                                    .onEnded { value in
+                                        guard vm.isStorePanelOpen else { return }
+                                        let panelH = geo.size.height * 0.6
+                                        let dragFrac      = value.translation.height           / max(panelH, 1)
+                                        let predictedFrac = value.predictedEndTranslation.height / max(panelH, 1)
+                                        if dragFrac < -0.30 || predictedFrac < -0.40 {
+                                            withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+                                                vm.isStorePanelOpen = false
+                                            }
+                                        }
+                                    }
+                            )
+                            Spacer()
+                        }
+                        .padding(.top, 4)
+                        .padding(.horizontal, 14)
+                        Spacer()
+                    }
+                    .zIndex(66)
                 }
 
                 // Transient toast. Used for both errors (server rejections,
@@ -202,6 +314,10 @@ struct GameView: View {
         .onChange(of: vm.shouldExit) { _, exit in
             if exit { dismiss() }
         }
+        // NOTE: cosmetics-store open/close + "viewed" side-effect are
+        // owned by StorePanelDrawer (mounted in the overlay ZStack above).
+        // It mirrors local open state back to vm.isStorePanelOpen via
+        // .onChange so the rest of the app can still observe the flag.
     }
 
     // ─── Portrait layout ──────────────────────────────────────────────────────
@@ -288,36 +404,14 @@ struct GameView: View {
 
             Spacer()
 
-            // Retro game-type pill — maroon card-back miniatures + ink label
-            // on a paper panel. Reads as a printed game-type stamp at the
-            // top of the page.
-            let gameLabel = (vm.gameState?.gameType ?? "TEXAS_HOLDEM") == "PLO" ? "PLO" : "NLH"
-            HStack(spacing: 6) {
-                HStack(spacing: -6) {
-                    ForEach(0..<2, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(SPRetro.maroon)
-                            .frame(width: 16, height: 22)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 2)
-                                    .strokeBorder(SPRetro.ink, lineWidth: 1)
-                            )
-                    }
-                }
-                Text(gameLabel)
-                    .font(.custom("AmericanTypewriter-Bold", size: 12))
-                    .tracking(1.2)
-                    .foregroundStyle(SPRetro.ink)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(SPRetro.paper)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(SPRetro.ink, lineWidth: 1.5)
-            )
-            .shadow(color: SPRetro.ink.opacity(0.6), radius: 0, x: 1.5, y: 2)
+            // Center slot intentionally empty. The cosmetics-store
+            // peek tab lives in the outer ZStack as a zIndex(66)
+            // overlay (see `storeTabOverlay` mounted near the end of
+            // body) so it sits ABOVE the panel and remains tappable
+            // when the panel is open — that's the primary
+            // tap-to-dismiss path. The Spacer-Spacer pair here
+            // matches the overlay's own HStack centering so the
+            // visual position is identical to the pre-overlay layout.
 
             Spacer()
 
@@ -843,6 +937,30 @@ struct GameView: View {
         case "T": return 10
         default:  return Int(r) ?? 0
         }
+    }
+
+    // ─── Cosmetics store view-model factory ───────────────────────────────────
+    //
+    // Same factory pattern used by ChipsView and ProfileView for their
+    // store entry points. Builds the balance publisher from the auth
+    // VM's currentUser stream so the in-store balance pill stays in
+    // sync with daily-bonus claims, transfers, and (recursive case)
+    // purchases made while the panel is open at the table.
+    //
+    // entryPoint is fixed to `.tableStoreTab` — the panel here is only
+    // reachable from the in-game peek-tab.
+
+    private func makeStoreViewModel() -> StoreViewModel {
+        let balancePublisher = authViewModel.$currentUser
+            .map { profile -> ChipAmount in
+                ChipAmount(serverString: profile?.chipBalance ?? "0") ?? .zero
+            }
+            .eraseToAnyPublisher()
+        return StoreViewModel(
+            container:        cosmetics,
+            balancePublisher: balancePublisher,
+            entryPoint:       .tableStoreTab
+        )
     }
 }
 

@@ -90,6 +90,66 @@ final class InventoryRepositoryTests: XCTestCase {
         XCTAssertTrue(repo.inventory.isOwned("card_back_royal_gold"))
     }
 
+    // ── Flash-prevention canary ──────────────────────────────────────────────
+    //
+    // Phase-2 hard requirement: when a new user logs in, no view binding
+    // against inventoryPublisher should ever briefly observe the previous
+    // user's items. The repo guarantees this by replacing `inventory`
+    // atomically inside setActiveUser — but the contract belongs in tests
+    // because every screen above sits on it.
+
+    func test_userSwitch_publishedStreamNeverShowsPreviousUsersItems() {
+        // Seed user_alpha with an owned item.
+        repo.setActiveUser("user_alpha")
+        repo.own("alpha_only_item")
+
+        // Start listening from this point. The sink fires once with the
+        // current value, then once per @Published update.
+        var emissions: [PlayerInventory] = []
+        let cancellable = repo.inventoryPublisher.sink { emissions.append($0) }
+        XCTAssertEqual(emissions.count, 1, "Sink fires once for current value")
+        XCTAssertTrue(emissions[0].isOwned("alpha_only_item"))
+
+        // Direct switch, no nil pass-through. This is the "login as a
+        // different user without explicit logout first" path.
+        repo.setActiveUser("user_beta")
+
+        // Every emission after the switch must NOT contain alpha's item.
+        let postSwitch = Array(emissions.dropFirst())
+        XCTAssertFalse(postSwitch.isEmpty,
+                       "Switching users must publish at least one new inventory snapshot")
+        for inv in postSwitch {
+            XCTAssertFalse(inv.isOwned("alpha_only_item"),
+                           "Published stream leaked previous user's items — flash bug")
+        }
+        // user_beta is a fresh account — final state is empty.
+        XCTAssertEqual(emissions.last, .empty,
+                       "Fresh user must see empty inventory, not stale prior state")
+
+        cancellable.cancel()
+    }
+
+    func test_logoutThenLogin_publishedStreamCleanlyTransitions() {
+        repo.setActiveUser("user_alpha")
+        repo.own("alpha_only_item")
+
+        var emissions: [PlayerInventory] = []
+        let cancellable = repo.inventoryPublisher.sink { emissions.append($0) }
+        XCTAssertEqual(emissions.last?.isOwned("alpha_only_item"), true)
+
+        // Logout pushes .empty.
+        repo.setActiveUser(nil)
+        XCTAssertEqual(emissions.last, .empty,
+                       "Logout must publish .empty immediately")
+
+        // Login as new user.
+        repo.setActiveUser("user_beta")
+        XCTAssertEqual(emissions.last, .empty,
+                       "user_beta is fresh; must remain empty, no stale flash")
+
+        cancellable.cancel()
+    }
+
     // ── Ownership semantics ──────────────────────────────────────────────────
 
     func test_own_idempotent() {
