@@ -46,7 +46,7 @@ struct TableLayout {
         min(tableWidth, tableHeight) / 2
     }
     var tableCenter: CGPoint {
-        CGPoint(x: size.width / 2, y: size.height * 0.46)
+        CGPoint(x: size.width / 2, y: size.height * 0.52)
     }
     var tableRect: CGRect {
         CGRect(
@@ -98,7 +98,7 @@ struct TableLayout {
         // boardCenter -0.09) sat at ~+5pt. That ~40pt overlap was the chip
         // stack visibly clipping the cards. 0.10 gives clean separation
         // without crowding gamePillCenter (still at 0.19).
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.10)
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.13)
     }
     // gamePillCenter and blindsCenter pushed down (was 0.19 / 0.26) so the
     // NLH pill + small/big-blind label sit visually closer to the bottom rim
@@ -147,7 +147,7 @@ struct TableLayout {
             case 3: return [90, 210, 330]
             case 4: return [90, 180, 270, 0]
             case 5: return [90, 162, 234, 306, 18]
-            case 6: return [90, 150, 210, 270, 330, 30]
+            case 6: return [90, 165, 210, 270, 330, 15]
             case 7: return [90, 141, 193, 244, 296, 347, 38]
             case 8: return [90, 129, 168, 207, 270, 333, 12, 51]
             case 9: return [90, 130, 170, 210, 250, 290, 330, 10, 50]
@@ -164,8 +164,40 @@ struct TableLayout {
             // rim, preserving the "near-the-viewer" feeling.
             let depth  = (sin(rad) + 1) / 2
             let xScale = tr + (1.0 - tr) * depth
-            return CGPoint(x: cx + rx * cos(rad) * xScale,
-                           y: cy + ry * sin(rad))
+            // Bottom-seat lift: the hero's avatar (angle 90°) sits at the
+            // lowest point of the rim, which after the recent table-size
+            // bump now crowds the action bar / screen bottom. Pull just
+            // that seat up by ~6% of tableHeight so it floats inside the
+            // felt instead of riding the bottom rim. All other seats are
+            // unaffected.
+            let yLift: CGFloat = (deg == 90) ? tableHeight * 0.10 : 0
+            // Side-seat inward pull: v1 (165°) and v5 (15°) sit on the
+            // widest part of the rim. Shrink their effective rx so they
+            // tuck slightly inside the felt edge — same line of rendering
+            // as the pot/chip stacks, no longer hugging the table's outer
+            // curve. Other seats unaffected.
+            // Side-seat inward pull. v1/v5 (165°/15°) sit on the widest
+            // part of the rim; v2/v4 (210°/330°) sit on the upper rim
+            // where the perspective taper already squeezes x but still
+            // reads as a touch wide. Tug both pairs inward toward the
+            // pot column. v1/v5 get the stronger pull (0.85) since
+            // they're on the rim's belly; v2/v4 get a gentler pull
+            // (0.90) because the topRatio taper has already nudged
+            // them inward.
+            let rxScale: CGFloat = {
+                switch deg {
+                case 165, 15:   return 0.85
+                case 210, 330:  return 0.90
+                default:        return 1.0
+                }
+            }()
+            // Top seat (270°, v3) nudge: the rim math floats the avatar
+            // ~20pt above the felt's painted top edge. A small downward
+            // pull tucks it just inside the rim so it reads as seated
+            // at the top of the table rather than hovering above it.
+            let yDrop: CGFloat = (deg == 270) ? tableHeight * 0.05 : 0
+            return CGPoint(x: cx + rx * rxScale * cos(rad) * xScale,
+                           y: cy + ry * sin(rad) - yLift + yDrop)
         }
     }
 }
