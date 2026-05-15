@@ -58,13 +58,17 @@ struct TableLayout {
     }
 
     // Community cards
-    // Sized so the 5-card row spans ~80% of the table width, reaching into
-    // the inner betting-line ring (which sits at tableWidth - 60). Total
-    // span = 5 * cardWidth + 4 * cardSpacing = 5*0.145 + 4*0.020 = 0.805.
-    // That keeps the cards comfortably *inside* the inner ring on iPhone
-    // (where the inset is proportionally tightest at ~83%) while still
-    // giving them a commanding visual presence on the felt.
-    var cardWidth: CGFloat { tableWidth * 0.145 }
+    // Sized so the 5-card row spans ~64% of the table width, leaving
+    // comfortable breathing room against the narrower middle felt section
+    // of the new poker_table.png illustration. Total span =
+    // 5 * cardWidth + 4 * cardSpacing = 5*0.112 + 4*0.020 = 0.640.
+    // Width factor was 0.145 prior to the 2026-05-15 image swap — at that
+    // size all five river cards crowded into the inner rim where the new
+    // illustration narrows toward the back. Spacing factor unchanged; at
+    // the smaller card size the same absolute gap is proportionally more
+    // breathing room (~18% of card width vs ~14% before).
+    // Aspect ratio (1:1.4) is preserved inside CommunityCardsView.
+    var cardWidth: CGFloat { tableWidth * 0.112 }
     var cardSpacing: CGFloat { tableWidth * 0.020 }
 
     // Center layout positions (all relative to tableCenter).
