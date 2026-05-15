@@ -10,6 +10,7 @@
 		3681CECA2FABD98B0066D2EE /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3681CEC92FABD98B0066D2EE /* WidgetKit.framework */; };
 		3681CECC2FABD98B0066D2EE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3681CECB2FABD98B0066D2EE /* SwiftUI.framework */; };
 		3681CED92FABD98D0066D2EE /* PokerActionWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3681CEC72FABD98B0066D2EE /* PokerActionWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3681D0C22FB7CBB80066D2EE /* PokerTableView+Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3681D0C12FB7CBB80066D2EE /* PokerTableView+Previews.swift */; };
 		36C91CD22F7F592A00697E42 /* StackPokerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CD12F7F592A00697E42 /* StackPokerTests.swift */; };
 		36C91CDC2F7F592A00697E42 /* StackPokerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDB2F7F592A00697E42 /* StackPokerUITests.swift */; };
 		36C91CDE2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDD2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift */; };
@@ -142,6 +143,7 @@
 		3681CEC72FABD98B0066D2EE /* PokerActionWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PokerActionWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3681CEC92FABD98B0066D2EE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		3681CECB2FABD98B0066D2EE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		3681D0C12FB7CBB80066D2EE /* PokerTableView+Previews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PokerTableView+Previews.swift"; sourceTree = "<group>"; };
 		36C91CBD2F7F592800697E42 /* StackPoker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StackPoker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CCD2F7F592A00697E42 /* StackPokerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StackPokerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CD12F7F592A00697E42 /* StackPokerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackPokerTests.swift; sourceTree = "<group>"; };
@@ -229,9 +231,9 @@
 		F11E000F00000000C05E51C1 /* StoreViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StoreViewModel.swift; sourceTree = "<group>"; };
 		F11E001000000000C05E51C1 /* StoreView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StoreView.swift; sourceTree = "<group>"; };
 		F11E001100000000C05E51C1 /* PurchaseConfettiView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PurchaseConfettiView.swift; sourceTree = "<group>"; };
+		F11E001200000000C05E51C1 /* ChipAmountTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipAmountTests.swift; sourceTree = "<group>"; };
 		F11E001300000000C05E51C1 /* StorePeekTab.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePeekTab.swift; sourceTree = "<group>"; };
 		F11E001400000000C05E51C1 /* StorePanelDrawer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePanelDrawer.swift; sourceTree = "<group>"; };
-		F11E001200000000C05E51C1 /* ChipAmountTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipAmountTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -499,6 +501,7 @@
 		36C91D142F7F5B8A00697E42 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				3681D0C12FB7CBB80066D2EE /* PokerTableView+Previews.swift */,
 				36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */,
 				36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */,
 				36C91D0F2F7F5B8A00697E42 /* CardViews.swift */,
@@ -790,20 +793,20 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
-		6011000600000000C05E51C1 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				F11E000F00000000C05E51C1 /* StoreViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
 		6011000500000000C05E51C1 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
 				F11E000900000000C05E51C1 /* cosmetics_catalog.json */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		6011000600000000C05E51C1 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				F11E000F00000000C05E51C1 /* StoreViewModel.swift */,
+			);
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1056,6 +1059,7 @@
 				B11D001000000000C05E51C1 /* StoreView.swift in Sources */,
 				B11D001100000000C05E51C1 /* PurchaseConfettiView.swift in Sources */,
 				B11D001300000000C05E51C1 /* StorePeekTab.swift in Sources */,
+				3681D0C22FB7CBB80066D2EE /* PokerTableView+Previews.swift in Sources */,
 				B11D001400000000C05E51C1 /* StorePanelDrawer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
