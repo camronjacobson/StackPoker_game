@@ -31,10 +31,10 @@ struct TableLayout {
     // landscape framing is a follow-up if it ends up looking off).
     var tableWidth: CGFloat {
         if isLandscape { return min(size.width - 48, size.height * 1.6) }
-        // Portrait: 92% screen width, with a height-derived guard so a very
+        // Portrait: 98% screen width, with a height-derived guard so a very
         // short screen (iPhone SE) doesn't push the bottom of the table
         // under the action bar.
-        return min(size.width * 0.92, size.height * 0.92 / 1.5)
+        return min(size.width * 0.98, size.height * 0.92 / 1.5)
     }
     var tableHeight: CGFloat {
         if isLandscape { return tableWidth / 1.6 }
