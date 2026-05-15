@@ -69,7 +69,7 @@ struct TableLayout {
     // breathing room (~18% of card width vs ~14% before).
     // Aspect ratio (1:1.4) is preserved inside CommunityCardsView.
     var cardWidth: CGFloat { tableWidth * 0.112 }
-    var cardSpacing: CGFloat { tableWidth * 0.008 }
+    var cardSpacing: CGFloat { tableWidth * 0.006 }
 
     // Center layout positions (all relative to tableCenter).
     // Tuned for the tall pill felt: community cards high, pot stack sits
