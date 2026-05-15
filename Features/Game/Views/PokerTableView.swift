@@ -23,18 +23,23 @@ struct TableLayout {
     let size: CGSize
     let isLandscape: Bool
 
-    // Felt dimensions — tall vertical pill (taller than wide) in portrait,
-    // classic landscape oval when the device is rotated.
+    // Felt dimensions — sized to fill ~92% of available width while
+    // preserving the poker_table.png intrinsic aspect ratio (1 : 1.5 W:H).
+    // The image is the source of truth for the silhouette now, so the frame
+    // matches it exactly — no more letterboxing inside a taller pill.
+    // Landscape kept on the old oval math (image is portrait-shaped;
+    // landscape framing is a follow-up if it ends up looking off).
     var tableWidth: CGFloat {
         if isLandscape { return min(size.width - 48, size.height * 1.6) }
-        // Portrait: pill is narrow relative to screen width so it reads as
-        // tall, not wide.
-        return min(size.width * 0.72, size.height * 0.42)
+        // Portrait: 92% screen width, with a height-derived guard so a very
+        // short screen (iPhone SE) doesn't push the bottom of the table
+        // under the action bar.
+        return min(size.width * 0.92, size.height * 0.92 / 1.5)
     }
     var tableHeight: CGFloat {
         if isLandscape { return tableWidth / 1.6 }
-        // Vertically stretched — ~1.65 × width, capped to ~72% of screen height.
-        return min(size.height * 0.72, tableWidth * 1.65)
+        // Locked to the image's 1.5× height-to-width ratio.
+        return tableWidth * 1.5
     }
     // Pill shape — radius = half of the shorter side (width in portrait).
     var tableCornerRadius: CGFloat {
@@ -161,6 +166,8 @@ struct TableLayout {
     }
 }
 
+// TODO: Dead code after poker_table.png swap (2026-05-15).
+// Remove in follow-up cleanup commit unless procedural rendering is revived.
 // ─── Table Perspective Shape ──────────────────────────────────────────────────
 // Forced-perspective table silhouette: a smaller circle at the top (further
 // from the viewer) joined by two *external common tangent* lines to a larger
@@ -297,6 +304,10 @@ struct PokerTableView: View {
     @ObservedObject var vm: GameViewModel
     var isLandscape: Bool = false
 
+    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // Remove in follow-up cleanup commit unless procedural rendering is revived.
+    // (GameView still reads tableThemeId for the room background gradient;
+    // only this view's local @AppStorage + theme are orphaned.)
     // Felt theme — read from user settings. Defaults to classic blue. Changes
     // in the settings sheet propagate here live via @AppStorage.
     @AppStorage("tableThemeId") private var tableThemeId: String = "classic_blue"
@@ -455,177 +466,45 @@ struct PokerTableView: View {
     }
 
     // ─── Felt + rail ──────────────────────────────────────────────────────────
-    // Rendered as a layered stack:
-    //   1. Cast shadow on the "floor" beneath the table
-    //   2. Padded leather rail surrounding the felt
-    //   3. Inner bevel + stitch line where rail meets felt
-    //   4. Felt surface (themed gradient + cloth texture + sheen + vignette)
-    //   5. Inset betting line where chips land
-
+    // Previously a 13-layer stack of TablePerspectiveShape fills/strokes plus
+    // FeltTexture (cast shadow, ink shadow, underside skirt + front-lip
+    // highlight, padded leather rail with top specular + bottom AO, inner
+    // bevel, saddle stitching, inner rim gleam, themed felt radial gradient,
+    // cloth weave, top-light, bowl vignette, ink rim, directional contact
+    // shadow, inset betting line). Replaced 2026-05-15 with a single
+    // illustrated PNG (poker_table.png in Assets.xcassets). The image carries
+    // the rail / felt / shadows / texture all baked in.
+    //
+    // Geometry preserved verbatim: tableWidth/tableHeight/tableCenter from
+    // TableLayout still drive the image's frame and position, so every
+    // sibling layer (seats, community cards, pot, dealer button, bet chips,
+    // brand mark) keeps its existing anchor. The image is `.aspectRatio(.fit)`
+    // inside that frame, so its silhouette ratio (intrinsic 1 : 1.5) and the
+    // pill's frame ratio (1 : 1.65 in portrait) will produce ~9% of empty
+    // space at the top + bottom of the frame — top/bottom seats may float
+    // past the painted rim. Per-item tableSurfaceTilt() and topRatio: 0.84
+    // intentionally left untouched in this commit — visual swap only,
+    // positioning math is a follow-up.
+    //
+    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // The orphaned procedural rendering helpers (TablePerspectiveShape,
+    // railLayer, feltSurface, FeltTexture, railWidth static, the
+    // PokerTableView-local @AppStorage("tableThemeId") + theme) are kept in
+    // place pending a cleanup commit. Remove unless procedural rendering is
+    // revived.
     private static let railWidth: CGFloat = 22
 
     private func feltOval(_ l: TableLayout) -> some View {
-        let cr      = l.tableCornerRadius
-        let rw      = Self.railWidth
-        let outerW  = l.tableWidth  + rw * 2
-        let outerH  = l.tableHeight + rw * 2
-        let outerCR = cr + rw
-
-        let tr = l.topRatio
-
-        // Underside skirt — visible "edge thickness" of the table viewed
-        // from above-front. Drawn behind the rail; bottom band peeks out
-        // below the rail's lower curve. Because the trapezoid is wider at
-        // the bottom, the skirt's silhouette also widens down — and because
-        // the offset is purely vertical, the top of the skirt is fully
-        // hidden by the rail (skirt has zero thickness up there). The
-        // result is a natural "thicker at bottom, thinning to nothing at
-        // the top" appearance with no per-side computed offsets needed.
-        //
-        // Bumped from 14 → 22pt to push the table forward in space: a
-        // taller skirt reads as a thicker, more substantial piece of
-        // furniture instead of a flat decal. Paired with a stronger
-        // underside gradient below for additional depth.
-        let skirtDrop: CGFloat = 22
-
-        return ZStack {
-            // 1. Cast shadow on the floor. Two-layer shadow for depth:
-            //    a soft blurred photographic shadow underneath gives the
-            //    table a sense of hovering above a surface, then the
-            //    hard-ink offset trapezoid on top keeps the comic-page
-            //    stamp visible. Together they read as a real piece of
-            //    furniture with weight rather than a flat sticker.
-            TablePerspectiveShape(topRatio: tr)
-                .fill(Color.black.opacity(0.45))
-                .frame(width: outerW + 14, height: outerH + 14)
-                .offset(x: 4, y: 14)
-                .blur(radius: 16)
-                .allowsHitTesting(false)
-            TablePerspectiveShape(topRatio: tr)
-                .fill(SPRetro.ink.opacity(0.55))
-                .frame(width: outerW, height: outerH)
-                .offset(x: 3, y: 5)
-                .allowsHitTesting(false)
-
-            // 1b. Underside skirt. Flat ink band giving the table apparent
-            //     edge-thickness. We use ink tones (not dark wood) so the
-            //     skirt reads as a stamped panel edge on the paper page
-            //     rather than a photographed leather lip. Subtle top→bottom
-            //     ink-to-inkSoft gradient still gives a sense of depth.
-            TablePerspectiveShape(topRatio: tr)
-                .fill(
-                    // Stronger top→bottom gradient. The top of the skirt
-                    // (in shadow under the rail) is now pure ink; the
-                    // bottom (front edge of the table) brightens to a
-                    // warm leather tone, simulating the front lip
-                    // catching room light. This gives the skirt a real
-                    // sense of edge thickness instead of reading flat.
-                    LinearGradient(
-                        stops: [
-                            .init(color: Color(hex: "#0F0B07"), location: 0.00),
-                            .init(color: Color(hex: "#241B14"), location: 0.45),
-                            .init(color: Color(hex: "#3A2818"), location: 0.85),
-                            .init(color: Color(hex: "#5C4028"), location: 1.00),
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-                .frame(width: outerW, height: outerH)
-                .overlay(
-                    // Front-lip highlight — brighter warm hairline along
-                    // the bottom curve where light would catch the
-                    // forward-facing edge. Replaces the previous flat
-                    // tan stroke for more punch.
-                    TablePerspectiveShape(topRatio: tr)
-                        .stroke(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: Color.clear,                           location: 0.55),
-                                    .init(color: Color(hex: "#8A6038").opacity(0.45),   location: 0.85),
-                                    .init(color: Color(hex: "#C9A574").opacity(0.85),   location: 1.00),
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            ),
-                            lineWidth: 1.2
-                        )
-                        .frame(width: outerW, height: outerH)
-                )
-                .offset(y: skirtDrop)
-                .allowsHitTesting(false)
-
-            // 2. Padded leather rail
-            railLayer(outerW: outerW, outerH: outerH, outerCR: outerCR, topRatio: tr)
-
-            // 3a. Inner bevel — retro version. White-highlight stop removed
-            //     because it conflicted with the paper substrate (read as a
-            //     stray gleam, not as the felt rim). Now an all-ink gradient,
-            //     deepest at top (under the rail) fading to a softer ink at
-            //     the bottom. Same line weight, same frame — only color tone
-            //     changed.
-            TablePerspectiveShape(topRatio: tr)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            SPRetro.ink.opacity(0.65),
-                            SPRetro.ink.opacity(0.30),
-                            SPRetro.inkMuted.opacity(0.20),
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    ),
-                    lineWidth: 2.5
-                )
-                .frame(width: l.tableWidth + 4, height: l.tableHeight + 4)
-                .allowsHitTesting(false)
-
-            // 3b. Saddle stitching where rail meets felt
-            TablePerspectiveShape(topRatio: tr)
-                .stroke(
-                    Color(hex: "#C9A574").opacity(0.32),
-                    style: StrokeStyle(lineWidth: 0.6, dash: [3, 2.5])
-                )
-                .frame(width: l.tableWidth + 2, height: l.tableHeight + 2)
-                .allowsHitTesting(false)
-
-            // 3c. Inner rim gleam — warm highlight right at the felt/rail
-            //     boundary, top-biased. Required because the rail's top
-            //     depth fade darkens the far edge so much that the rail
-            //     visually "dissolves" into the felt up there. This thin
-            //     stroke re-anchors the boundary at the top without
-            //     fighting the perspective gradient: peak opacity at the
-            //     top (where the rail is otherwise lost), fading to nearly
-            //     nothing at the bottom (where the rail's bottom highlight
-            //     already defines the edge). Tan/copper tone reads as a
-            //     leather lip catching ambient light, not a hard outline.
-            TablePerspectiveShape(topRatio: tr)
-                .stroke(
-                    LinearGradient(
-                        stops: [
-                            .init(color: Color(hex: "#8A6038").opacity(0.65), location: 0.00),
-                            .init(color: Color(hex: "#8A6038").opacity(0.30), location: 0.35),
-                            .init(color: Color(hex: "#8A6038").opacity(0.08), location: 0.70),
-                            .init(color: Color.clear,                          location: 1.00),
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    ),
-                    lineWidth: 1.2
-                )
-                .frame(width: l.tableWidth + 1, height: l.tableHeight + 1)
-                .allowsHitTesting(false)
-
-            // 4. Felt surface (gradient + cloth texture + sheen + vignette)
-            feltSurface(l, cr: cr)
-
-            // 5. Inset betting line — the guide curve where action chips land.
-            //    Same trapezoidal silhouette, just inset 30pt on each axis so
-            //    it nests inside the felt rim.
-            TablePerspectiveShape(topRatio: tr)
-                .stroke(Color.white.opacity(0.085), lineWidth: 1)
-                .frame(width: l.tableWidth - 60, height: l.tableHeight - 60)
-                .allowsHitTesting(false)
-        }
-        .position(x: l.tableCenter.x, y: l.tableCenter.y)
+        Image("poker_table")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: l.tableWidth, height: l.tableHeight)
+            .position(x: l.tableCenter.x, y: l.tableCenter.y)
+            .allowsHitTesting(false)
     }
 
+    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // Remove in follow-up cleanup commit unless procedural rendering is revived.
     // ── Rail (padded leather) ────────────────────────────────────────────────
 
     private func railLayer(outerW: CGFloat,
@@ -689,6 +568,8 @@ struct PokerTableView: View {
         .allowsHitTesting(false)
     }
 
+    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // Remove in follow-up cleanup commit unless procedural rendering is revived.
     // ── Felt surface ─────────────────────────────────────────────────────────
 
     private func feltSurface(_ l: TableLayout, cr: CGFloat) -> some View {
@@ -2740,6 +2621,10 @@ struct TableTheme: Identifiable, Equatable {
 // across renders and identical for every table). The result is a subtle noise
 // that breaks up the gradient and reads as fabric instead of plastic.
 
+// TODO: Dead code after poker_table.png swap (2026-05-15).
+// Remove in follow-up cleanup commit unless procedural rendering is revived.
+// (Was previously also reused by the lobby background per the comment above;
+// confirm no other call sites before removing.)
 // Exposed (was `private`) so non-felt screens (e.g. the lobby background)
 // can reuse the same procedural cloth weave at low opacity for an
 // at-the-table aesthetic without re-implementing the deterministic dot

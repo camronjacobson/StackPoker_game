@@ -738,11 +738,16 @@ struct GameView: View {
                     .zIndex(35)
                 }
 
-                // Waiting overlay — dim the table behind a translucent ink
-                // pane so the paper waiting card sits on a darkened page
-                // (not full black-out, which would lose the page texture).
+                // Waiting overlay — no visible dim anymore (the retro table
+                // illustration earns the right to show through). We keep an
+                // invisible tap-blocking layer so empty-seat taps behind the
+                // waiting card don't accidentally surface the open-seat
+                // invite flow while the user is already looking at the
+                // "Invite Friends" / "Add Bot" card.
                 if vm.gameState?.phase == .waiting || vm.gameState == nil {
-                    SPRetro.ink.opacity(0.55).ignoresSafeArea()
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea()
                     VStack(spacing: 20) {
                         if vm.gameState == nil {
                             ProgressView()
