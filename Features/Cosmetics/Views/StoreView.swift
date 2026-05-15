@@ -490,6 +490,9 @@ struct PurchaseErrorToast: View {
         case .limitedTimeExpired:  return NSLocalizedString("This limited-time item just expired.",  comment: "")
         case .unknownCosmetic:     return NSLocalizedString("Item not found. Please try again.",     comment: "")
         case .insufficientFunds:   return NSLocalizedString("Not enough chips.",                     comment: "")
+        case .priceMismatch:       return NSLocalizedString("Item price has changed. Please refresh and try again.", comment: "")
+        case .rateLimited:         return NSLocalizedString("Too many requests. Slow down and try again in a moment.", comment: "")
+        case .validationError:     return NSLocalizedString("Something went wrong. Please try again.", comment: "")
         case .network(let s):      return String(format: NSLocalizedString("Network error: %@", comment: ""), s)
         case .atomicityViolation:  return NSLocalizedString("Purchase partially failed — refresh your balance.", comment: "")
         }

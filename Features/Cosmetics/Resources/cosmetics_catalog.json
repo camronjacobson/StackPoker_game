@@ -262,7 +262,6 @@
       "name": "Standard",
       "category": "cardFace",
       "rarity": "common",
-      "priceChips": 0,
       "previewAssetName": "cosmetic_cardFace_standard",
       "unlockCondition": "achievement"
     },
@@ -292,7 +291,6 @@
       "name": "Classic Slide",
       "category": "dealAnimation",
       "rarity": "common",
-      "priceChips": 0,
       "previewAssetName": "cosmetic_dealAnimation_classic_slide",
       "unlockCondition": "achievement"
     },

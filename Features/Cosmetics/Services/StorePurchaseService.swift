@@ -27,8 +27,23 @@ enum PurchaseError: Error, Equatable {
     case limitedTimeExpired
 
     /// Server-confirmed insufficient chips. The remote impl maps the
-    /// backend's "INSUFFICIENT_FUNDS" serverError code to this case.
+    /// backend's "INSUFFICIENT_CHIPS" serverError code to this case.
     case insufficientFunds
+
+    /// `expectedPrice` sent by the client did not match the server's
+    /// `priceChips` for this cosmetic. Indicates client/catalog drift —
+    /// the user should refresh and retry. Backend code: PRICE_MISMATCH.
+    case priceMismatch
+
+    /// Hit the `chipRateLimit` middleware (shared with /chips/transfer).
+    /// Backend code: RATE_LIMITED, HTTP 429.
+    case rateLimited
+
+    /// express-validator rejected the request body before it reached the
+    /// service. In practice this means the client sent a malformed
+    /// cosmeticId or expectedPrice — a bug, not a user-actionable error.
+    /// Backend code: VALIDATION_ERROR, HTTP 422.
+    case validationError
 
     /// Generic network failure — wraps the underlying NetworkError's
     /// localizedDescription. We don't re-export NetworkError directly so
@@ -92,6 +107,14 @@ final class RemoteStorePurchaseService: StorePurchaseServiceProtocol, Observable
     private let network: NetworkPurchasePort
     private let now: () -> Date
 
+    /// Callback that publishes the server-confirmed new chip balance after
+    /// a successful purchase. Settable so the composition root in
+    /// StackPokerApp can wire it to AuthViewModel.applyServerBalance after
+    /// both @StateObjects are initialized (they can't reference each other
+    /// at init time). Optional because tests and the local stub path don't
+    /// need it. Must be @MainActor because it touches @Published state.
+    var onBalanceUpdated: (@MainActor (String) -> Void)?
+
     private static let log = OSLog(subsystem: "com.stackpoker.cosmetics",
                                    category: "purchase")
 
@@ -134,13 +157,32 @@ final class RemoteStorePurchaseService: StorePurchaseServiceProtocol, Observable
         }
 
         // ── Atomic server-side purchase (4) ──────────────────────────────────
+        // We send `expectedPrice` as a BigInt-as-decimal-string so the server
+        // can guard against catalog/client drift. If the server's
+        // `priceChips` doesn't match, it returns PRICE_MISMATCH and we abort
+        // before any chip movement. On success, the server returns the
+        // post-decrement balance so we can update the shared UserProfile
+        // without a second /auth/me round-trip.
+        let newBalance: String
         do {
-            try await network.postPurchase(cosmeticId: resolved.id)
+            newBalance = try await network.postPurchase(
+                cosmeticId: resolved.id,
+                expectedPrice: String(resolved.priceChips)
+            )
         } catch let err as PurchaseError {
             return finalize(.failure(err), cosmetic: resolved)
         } catch {
             return finalize(.failure(.network(error.localizedDescription)),
                             cosmetic: resolved)
+        }
+
+        // ── Propagate server-confirmed balance to AuthViewModel ──────────────
+        // Wired by the composition root via `onBalanceUpdated`. If unset
+        // (tests, stubs), the propagation is a no-op and the rest of the
+        // flow still completes — purchase success isn't dependent on the
+        // HUD refresh sink being installed.
+        if let updater = onBalanceUpdated {
+            await updater(newBalance)
         }
 
         // ── Local inventory grant ────────────────────────────────────────────
@@ -175,12 +217,15 @@ final class RemoteStorePurchaseService: StorePurchaseServiceProtocol, Observable
 // The production binding lives in NetworkPurchasePort+Live.swift below.
 
 protocol NetworkPurchasePort {
-    /// POSTs to /cosmetics/purchase with `{ "cosmeticId": id }`. Throws a
-    /// `PurchaseError` for product-meaningful failures (insufficientFunds,
-    /// alreadyOwned, etc.) or rethrows the underlying NetworkError for
-    /// transport failures. Returns Void on success — the new balance will
-    /// be read from /auth/me on the next refresh.
-    func postPurchase(cosmeticId: CosmeticID) async throws
+    /// POSTs to /cosmetics/purchase with
+    /// `{ "cosmeticId": id, "expectedPrice": "<BigInt-as-string>" }`.
+    /// Throws a `PurchaseError` for product-meaningful failures
+    /// (insufficientFunds, alreadyOwned, priceMismatch, etc.) or rethrows
+    /// the underlying NetworkError for transport failures. On success,
+    /// returns the server-confirmed new chip balance (BigInt-as-string) so
+    /// callers can propagate it to the shared user profile without a
+    /// follow-up /auth/me request.
+    func postPurchase(cosmeticId: CosmeticID, expectedPrice: String) async throws -> String
 }
 
 // ─── Local stub (works offline, for dev + Phase-1 demo) ───────────────────────

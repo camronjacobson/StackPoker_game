@@ -79,4 +79,16 @@ final class CosmeticsContainer: ObservableObject {
             }
             .store(in: &cancellables)
     }
+
+    /// Installs a callback that the remote purchase service invokes with
+    /// the server-confirmed new chip balance after every successful
+    /// purchase. Wired from the composition root because `AuthViewModel`
+    /// and `CosmeticsContainer` are sibling @StateObjects and can't
+    /// reference each other at init time — the bridge has to be deferred
+    /// to `.onAppear`. The cast no-ops cleanly for the local-stub purchase
+    /// service (which manages its own simulated balance and doesn't need
+    /// to talk back to AuthViewModel).
+    func setBalanceUpdater(_ updater: @escaping @MainActor (String) -> Void) {
+        (purchaseService as? RemoteStorePurchaseService)?.onBalanceUpdated = updater
+    }
 }

@@ -13,14 +13,19 @@ private final class FakeNetworkPort: NetworkPurchasePort {
         case throwOther(Error)
     }
     var outcome: Outcome = .ok
+    /// Balance string the fake returns on a successful purchase. Tests that
+    /// assert on the onBalanceUpdated callback override this.
+    var scriptedNewBalance: String = "0"
     private(set) var callCount = 0
     private(set) var lastCosmeticId: CosmeticID?
+    private(set) var lastExpectedPrice: String?
 
-    func postPurchase(cosmeticId: CosmeticID) async throws {
+    func postPurchase(cosmeticId: CosmeticID, expectedPrice: String) async throws -> String {
         callCount += 1
         lastCosmeticId = cosmeticId
+        lastExpectedPrice = expectedPrice
         switch outcome {
-        case .ok:                          return
+        case .ok:                          return scriptedNewBalance
         case .throwPurchase(let e):        throw e
         case .throwOther(let e):           throw e
         }
