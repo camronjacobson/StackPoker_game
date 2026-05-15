@@ -86,7 +86,7 @@ struct LobbyView: View {
         BuyInSheet(table: table, buyIn: $buyInInput) {
           guard let amount = Int(buyInInput) else { return }
           showBuyInSheet = nil
-          Task { await vm.joinTable(table, buyIn: amount) }
+          Task { await vm.joinTable(table, buyIn: amount, authVM: authVM) }
         }
       }
       .sheet(isPresented: $showFriends) { FriendsSheet(vm: fvm) }

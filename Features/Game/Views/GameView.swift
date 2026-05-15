@@ -1679,6 +1679,9 @@ struct TableSideMenu: View {
 
 struct TopUpSheet: View {
     @ObservedObject var vm: GameViewModel
+    // Injected so we can hand it through to vm.topUpChips — the VM needs to
+    // call applyServerBalance on it after the server returns newBalance.
+    @EnvironmentObject var authVM: AuthViewModel
     @State private var amount: Double = 0
 
     // True when there's an active hand running. The backend accepts the
@@ -1801,7 +1804,7 @@ struct TopUpSheet: View {
                 // and a hard ink offset shadow. Disabled state goes to a
                 // muted paperShade so the affordance is unmistakable.
                 Button {
-                    vm.topUpChips(amount: Int(amount))
+                    vm.topUpChips(amount: Int(amount), authVM: authVM)
                 } label: {
                     HStack(spacing: 8) {
                         if vm.topUpInProgress {

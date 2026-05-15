@@ -4,6 +4,9 @@ import SwiftUI
 
 struct JoinByCodeSheet: View {
   @ObservedObject var vm: LobbyViewModel
+  // Needed so the VM can apply the server-returned newBalance to the HUD
+  // after a successful join-by-code (which debits the buy-in).
+  @EnvironmentObject var authVM: AuthViewModel
   @Environment(\.dismiss) var dismiss
 
   var body: some View {
@@ -73,7 +76,7 @@ struct JoinByCodeSheet: View {
               icon: "arrow.right.circle.fill",
               isLoading: vm.isJoining,
               isDisabled: vm.joinCode.count < 4 || vm.buyInAmount.isEmpty
-            ) { Task { await vm.joinByCode() } }
+            ) { Task { await vm.joinByCode(authVM: authVM) } }
             .padding(.horizontal, SPSpacing.md)
 
             Text("Virtual chips only — no real money")
@@ -103,6 +106,9 @@ struct JoinByCodeSheet: View {
 
 struct InvitesSheet: View {
   @ObservedObject var vm: LobbyViewModel
+  // Needed so the VM can apply the server-returned newBalance to the HUD
+  // when an accepted invite auto-joins the table (debits the buy-in).
+  @EnvironmentObject var authVM: AuthViewModel
   @Environment(\.dismiss) var dismiss
 
   var body: some View {
@@ -125,7 +131,7 @@ struct InvitesSheet: View {
           List {
             ForEach(vm.pendingInvites) { invite in
               InviteRow(invite: invite) { accept in
-                Task { await vm.respondToInvite(invite, accept: accept) }
+                Task { await vm.respondToInvite(invite, accept: accept, authVM: authVM) }
               }
               .listRowBackground(SPColors.surface)
               .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))

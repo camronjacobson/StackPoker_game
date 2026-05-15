@@ -42,6 +42,12 @@ final class AuthViewModel: ObservableObject {
     private let keychain = KeychainManager.shared
     private var usernameCancellable: AnyCancellable?
     private var usernameCheckTask: Task<Void, Never>?
+    // Single subscription to the GameSocketClient's chipsUpdatedSubject.
+    // Wired at app root via `bindToSocketChipUpdates(_:)`. Holding it as a
+    // dedicated property (rather than a Set<AnyCancellable>) makes the
+    // lifecycle obvious and prevents accidentally stacking duplicate
+    // subscriptions if the bind is ever called twice.
+    private var socketChipsCancellable: AnyCancellable?
 
     init() {
         // Inject access token into network layer
@@ -284,8 +290,19 @@ final class AuthViewModel: ObservableObject {
     }
 
     // ─── Refresh Profile ──────────────────────────────────────────────────────
-    // Pulls the latest UserProfile from /auth/me so UI bound to chipBalance,
-    // avatar, etc. reflects server-side changes (e.g. after an admin grant).
+    // MANUAL REFRESH ONLY. Pulls the latest UserProfile from /auth/me so UI
+    // bound to chipBalance, avatar, etc. reflects out-of-band server-side
+    // changes (e.g. an admin grant, a CASH_OUT via the game socket — both
+    // mutate chipBalance without pushing the new value to this client).
+    //
+    // Do NOT call this after a known chip-mutating endpoint that already
+    // returned `newBalance` in its response — use `applyServerBalance(_:)`
+    // instead. Round-tripping /auth/me when we already have the answer is
+    // wasted bandwidth and a perceptible HUD lag.
+    //
+    // Appropriate callers: pull-to-refresh, post-login hydration, app
+    // foreground refresh, and the tech-debt fallback for socket-driven
+    // cash-out / sit-out events that lack a balance push.
 
     func refreshProfile() async {
         do {
@@ -296,15 +313,60 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    // ─── Apply server-confirmed chip balance ──────────────────────────────────
+    //
+    // Used by code paths that just received a fresh balance back from a
+    // server-write endpoint (cosmetics purchase, future chip transfers,
+    // etc.). Avoids a /auth/me round-trip for data the caller already has.
+    //
+    // Marked @MainActor explicitly so this is the API-level contract: any
+    // future caller is forced to honor main-thread publication of
+    // @Published `currentUser`. Without the annotation, a caller could
+    // invoke this from a background task and SwiftUI would crash on the
+    // resulting UI update.
+    //
+    // The server is the only authority on chipBalance — this method should
+    // only be invoked with a value that came back from a server response
+    // in the *current* session. Don't call it with locally-computed
+    // arithmetic on the cached balance; that defeats the whole point of
+    // server authority on chip movements.
+
+    @MainActor
+    func applyServerBalance(_ newBalance: String) {
+        guard let u = currentUser else { return }
+        currentUser = u.with(chipBalance: newBalance)
+    }
+
+    // ─── Socket-pushed balance updates ────────────────────────────────────────
+    // Subscribes to the GameSocketClient's `your_chips_updated` stream. The
+    // server emits this whenever it mutates the user's wallet outside an HTTP
+    // response cycle — currently softLeaveCashOut, rejoinRedebit, and the
+    // idle-table sweeper (see backend TECH_DEBT.md "Balance sync via socket").
+    //
+    // Called once from StackPokerApp.onAppear so the subscription survives
+    // every view transition. Re-binding is safe — the previous cancellable is
+    // released by reassignment, which prevents stacked subscriptions.
+    func bindToSocketChipUpdates(_ socket: GameSocketClient) {
+        socketChipsCancellable = socket.chipsUpdatedSubject
+            .receive(on: RunLoop.main)
+            .sink { [weak self] event in
+                // CHIP MUTATION: server returned newBalance; sync HUD.
+                self?.applyServerBalance(event.newBalance)
+            }
+    }
+
     // ─── Daily Bonus ──────────────────────────────────────────────────────────
     // Calls POST /chips/daily to claim the once-per-24h chip bonus. The backend
     // is the source of truth — it checks today's chipTransaction history for a
     // DAILY_BONUS row and rejects the call with code "ALREADY_CLAIMED" if the
     // user has already redeemed today (the message includes hours-until-reset).
     //
-    // On success we refresh the profile so chipBalance bound elsewhere in the
-    // UI updates immediately; the caller still gets the bonus amount for any
-    // success animation (e.g. "+1000" pop in DailyBonusCard).
+    // On success the response carries the post-credit `newBalance`; we feed
+    // it into applyServerBalance so the HUD updates in one runloop tick. This
+    // is the canonical "server returns newBalance after a mutation" pattern
+    // (Option A). `refreshProfile()` is reserved for *manual* refreshes — pull-
+    // to-refresh, post-login hydration, etc. — never for known mutations
+    // where the server already handed us the post-balance.
 
     enum DailyBonusResult {
         case success(amount: Int)
@@ -317,7 +379,8 @@ final class AuthViewModel: ObservableObject {
             let response: DailyBonusResponse = try await network.request(
                 .dailyBonus, method: .POST
             )
-            await refreshProfile()
+            // CHIP MUTATION: server returned newBalance; sync HUD.
+            applyServerBalance(response.newBalance)
             // bonusAmount is a BigInt-as-string from the backend; coerce here
             // so the caller (DailyBonusCard) can show "+\(amount)" plainly.
             return .success(amount: Int(response.bonusAmount) ?? 0)

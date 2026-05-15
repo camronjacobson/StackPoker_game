@@ -2,6 +2,9 @@ import SwiftUI
 
 struct CreateTableSheet: View {
   @ObservedObject var vm: LobbyViewModel
+  // Needed so the VM can apply the server-returned newBalance to the HUD
+  // when the auto-seat step after table creation debits the buy-in.
+  @EnvironmentObject var authVM: AuthViewModel
   @Environment(\.dismiss) var dismiss
 
   // Continuous slider state — decouples thumb animation from discrete VM values.
@@ -212,7 +215,7 @@ struct CreateTableSheet: View {
               isLoading: vm.isCreating,
               isDisabled: vm.newTableName.count < 2
             ) {
-              Task { await vm.createTable() }
+              Task { await vm.createTable(authVM: authVM) }
             }
             .padding(.horizontal, SPSpacing.md)
             .padding(.bottom, SPSpacing.xl)

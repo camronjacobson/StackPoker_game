@@ -844,20 +844,29 @@ final class GameViewModel: ObservableObject {
     // ─── Top-up chips ────────────────────────────────────────────────────────
     // Adds chips to the local player's stack between hands. Server enforces
     // the mid-hand block, max-buy-in cap, and chip balance check; we just
-    // surface any error message.
-    func topUpChips(amount: Int) {
+    // surface any error message. authVM is passed in so we can sync the HUD
+    // from the server-returned newBalance (rather than refetching /auth/me).
+    func topUpChips(amount: Int, authVM: AuthViewModel) {
         guard amount > 0 else { return }
         topUpInProgress = true
         Task {
             defer { topUpInProgress = false }
             do {
                 struct Body: Encodable { let amount: Int }
-                struct TopUpResponse: Decodable { let newStack: String; let addedAmount: String }
-                let _: TopUpResponse = try await NetworkService.shared.request(
+                struct TopUpResponse: Decodable {
+                    let newStack:    String
+                    let addedAmount: String
+                    /// Caller's post-debit wallet balance (BigInt-as-string).
+                    /// Server-authoritative — see TECH_DEBT.md.
+                    let newBalance:  String
+                }
+                let resp: TopUpResponse = try await NetworkService.shared.request(
                     .topUpChips(tableId: tableId),
                     method: .POST,
                     body: Body(amount: amount)
                 )
+                // CHIP MUTATION: server returned newBalance; sync HUD.
+                authVM.applyServerBalance(resp.newBalance)
                 showTopUpSheet = false
             } catch let err as NetworkError {
                 errorMessage = err.localizedDescription

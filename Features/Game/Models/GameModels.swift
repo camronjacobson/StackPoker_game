@@ -280,6 +280,20 @@ struct WsErrorData: Decodable {
     let message: String
 }
 
+// ─── your_chips_updated payload ──────────────────────────────────────────────
+// Server-pushed wallet update for the current user. `newBalance` is the
+// authoritative post-mutation chipBalance (BigInt-as-string, matching the
+// REST `newBalance` field convention). `reason` is a short tag for
+// debugging/telemetry — iOS does NOT branch on it; every value flows through
+// applyServerBalance the same way.
+//
+// See TECH_DEBT.md ("Balance sync via socket"). The canonical channel for
+// server-side wallet mutations that aren't tied to an HTTP response.
+struct ChipsUpdatedEvent: Decodable {
+    let newBalance: String
+    let reason:     String?
+}
+
 struct ChatMessage: Decodable, Identifiable {
     let userId:   String
     let username: String

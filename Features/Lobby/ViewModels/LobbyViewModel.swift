@@ -216,7 +216,7 @@ final class LobbyViewModel: ObservableObject {
 
   // ─── Join by Code ──────────────────────────────────────────────────────────
 
-  func joinByCode() async {
+  func joinByCode(authVM: AuthViewModel) async {
     let code = joinCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     guard !code.isEmpty else { joinError = "Enter a join code"; return }
 
@@ -229,16 +229,18 @@ final class LobbyViewModel: ObservableObject {
     joinError = nil
 
     do {
-      let table: TableDetail = try await network.request(
+      let table: JoinTableResponse = try await network.request(
         .joinTable(code: code),
         method: .POST,
         body: JoinTableRequest(buyInAmount: amount, seatIndex: nil)
       )
+      // CHIP MUTATION: server returned newBalance; sync HUD.
+      authVM.applyServerBalance(table.newBalance)
       showJoinCodeSheet = false
       joinCode = ""
       buyInAmount = ""
-      lastTable   = table
-      joinedTable = table
+      lastTable   = table.detail
+      joinedTable = table.detail
     } catch let err as NetworkError {
       joinError = err.localizedDescription
     } catch {}
@@ -248,18 +250,20 @@ final class LobbyViewModel: ObservableObject {
 
   // ─── Join by ID (from list) ────────────────────────────────────────────────
 
-  func joinTable(_ table: TableListItem, buyIn: Int) async {
+  func joinTable(_ table: TableListItem, buyIn: Int, authVM: AuthViewModel) async {
     isJoining = true
     joinError = nil
 
     do {
-      let detail: TableDetail = try await network.request(
+      let detail: JoinTableResponse = try await network.request(
         .joinTable(code: table.joinCode),
         method: .POST,
         body: JoinTableRequest(buyInAmount: buyIn, seatIndex: nil)
       )
-      lastTable   = detail
-      joinedTable = detail
+      // CHIP MUTATION: server returned newBalance; sync HUD.
+      authVM.applyServerBalance(detail.newBalance)
+      lastTable   = detail.detail
+      joinedTable = detail.detail
     } catch let err as NetworkError {
       joinError = err.localizedDescription
     } catch {}
@@ -269,7 +273,7 @@ final class LobbyViewModel: ObservableObject {
 
   // ─── Create Table ──────────────────────────────────────────────────────────
 
-  func createTable() async {
+  func createTable(authVM: AuthViewModel) async {
     guard validateCreateForm() else { return }
 
     isCreating = true
@@ -293,17 +297,20 @@ final class LobbyViewModel: ObservableObject {
     )
 
     do {
-      // Step 1: create the table
+      // Step 1: create the table — chip balance unchanged at this point;
+      // the buy-in debit happens in step 2 via /tables/join/:code.
       let table: TableDetail = try await network.request(
         .createTable, method: .POST, body: req
       )
 
       // Step 2: seat the creator — table creation doesn't auto-seat the owner
-      let _: TableDetail = try await network.request(
+      let joinResp: JoinTableResponse = try await network.request(
         .joinTable(code: table.joinCode),
         method: .POST,
         body: JoinTableRequest(buyInAmount: min, seatIndex: nil)
       )
+      // CHIP MUTATION: server returned newBalance; sync HUD.
+      authVM.applyServerBalance(joinResp.newBalance)
 
       // Persist the creator's bot preference so the game screen knows whether
       // to surface bot UI later. We don't have a server-side `allowBots`
@@ -343,7 +350,7 @@ final class LobbyViewModel: ObservableObject {
     } catch {}
   }
 
-  func respondToInvite(_ invite: TableInvite, accept: Bool) async {
+  func respondToInvite(_ invite: TableInvite, accept: Bool, authVM: AuthViewModel) async {
     do {
       struct RespondBody: Encodable { let accept: Bool }
       struct RespondResponse: Decodable { let joinCode: String? }
@@ -361,13 +368,15 @@ final class LobbyViewModel: ObservableObject {
         isJoining = true
         joinError = nil
         do {
-          let detail: TableDetail = try await network.request(
+          let detail: JoinTableResponse = try await network.request(
             .joinTable(code: code),
             method: .POST,
             body: JoinTableRequest(buyInAmount: minBuyIn > 0 ? minBuyIn * 20 : 1000, seatIndex: nil)
           )
-          lastTable = detail
-          joinedTable = detail
+          // CHIP MUTATION: server returned newBalance; sync HUD.
+          authVM.applyServerBalance(detail.newBalance)
+          lastTable = detail.detail
+          joinedTable = detail.detail
         } catch let err as NetworkError {
           joinError = err.localizedDescription
         } catch {}

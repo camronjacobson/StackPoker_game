@@ -101,6 +101,34 @@ struct UserProfile: Decodable, Identifiable, Equatable {
     static func == (lhs: UserProfile, rhs: UserProfile) -> Bool {
         lhs.id == rhs.id
     }
+
+    // ── Field-level copy helpers ──────────────────────────────────────────────
+    //
+    // UserProfile's fields are `let` (immutability is deliberate — it's
+    // decoded from /auth/me and we don't want any client code mutating a
+    // server-owned struct piecemeal). When a server write returns one
+    // updated field (purchase → chipBalance, stats update → totalWon, etc.)
+    // we still need to publish a new instance carrying the change.
+    //
+    // These helpers wrap the full-field copy so a single-field update is a
+    // one-liner at the call site instead of a 13-arg constructor block.
+    // Add a new `with(...)` overload whenever a new server-write endpoint
+    // returns an updated single field.
+
+    /// Returns a copy with `chipBalance` replaced. Used by the cosmetics
+    /// purchase flow to apply server-confirmed new balance to the cached
+    /// profile without a /auth/me round-trip.
+    func with(chipBalance newBalance: String) -> UserProfile {
+        UserProfile(
+            id: id, username: username, displayName: displayName,
+            avatarId: avatarId, avatarUrl: avatarUrl,
+            chipBalance: newBalance,
+            totalWon: totalWon, totalLost: totalLost,
+            handsPlayed: handsPlayed, gamesPlayed: gamesPlayed,
+            email: email, isAdmin: isAdmin,
+            createdAt: createdAt, lastSeenAt: lastSeenAt
+        )
+    }
 }
 
 // ─── Avatar Definitions ───────────────────────────────────────────────────────

@@ -68,7 +68,7 @@ struct ChipsView: View {
         VStack(spacing: SPSpacing.sm) {
             HStack(spacing: SPSpacing.sm) {
                 SPButton("Daily Bonus", icon: "gift.fill", isLoading: vm.isClaiming) {
-                    Task { await vm.claimDailyBonus() }
+                    Task { await vm.claimDailyBonus(authVM: authVM) }
                 }
                 SPButton("Transfer", style: .secondary, icon: "arrow.left.arrow.right") {
                     vm.showTransferSheet = true
@@ -217,6 +217,7 @@ struct TransactionRow: View {
 
 struct TransferSheet: View {
     @ObservedObject var vm: ChipsViewModel
+    @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -277,7 +278,7 @@ struct TransferSheet: View {
                             isLoading: vm.isTransferring,
                             isDisabled: vm.recipientId.isEmpty || vm.transferAmount.isEmpty
                         ) {
-                            Task { await vm.transfer() }
+                            Task { await vm.transfer(authVM: authVM) }
                         }
                         .padding(.horizontal, SPSpacing.md)
 

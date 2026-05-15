@@ -45,6 +45,9 @@ struct ChipHistoryResponse: Decodable {
 struct DailyBonusResponse: Decodable {
     let bonusAmount: String
     let message:     String
+    /// Sender's post-credit wallet balance (BigInt-as-string). Server-
+    /// authoritative — see TECH_DEBT.md.
+    let newBalance:  String
 }
 
 struct TransferRequest: Encodable {
@@ -56,6 +59,10 @@ struct TransferRequest: Encodable {
 struct TransferResponse: Decodable {
     let transferred: Int
     let recipient:   String
+    /// Sender's post-debit wallet balance (BigInt-as-string). Never the
+    /// recipient's — that user's HUD goes stale until their next /auth/me
+    /// (see TECH_DEBT.md "socket-pushed balance_updated").
+    let newBalance:  String
 }
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
@@ -92,12 +99,13 @@ final class ChipsViewModel: ObservableObject {
         } catch {}
     }
 
-    func claimDailyBonus() async {
+    func claimDailyBonus(authVM: AuthViewModel) async {
         isClaiming = true
         defer { isClaiming = false }
         do {
-            struct Empty: Decodable {}
             let resp: DailyBonusResponse = try await network.request(.dailyBonus, method: .POST)
+            // CHIP MUTATION: server returned newBalance; sync HUD.
+            authVM.applyServerBalance(resp.newBalance)
             successMessage = "+\(formatChips(resp.bonusAmount)) chips added!"
             await loadHistory()
         } catch let e as NetworkError {
@@ -105,7 +113,7 @@ final class ChipsViewModel: ObservableObject {
         } catch {}
     }
 
-    func transfer() async {
+    func transfer(authVM: AuthViewModel) async {
         guard let amt = Int(transferAmount), amt >= 100 else {
             error = "Minimum transfer is 100 chips"; return
         }
@@ -117,6 +125,8 @@ final class ChipsViewModel: ObservableObject {
         do {
             let req = TransferRequest(recipientId: recipientId, amount: amt, note: transferNote.isEmpty ? nil : transferNote)
             let resp: TransferResponse = try await network.request(.transferChips, method: .POST, body: req)
+            // CHIP MUTATION: server returned newBalance; sync HUD.
+            authVM.applyServerBalance(resp.newBalance)
             successMessage = "\(formatChips(String(resp.transferred))) chips sent to \(resp.recipient)"
             recipientId = ""; transferAmount = ""; transferNote = ""
             showTransferSheet = false

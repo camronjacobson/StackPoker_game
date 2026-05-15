@@ -35,6 +35,15 @@ final class GameSocketClient: ObservableObject {
     let playerEventSubject  = PassthroughSubject<(String, String), Never>() // (event, userId)
     let kickedSubject       = PassthroughSubject<String, Never>()
     let errorSubject        = PassthroughSubject<WsErrorData, Never>()
+    // Canonical socket-side balance update — fires whenever the server's
+    // chips ledger changes for the current user outside an HTTP response.
+    // Sources (per TECH_DEBT.md "Balance sync via socket"):
+    //   • leave_table → softLeaveCashOut         (reason: "cash_out")
+    //   • join_table  → rejoinRedebit            (reason: "rejoin_redebit" | "rejoin_noop")
+    //   • idle-table sweeper → forceCloseIdleTable (reason: "idle_table_closed")
+    // Future emit sources (admin grant, tipping, tournament prizes) should
+    // ride this same channel rather than introducing parallel events.
+    let chipsUpdatedSubject = PassthroughSubject<ChipsUpdatedEvent, Never>()
 
     private var webSocket:    URLSessionWebSocketTask?
     private var pingTimer:    Timer?
@@ -262,6 +271,11 @@ final class GameSocketClient: ObservableObject {
             struct PlayerEvent: Decodable { let userId: String; let username: String }
             if let pe = try? decoder.decode(WsEnvelope<PlayerEvent>.self, from: envData) {
                 playerEventSubject.send((eventName, pe.data.userId))
+            }
+
+        case "your_chips_updated":
+            if let cu = try? decoder.decode(WsEnvelope<ChipsUpdatedEvent>.self, from: envData) {
+                chipsUpdatedSubject.send(cu.data)
             }
 
         case "kicked":

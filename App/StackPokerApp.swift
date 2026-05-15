@@ -53,6 +53,24 @@ struct StackPokerApp: App {
                             .map { $0?.id }
                             .eraseToAnyPublisher()
                     )
+                    // Bridge purchase-success → AuthViewModel balance refresh.
+                    // RemoteStorePurchaseService publishes the server-
+                    // confirmed new balance through this closure after each
+                    // successful purchase so the HUD, ChipsView, ProfileView,
+                    // and Store balance pill update without a follow-up
+                    // /auth/me round-trip. Wired here (not in init) because
+                    // both objects are @StateObjects and can't reference
+                    // each other at init time.
+                    cosmetics.setBalanceUpdater { [weak authViewModel] newBalance in
+                        authViewModel?.applyServerBalance(newBalance)
+                    }
+                    // Bridge GameSocketClient.chipsUpdatedSubject → AuthVM.
+                    // Single subscription that lives for the app's lifetime;
+                    // see backend TECH_DEBT.md "Balance sync via socket".
+                    // Catches in-session wallet mutations the HTTP-level
+                    // `newBalance` plumbing can't reach: leave_table cash-out,
+                    // join_table re-debit, idle-table sweep refunds.
+                    authViewModel.bindToSocketChipUpdates(GameSocketClient.shared)
                 }
                 // ─── Live Activity → app deep-link bridge ──────────────────
                 // The Fold button in the Live Activity fires

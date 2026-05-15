@@ -109,6 +109,33 @@ struct JoinTableRequest: Encodable {
   let seatIndex: Int?
 }
 
+// ─── Join Table Response ──────────────────────────────────────────────────────
+//
+// The backend's /tables/join/:code endpoint returns a *flat* JSON shape:
+// every TableDetail field plus a top-level `newBalance` (the caller's post-
+// buy-in chip balance, BigInt-as-string). The flat shape matches the
+// convention used by /cosmetics/purchase and the other chip-mutating
+// endpoints — see TECH_DEBT.md.
+//
+// We model that flat JSON as a wrapper so TableDetail itself doesn't grow
+// an optional `newBalance` field (which would be meaningless for the GET
+// /tables/:id detail fetch and for the list endpoint). Custom Decodable
+// decodes the embedded TableDetail from the same root keyed container,
+// then pulls out `newBalance` separately.
+
+struct JoinTableResponse: Decodable {
+  let detail:     TableDetail
+  let newBalance: String
+
+  private enum CodingKeys: String, CodingKey { case newBalance }
+
+  init(from decoder: Decoder) throws {
+    self.detail = try TableDetail(from: decoder)
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.newBalance = try c.decode(String.self, forKey: .newBalance)
+  }
+}
+
 // ─── Friend Models ────────────────────────────────────────────────────────────
 
 struct Friend: Decodable, Identifiable {
