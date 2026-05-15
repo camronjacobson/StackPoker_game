@@ -22,7 +22,10 @@ enum APIConfig {
     // router reboot, etc). If you start seeing "server error" on a real device while
     // running from Xcode, check `ipconfig getifaddr en0` and update the debug host.
     #if DEBUG
-    private static let host = "http://192.168.0.55:3000"
+    // 127.0.0.1 works for the iOS Simulator (which shares the Mac's network
+    // stack). For a physical device on the same LAN, swap to the Mac's
+    // current LAN IP from `ipconfig getifaddr en0`.
+    private static let host = "http://127.0.0.1:3000"
     #else
     private static let host = "https://stackpoker-backend-production.up.railway.app"
     #endif
