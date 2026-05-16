@@ -330,9 +330,14 @@ struct GameView: View {
                 tableArea(isLandscape: false)
                 localPlayerOverlay
                     .padding(.bottom, 4)
-                    // When it's my turn, drop the hole-card layer behind the
-                    // table so the seat avatar + timer ring draw on top.
-                    .zIndex(vm.isMyTurn ? -1 : 1)
+                    // Hole cards always render above the table felt. The hero
+                    // seat avatar now sits inside the felt (lifted off the
+                    // bottom rim), so the old `vm.isMyTurn ? -1 : 1` trick —
+                    // which dropped cards behind the table so the timer ring
+                    // could draw on top — would now hide the cards under the
+                    // felt entirely. Avatar/ring are physically separated
+                    // from the cards, so no zIndex juggling needed.
+                    .zIndex(1)
             }
             ActionBar(vm: vm)
         }
