@@ -324,20 +324,66 @@ struct GameView: View {
     // Stacked vertically: top bar → table → action bar
 
     private func portraitLayout(geo: GeometryProxy) -> some View {
+        // VStack splits the screen into a "table region" (top) and a fixed
+        // ActionBar (bottom). When bet entry is open we layer a transparent
+        // tap-dismiss surface INSIDE the table region only — that way it
+        // can never sit above the ActionBar and steal its button taps,
+        // while still covering every pixel of the felt / top bar that the
+        // user might tap to back out. This gives the user the standard
+        // sheet/drawer "tap outside to dismiss" escape hatch.
         VStack(spacing: 0) {
-            topBar
             ZStack(alignment: .bottom) {
-                tableArea(isLandscape: false)
-                localPlayerOverlay
-                    .padding(.bottom, 4)
-                    // Hole cards always render above the table felt. The hero
-                    // seat avatar now sits inside the felt (lifted off the
-                    // bottom rim), so the old `vm.isMyTurn ? -1 : 1` trick —
-                    // which dropped cards behind the table so the timer ring
-                    // could draw on top — would now hide the cards under the
-                    // felt entirely. Avatar/ring are physically separated
-                    // from the cards, so no zIndex juggling needed.
-                    .zIndex(1)
+                VStack(spacing: 0) {
+                    topBar
+                    ZStack(alignment: .bottom) {
+                        tableArea(isLandscape: false)
+                        localPlayerOverlay
+                            .padding(.bottom, 4)
+                            // Hole cards always render above the table felt. The hero
+                            // seat avatar now sits inside the felt (lifted off the
+                            // bottom rim), so the old `vm.isMyTurn ? -1 : 1` trick —
+                            // which dropped cards behind the table so the timer ring
+                            // could draw on top — would now hide the cards under the
+                            // felt entirely. Avatar/ring are physically separated
+                            // from the cards, so no zIndex juggling needed.
+                            .zIndex(1)
+                    }
+                }
+
+                if vm.showRaiseSlider {
+                    // Transparent backdrop scoped to the table region (the
+                    // ActionBar lives in the outer VStack below, so it is
+                    // unaffected). `.contentShape(Rectangle())` makes the
+                    // whole frame tappable even though `Color.clear` has
+                    // no pixels of its own. Mounted only while bet entry
+                    // is open so normal play taps fall through to the felt.
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { vm.showRaiseSlider = false }
+
+                    // Right-edge vertical chip slider. Sits ABOVE the
+                    // tap-dismiss overlay in z-order so chip/track taps
+                    // hit the slider; everything else falls through to
+                    // the dismiss. Anchored bottom-trailing so its
+                    // bottom edge meets the top of the ActionBar (which
+                    // sits in the outer VStack below this ZStack).
+                    // Slides in from the trailing edge with the same
+                    // drawer spring used elsewhere; transitions out the
+                    // same way when `vm.showRaiseSlider` flips false.
+                    VerticalChipSlider(vm: vm)
+                        .padding(.trailing, 8)
+                        .padding(.bottom, 0)
+                        .frame(maxWidth: .infinity,
+                               maxHeight: .infinity,
+                               alignment: .bottomTrailing)
+                        .transition(
+                            .move(edge: .trailing).combined(with: .opacity)
+                        )
+                        .animation(
+                            .spring(response: 0.32, dampingFraction: 0.9),
+                            value: vm.showRaiseSlider
+                        )
+                }
             }
             ActionBar(vm: vm)
         }

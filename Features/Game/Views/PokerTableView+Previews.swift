@@ -14,7 +14,7 @@ import SwiftUI
 //     `Decodable` with `let` properties. We'd need to either add
 //     memberwise inits for every type (production surface area) or just
 //     hand the decoder a literal — the literal is cheaper and stays in
-//     this preview-only file.
+//     this preview-only filxe.
 //
 // Mocked dependencies (everything else in the env chain is untouched
 // because PokerTableView doesn't read it directly):
@@ -215,6 +215,10 @@ private enum PreviewMocks {
     }
     """
 
+    // Postflop bet-entry mock — hero on the turn with the betting row
+    // available. Used to verify the postflop preset labels (33% / 66% /
+    // 100%) and that the pot-percentage math reads from
+    // `totalPot + callAmount` correctly.
     static let actionBarState = """
     {
       "tableId": "preview-actionbar",
@@ -235,6 +239,40 @@ private enum PreviewMocks {
       "legalActions": [
         {"action":"FOLD"},
         {"action":"CHECK"},
+        {"action":"RAISE","minAmount":40,"maxAmount":4820}
+      ]
+    }
+    """
+
+    // Preflop bet-entry mock — empty board, hero in big blind facing a
+    // potential open. Used to verify the preflop preset labels (2BB /
+    // 3BB / 4BB) and that the row swaps cleanly from percentages to BB
+    // multiples when `vm.isPostflop` flips false.
+    //
+    // Currents: bigBlind = 20, so minRaise = 40 (2BB), 3BB = 60, 4BB = 80.
+    // currentBet matches the BB so RAISE math reads as a standard preflop
+    // open. We keep activePlayerId = "" / hero userId = "" so isMyTurn
+    // resolves true the same way the postflop preview does.
+    static let actionBarPreflopState = """
+    {
+      "tableId": "preview-actionbar-pf",
+      "handNumber": 42,
+      "phase": "BETTING",
+      "street": "PREFLOP",
+      "seats": [\(heroSeatActionable),\(villainSeat)],
+      "communityCards": [],
+      "pots": [{"amount":30,"eligiblePlayerIds":["","villain"],"isMain":true}],
+      "totalPot": 30,
+      "currentBet": 20,
+      "minRaise": 40,
+      "activePlayerId": "",
+      "dealerSeatIndex": 0,
+      "smallBlind": 10,
+      "bigBlind": 20,
+      "actionDeadline": 1900000000000,
+      "legalActions": [
+        {"action":"FOLD"},
+        {"action":"CALL","callAmount":20},
         {"action":"RAISE","minAmount":40,"maxAmount":4820}
       ]
     }
@@ -298,12 +336,37 @@ private struct PokerTablePreviewHost: View {
             Color(red: 0.95, green: 0.93, blue: 0.86)
                 .ignoresSafeArea()
             VStack(spacing: 0) {
-                PokerTableView(
-                    seats:       seats,
-                    maxSeats:    maxSeats,
-                    vm:          vm,
-                    isLandscape: false
-                )
+                ZStack(alignment: .bottomTrailing) {
+                    PokerTableView(
+                        seats:       seats,
+                        maxSeats:    maxSeats,
+                        vm:          vm,
+                        isLandscape: false
+                    )
+                    // Mirror GameView.localPlayerOverlay (cards pinned above
+                    // the action bar). PokerTableView itself doesn't render
+                    // the hero's hole cards — that lives in GameView — so
+                    // we drop a minimal replica here so the preview shows
+                    // the hand in front of the felt.
+                    if !vm.myCards.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(vm.myCards, id: \.id) { card in
+                                PlayingCardView(card: card, size: .large)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.bottom, 4)
+                    }
+                    // Mirror GameView.portraitLayout's right-side chip
+                    // slider mount so the preview canvas shows the live
+                    // bet-entry composition. We skip the tap-dismiss
+                    // Color.clear overlay (no point in preview) but
+                    // otherwise match the production placement.
+                    if vm.showRaiseSlider {
+                        VerticalChipSlider(vm: vm)
+                            .padding(.trailing, 8)
+                    }
+                }
                 if showActionBar {
                     ActionBar(vm: vm)
                 }
@@ -344,12 +407,33 @@ private struct PokerTablePreviewHost: View {
     return PokerTablePreviewHost(seats: state.seats, maxSeats: 6, vm: vm)
 }
 
-// Hero on the turn, hole cards in hand, ActionBar mounted with the
-// raise slider pre-opened. Useful for tuning bottom-of-screen layout
-// (action row spacing, slider quick-amounts, hole-card row vs. seat
-// row collisions). See `heroSeatActionable` for the userId="" trick
-// that makes `vm.isMyTurn` resolve to true in preview.
-#Preview("Hand + Action bar") {
+// Hero preflop with the in-place betting row pre-opened. Verifies that
+// `vm.isPostflop == false` picks the BB-multiple preset labels (2BB /
+// 3BB / 4BB) and that the slim slider's min/max math reads the legal
+// raise bounds correctly. Pre-seeded `raiseAmount = minRaise` mirrors
+// what the Raise button does in production on first tap. See
+// `heroSeatActionable` for the userId="" trick that makes `isMyTurn`
+// resolve to true in preview.
+#Preview("Bet Entry — preflop") {
+    let state = PreviewMocks.decode(PreviewMocks.actionBarPreflopState)
+    let vm = PreviewMocks.makeVM(with: state)
+    vm.showRaiseSlider = true
+    vm.raiseAmount = state.minRaise
+    return PokerTablePreviewHost(
+        seats:         state.seats,
+        maxSeats:      6,
+        vm:            vm,
+        showActionBar: true
+    )
+}
+
+// Hero postflop (turn) with the in-place betting row pre-opened.
+// Verifies the percentage preset labels (33% / 66% / 100%) and that
+// the pot-sized "100%" preset reads `totalPot + callAmount` so it lands
+// on the canonical pot-sized raise after calling. callAmount is 0 here
+// since `betThisStreet` and `currentBet` are both 0, so the 100% chip
+// should equal `currentBet + totalPot` = 0 + 1200 = 1200 chips.
+#Preview("Bet Entry — postflop") {
     let state = PreviewMocks.decode(PreviewMocks.actionBarState)
     let vm = PreviewMocks.makeVM(with: state)
     vm.showRaiseSlider = true

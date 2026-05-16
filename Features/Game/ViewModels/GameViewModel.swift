@@ -937,6 +937,17 @@ final class GameViewModel: ObservableObject {
     var isMyTurn: Bool    { gameState?.activePlayerId == userId }
     var myCards:  [PokerCard] { mySeat?.holeCards ?? [] }
 
+    /// True when any community cards are visible (flop / turn / river).
+    /// Drives the action-bar betting-row preset set: false → preflop
+    /// [2BB / 3BB / 4BB], true → postflop [33% / 66% / 100%]. Reads from
+    /// `communityCards.isEmpty` rather than `street == .preflop` so any
+    /// future "rabbit-hunt" or replay state that backfills board cards
+    /// onto a preflop fold-out hand picks the right preset set without
+    /// needing a parallel boolean on the server payload.
+    var isPostflop: Bool {
+        !(gameState?.communityCards.isEmpty ?? true)
+    }
+
     /// Card IDs (e.g. "AH", "KD") that appear in any winner's best 5. Used by
     /// the table + local-player overlay to highlight the cards that made the
     /// winning hand at showdown.

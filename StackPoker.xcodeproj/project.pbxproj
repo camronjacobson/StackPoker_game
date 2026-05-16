@@ -32,6 +32,7 @@
 		36C91D402F7F5B8B00697E42 /* GameModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D092F7F5B8A00697E42 /* GameModels.swift */; };
 		36C91D412F7F5B8B00697E42 /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */; };
 		36C91D422F7F5B8B00697E42 /* ActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */; };
+		3681D0F12FB7E1000066D2EE /* VerticalChipSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3681D0F02FB7E1000066D2EE /* VerticalChipSlider.swift */; };
 		36C91D432F7F5B8B00697E42 /* AdminPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */; };
 		36C91D442F7F5B8B00697E42 /* CardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0F2F7F5B8A00697E42 /* CardViews.swift */; };
 		36C91D452F7F5B8B00697E42 /* GameHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D102F7F5B8A00697E42 /* GameHUD.swift */; };
@@ -168,6 +169,7 @@
 		36C91D092F7F5B8A00697E42 /* GameModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameModels.swift; sourceTree = "<group>"; };
 		36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
 		36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
+		3681D0F02FB7E1000066D2EE /* VerticalChipSlider.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VerticalChipSlider.swift; sourceTree = "<group>"; };
 		36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AdminPanelView.swift; sourceTree = "<group>"; };
 		36C91D0F2F7F5B8A00697E42 /* CardViews.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CardViews.swift; sourceTree = "<group>"; };
 		36C91D102F7F5B8A00697E42 /* GameHUD.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameHUD.swift; sourceTree = "<group>"; };
@@ -510,6 +512,7 @@
 				36C91D122F7F5B8A00697E42 /* PlayerSeatView.swift */,
 				36C91D132F7F5B8A00697E42 /* PokerTableView.swift */,
 				AAAAAA002F7F5B8A00697E42 /* OpponentPopupView.swift */,
+				3681D0F02FB7E1000066D2EE /* VerticalChipSlider.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1011,6 +1014,7 @@
 				36C91D402F7F5B8B00697E42 /* GameModels.swift in Sources */,
 				36C91D432F7F5B8B00697E42 /* AdminPanelView.swift in Sources */,
 				36C91D422F7F5B8B00697E42 /* ActionBar.swift in Sources */,
+				3681D0F12FB7E1000066D2EE /* VerticalChipSlider.swift in Sources */,
 				36C91D372F7F5B8B00697E42 /* AuthModels.swift in Sources */,
 				36C91D522F7F5B8B00697E42 /* ChipsView.swift in Sources */,
 				36C91D3D2F7F5B8B00697E42 /* SplashView.swift in Sources */,
