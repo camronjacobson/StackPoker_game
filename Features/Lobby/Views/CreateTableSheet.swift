@@ -190,7 +190,7 @@ struct CreateTableSheet: View {
                       Text(vm.addBotOnCreate ? "Add a bot opponent" : "No bot — wait for players")
                         .font(.custom("AmericanTypewriter-Bold", size: 14))
                         .foregroundStyle(SPRetro.ink)
-                      Text(vm.addBotOnCreate ? "StackBot will sit down so you can start right away" : "You can still add a bot from the table later")
+                      Text(vm.addBotOnCreate ? "A bot will sit down so you can start right away" : "You can still add a bot from the table later")
                         .font(.custom("AmericanTypewriter", size: 12))
                         .foregroundStyle(SPRetro.inkMuted)
                     }

@@ -388,8 +388,12 @@ struct PokerTableView: View {
     // populated; nothing else in the game scene needs friends data.
     @StateObject private var friendsVM = FriendsViewModel()
 
-    private var hasBotSeated: Bool {
-        vm.gameState?.seats.contains { $0.username == "StackBot" } ?? false
+    /// True when every seat at the table is occupied (by a human or a bot).
+    /// Drives the Add-Bot button's disabled state — previously this was
+    /// `hasBotSeated` (one-bot limit). Now that multiple bots are supported,
+    /// the only condition that blocks adding another is a full table.
+    private var tableIsFull: Bool {
+        (vm.gameState?.seats.count ?? 0) >= maxSeats
     }
 
     /// Honors the per-table bot preference recorded when the creator opted
@@ -472,7 +476,7 @@ struct PokerTableView: View {
                         vm?.addBot()
                         showOpenSeatSheet = false
                     } : nil,
-                    addBotDisabled: hasBotSeated
+                    addBotDisabled: tableIsFull
                 )
             }
             // Legacy binding kept around in case any other code path

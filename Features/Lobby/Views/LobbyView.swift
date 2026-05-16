@@ -994,8 +994,8 @@ struct InviteFriendsSheet: View {
                     .font(SPFonts.headline(14))
                     .foregroundStyle(addBotDisabled ? SPColors.textTertiary : SPColors.textPrimary)
                   Text(addBotDisabled
-                       ? "A bot is already seated at this table"
-                       : "Fill this seat with StackBot")
+                       ? "The table is full"
+                       : "Fill this seat with a bot")
                     .font(SPFonts.caption(12))
                     .foregroundStyle(SPColors.textTertiary)
                 }

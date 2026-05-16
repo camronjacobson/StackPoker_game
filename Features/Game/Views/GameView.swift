@@ -855,13 +855,16 @@ struct GameView: View {
                                 .buttonStyle(ScaleButtonStyle())
                             }
 
-                            // Add bot button — lets you play solo against an AI opponent.
-                            // Only shown when the creator opted into bots at table
-                            // creation (or for tables where we have no preference,
-                            // i.e. ones we joined rather than created).
-                            let hasBot = vm.gameState!.seats.contains { $0.username == "StackBot" }
+                            // Add Bot / Fill Table — lets you play solo against AI
+                            // opponents. Shown whenever there's at least one empty
+                            // seat AND the creator opted into bots at table creation
+                            // (defaults to true for tables we joined). Previously
+                            // gated on "no bot seated yet"; now that the server
+                            // supports N bots (BOT_PROFILES roster), the gate is
+                            // simply "is there an open seat?".
+                            let openSeats   = max(0, maxSeats - (vm.gameState?.seats.count ?? 0))
                             let botsAllowed = TablePreferences.botsAllowed(forTableId: vm.tableId)
-                            if !hasBot && botsAllowed {
+                            if openSeats > 0 && botsAllowed {
                                 // Retro Add-Bot — paper pill with ink text
                                 // so it sits subordinate to the mustard
                                 // Invite CTA above (secondary action).
@@ -883,6 +886,35 @@ struct GameView: View {
                                     .shadow(color: SPRetro.ink.opacity(0.6), radius: 0, x: 1.5, y: 2)
                                 }
                                 .buttonStyle(ScaleButtonStyle())
+
+                                // Fill Table — fires N addBot calls back-to-back
+                                // (one per empty seat). Each request is independent
+                                // on the server; sequential dispatch from iOS keeps
+                                // BOT_PROFILES selection deterministic (Alpha →
+                                // Bravo → …) and avoids racing addPlayer/seatIndex
+                                // assignment. Only shown when more than one seat is
+                                // open — at 1 open seat "Add Bot Player" already
+                                // does the same thing.
+                                if openSeats > 1 {
+                                    Button {
+                                        for _ in 0..<openSeats { vm.addBot() }
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "person.3.fill")
+                                                .font(.system(size: 14))
+                                            Text("Fill Table with Bots")
+                                                .font(.custom("AmericanTypewriter-Bold", size: 14))
+                                        }
+                                        .foregroundStyle(SPRetro.ink)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(SPRetro.paper)
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().strokeBorder(SPRetro.ink, lineWidth: 1.5))
+                                        .shadow(color: SPRetro.ink.opacity(0.6), radius: 0, x: 1.5, y: 2)
+                                    }
+                                    .buttonStyle(ScaleButtonStyle())
+                                }
                             }
                         }
                     }
