@@ -90,31 +90,34 @@ struct TableLayout {
         CGPoint(x: tableCenter.x, y: tableCenter.y - tableHeight * 0.09)
     }
     var potCenter: CGPoint {
-        // Bumped from 0.04 → 0.10 of tableHeight. The pot VStack is taller
+        // Bumped from 0.04 → 0.10 → 0.13 → 0.10. The pot VStack is taller
         // than it looks at first glance — chip stack (up to ~73pt for big
         // pots) plus the "Pot" + amount text below (~28pt) — so when it was
         // centered at +0.04 the top of the chip stack reached ~34pt above
         // table center, while the bottom edge of the community cards (at
         // boardCenter -0.09) sat at ~+5pt. That ~40pt overlap was the chip
-        // stack visibly clipping the cards. 0.10 gives clean separation
-        // without crowding gamePillCenter (still at 0.19).
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.13)
+        // stack visibly clipping the cards. 0.10 is the documented safe
+        // value (clean separation, no crowding of gamePillCenter). Back
+        // off from 0.13 to 0.10 to lift the pot column up — the felt has
+        // more room near center than near the bottom rim, and the visible
+        // bottom area was reading "bottom-heavy" with the pot pushed down.
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.10)
     }
-    // gamePillCenter and blindsCenter pushed down (was 0.19 / 0.26) so the
-    // NLH pill + small/big-blind label sit visually closer to the bottom rim
-    // and don't crowd the pot stack. Kept the 0.07 gap between the two so
-    // the row spacing is unchanged.
+    // Whole bottom column shifted up by 0.03 (≈21–24pt on a phone table)
+    // to lift the pot stack, NLH pill, and blinds visually up the felt.
+    // Each row keeps its 0.06–0.07 gap from its neighbour so the row
+    // spacing is unchanged — only the column as a whole moves.
     var gamePillCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.24)
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.21)
     }
     var blindsCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.31)
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.28)
     }
     var hostedByCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.34)
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.31)
     }
     var brandCenter: CGPoint {
-        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.40)
+        CGPoint(x: tableCenter.x, y: tableCenter.y + tableHeight * 0.37)
     }
 
     // Seats
@@ -167,10 +170,16 @@ struct TableLayout {
             // Bottom-seat lift: the hero's avatar (angle 90°) sits at the
             // lowest point of the rim, which after the recent table-size
             // bump now crowds the action bar / screen bottom. Pull just
-            // that seat up by ~6% of tableHeight so it floats inside the
+            // that seat up by ~12% of tableHeight so it floats inside the
             // felt instead of riding the bottom rim. All other seats are
             // unaffected.
-            let yLift: CGFloat = (deg == 90) ? tableHeight * 0.10 : 0
+            //
+            // Bumped 0.10 → 0.12 → 0.14 to open up vertical breathing
+            // room between the hero avatar and the hole cards rendered
+            // just below it (see GameView.localPlayerOverlay) — the
+            // previous values left the chip stack and cards visually
+            // overlapping.
+            let yLift: CGFloat = (deg == 90) ? tableHeight * 0.14 : 0
             // Side-seat inward pull: v1 (165°) and v5 (15°) sit on the
             // widest part of the rim. Shrink their effective rx so they
             // tuck slightly inside the felt edge — same line of rendering
@@ -949,6 +958,12 @@ struct PokerTableView: View {
 
     private func seatOverlay(_ l: TableLayout) -> some View {
         let positions = l.seatPositions(count: maxSeats)
+        // Side-classification threshold used to decide whether a seat is
+        // "on the left/right edge" vs. "near the top/bottom centerline".
+        // 0.15·tableWidth is comfortably below the minimum |dx| of any
+        // 6-max side seat (~0.343·W at 210°/330°) so the partition has >2x
+        // safety margin — see the verification table in the diagnosis.
+        let sideThreshold = l.tableWidth * 0.15
         return ForEach(0..<maxSeats, id: \.self) { idx in
             Group {
                 if idx < seats.count {
@@ -956,6 +971,20 @@ struct PokerTableView: View {
                     let isMe = (idx == 0)
                     let isActive = vm.gameState?.activePlayerId == seat.userId
                     let isWinner = winnerIds.contains(seat.userId)
+                    // Classify the seat's rendered position. dx/dy are
+                    // relative to the table's geometric center; |dx| over
+                    // threshold means the seat hugs the screen edge and
+                    // its opponent cards must fan inward (toward center)
+                    // to avoid clipping off-screen.
+                    let dx = positions[idx].x - l.tableCenter.x
+                    let dy = positions[idx].y - l.tableCenter.y
+                    let seatSide: SeatSide = {
+                        if abs(dx) > sideThreshold {
+                            return dx < 0 ? .left : .right
+                        } else {
+                            return dy < 0 ? .top : .bottom
+                        }
+                    }()
                     // Every seat is wrapped in TickingSeat — the same
                     // struct type at this position regardless of who is
                     // currently active. SwiftUI keys @State to the view's
@@ -986,6 +1015,7 @@ struct PokerTableView: View {
                         isWinner: isWinner,
                         lastAction: vm.gameState?.lastAction,
                         avatarSize: l.seatAvatarSize,
+                        seatSide: seatSide,
                         winningCardIds: winnerCardIds,
                         anyWinnersDeclared: !winnerIds.isEmpty,
                         onProfileTap: { profilePopupUserId = seat.userId }
@@ -1636,6 +1666,9 @@ struct TickingSeat: View {
     let isWinner:       Bool
     let lastAction:     LastAction?
     let avatarSize:     CGFloat
+    // Pre-computed in the parent's seat loop from positions[idx] vs.
+    // tableCenter — see SeatSide for what this drives.
+    let seatSide:       SeatSide
     let winningCardIds: Set<String>
     let anyWinnersDeclared: Bool
     let onProfileTap:   () -> Void
@@ -1646,6 +1679,7 @@ struct TickingSeat: View {
             isMe:               isMe,
             isMyTurn:           isMyTurn,
             isWinner:           isWinner,
+            seatSide:           seatSide,
             // Only feed the live clock values to the active seat. For
             // non-active seats we hard-code the same placeholders the
             // original branch used (turnProgress 1.0, no seconds left) so
@@ -1670,11 +1704,29 @@ struct TickingSeat: View {
 
 // ─── Target-style seat ───────────────────────────────────────────────────────
 
+// Which side of the table the seat sits on, computed from its rendered
+// position relative to table center. Drives the opponent-hole-card anchor:
+// side seats fan their cards toward table center (away from the screen
+// edge), top seats fan above the avatar. `.bottom` is included for
+// completeness but is dead in practice — the bottom seat (90°) is always
+// the local hero, and OpponentHoleCardsView is only mounted for `!isMe`.
+// We route `.bottom` through the same code path as `.top` defensively in
+// case a future layout puts a non-hero seat there.
+enum SeatSide { case left, right, top, bottom }
+
 struct TargetSeatView: View {
     let seat:         GameSeat
     let isMe:         Bool
     let isMyTurn:     Bool
     var isWinner:     Bool = false
+    // Which side of the table this seat sits on. Drives the opponent-
+    // hole-card anchor below — side seats fan inward (toward table center)
+    // so their cards don't clip off-screen; top seats fan above the avatar.
+    // Defaults to `.bottom` so replay / preview call sites that don't
+    // compute a seat side keep working (the bottom-seat path is hero-only
+    // in production and OpponentHoleCardsView is `!isMe`, so the default
+    // value is never read in a card-rendering context).
+    var seatSide:     SeatSide = .bottom
     let turnProgress: Double
     var turnSecondsLeft: Int = 0
     // Absolute end-of-turn date + total span. When non-nil the ring uses
@@ -1867,23 +1919,29 @@ struct TargetSeatView: View {
                 // don't draw face-down cards in front of a folded seat.
                 let hasShown = !seat.revealed.isEmpty
                 if !isMe && seat.hasCards && (seat.status != .folded || hasShown) {
+                    // OpponentHoleCardsView owns its own seat-aware anchor
+                    // now (rather than the parent applying a static .offset
+                    // here). Why: the anchor needs to FLIP between face-down
+                    // and revealed states — face-down cards sit on the
+                    // outside of the avatar (away from felt center, keeps
+                    // the felt clean), revealed cards swing inward (toward
+                    // felt center, avoids screen-edge clipping at the
+                    // enlarged 1.85× geometry). The view already owns the
+                    // animated `lifted` @State that drives every other
+                    // state transition (scale, fan, z-shadow), so anchoring
+                    // here keeps the directional flip in lock-step with
+                    // the spring animation instead of having two separate
+                    // sources of truth.
                     OpponentHoleCardsView(
                         revealedCards:      seat.holeCards,
                         cardCount:          seat.cardCount,
                         isWinner:           isWinner,
                         anyWinnersDeclared: anyWinnersDeclared,
                         winningCardIds:     winningCardIds,
-                        partialReveals:     seat.revealed
+                        partialReveals:     seat.revealed,
+                        seatSide:           seatSide,
+                        avatarSize:         avatarSize
                     )
-                    // Previously wrapped in `.tableSurfaceTilt()` to make
-                    // the cluster lie flat on the felt at the table's 26°
-                    // foreshortening angle. The user found the resulting
-                    // foreshortening read as "weirdly tilted" rather than
-                    // "lying flat" — at the small (22pt) cluster size the
-                    // 3D rotation just looks like a skew. Rendering them
-                    // upright (no tilt) keeps the cards readable as
-                    // standing-up cards next to the avatar.
-                    .offset(x: -avatarSize * 0.52, y: -avatarSize * 0.15)
                     .zIndex(8)
                 }
 
@@ -2269,6 +2327,24 @@ private struct OpponentHoleCardsView: View {
     // including after they've folded. We render face-up specifically at
     // the matching slot index, leaving any non-shown slots face-down.
     var partialReveals:     [RevealedCard] = []
+    // Seat side controls the directional bias of the cluster's anchor
+    // and lifted-state inner shift. Left-seat clusters anchor on the
+    // OUTSIDE of the avatar when face-down (toward screen edge) and flip
+    // INWARD (toward felt center) when lifted/revealed so the enlarged
+    // 1.85× geometry stays on-screen. Right-seat clusters mirror.
+    // Top seats stay horizontally centered, anchored above the avatar in
+    // both states. Defaults to `.bottom` so existing preview/replay call
+    // sites that don't pass it keep working — those views aren't running
+    // showdown geometry tests, so the default just resolves to the
+    // centered behavior.
+    var seatSide:           SeatSide = .bottom
+    // Used to size the seat-aware anchor offset (anchorX/anchorY in
+    // `body`). The cluster anchors at a fraction of the avatar diameter
+    // so side-seat clusters consistently clear the avatar circle at any
+    // table size. Defaulted to a sensible mid-range so preview/replay
+    // call sites keep compiling without forcing them to thread the
+    // exact runtime avatarSize through.
+    var avatarSize:         CGFloat  = 50
 
     @State private var revealed:   Bool    = false
     @State private var flipScaleX: CGFloat = 1
@@ -2332,9 +2408,77 @@ private struct OpponentHoleCardsView: View {
         //   NLH (count=2): rotations (-5°,    0°)             — 5° spread
         //   PLO (count=4): rotations (-7.5°, -5°, -2.5°, 0°) — 7.5° spread
         //                                  ^ matches NLH's leftmost card exactly
-        let fanStep:    Double  = lifted ? (isPLOWidth ? 4.5 : 3)   : (isPLOWidth ? 2.5 : 5)
-        let fanBase:    Double  = lifted ? (isPLOWidth ? 6.75 : 4.5) : (isPLOWidth ? 7.5 : 5)
-        let cardGap:    CGFloat = lifted ? (isPLOWidth ? 2.5 : 3)   : -6
+        // Lifted fan tightened: previously NLH (step 3, base 4.5) put
+        // the pair at -4.5° and -1.5° — both cards leaning ~3° left of
+        // vertical, which read as visibly crooked. Now NLH (step 2,
+        // base 1) gives -1° and +1° — symmetric about vertical, just
+        // a hint of fan. PLO (step 1.5, base 2.25) gives ±2.25° at the
+        // edges, still subtle but lets four cards visually separate.
+        // Face-down geometry unchanged — the dramatic 5°/2.5° fan is
+        // what makes face-down cards read as a stacked deck rather
+        // than a flat pair.
+        let fanStep:    Double  = lifted ? (isPLOWidth ? 1.5 : 2)   : (isPLOWidth ? 2.5 : 5)
+        let fanBase:    Double  = lifted ? (isPLOWidth ? 2.25 : 1)  : (isPLOWidth ? 7.5 : 5)
+        // Revealed (lifted) gap tightened — previously 3pt (NLH) / 2.5pt (PLO)
+        // left a visible felt strip between cards that read as "cards floating
+        // apart" rather than "this is my hand". 1pt keeps a hairline of
+        // separation so adjacent rotated corners don't visually collide
+        // (fan is only 3° per step) while pulling the cluster into a single
+        // readable unit.
+        let cardGap:    CGFloat = lifted ? (isPLOWidth ? 1 : 1)     : -6
+        // Lifted x-shift is now sign-aware. Previously hardcoded -6 (NLH)
+        // which assumed the outer anchor was always to the LEFT of the
+        // avatar (old `-avatarSize * 0.52` constant). Now that the outer
+        // anchor flips direction per seat side, the inner lift-shift has
+        // to flip with it so the lift consistently pushes the cluster
+        // *further away from the avatar* (toward table center) rather
+        // than back into it. Sign per seat side:
+        //   .left   → outer is +x; inner lift shifts further +x.
+        //   .right  → outer is -x; inner lift shifts further -x.
+        //   .top    → outer is centered; inner lift stays centered (0).
+        //   .bottom → dead in practice; centered for safety.
+        // PLO uses a larger magnitude (22) to compensate for its wider
+        // 4-card cluster, NLH stays at 6.
+        let nlhLift: CGFloat = 6
+        let ploLift: CGFloat = 22
+        let liftSign: CGFloat = {
+            switch seatSide {
+            case .left:           return  1
+            case .right:          return -1
+            case .top, .bottom:   return  0
+            }
+        }()
+        let liftedX: CGFloat = (isPLOWidth ? ploLift : nlhLift) * liftSign
+
+        // Seat-aware cluster anchor (was previously a static .offset at
+        // the mount site). The X anchor FLIPS direction by lifted state
+        // for side seats:
+        //   face-down → cluster on the OUTSIDE of the avatar (away from
+        //               table center). Keeps the felt's interior clean
+        //               of crowded card backs around the pot.
+        //   lifted    → cluster INWARD (toward table center). The 1.85×
+        //               enlarged geometry needs the room — anchoring
+        //               outward at lift would clip off-screen for side
+        //               seats and overlap the avatar at full scale.
+        // Top/bottom seats stay horizontally centered in both states —
+        // they're already on the table's vertical axis, "outward" would
+        // push them off-table.
+        // Y anchor is state-independent: side seats stay at the avatar's
+        // mid-line (-0.15·avatar), top/bottom seats sit above the avatar
+        // (-0.65·avatar) so they clear the name pill that lives below.
+        let anchorX: CGFloat = {
+            switch seatSide {
+            case .left:           return lifted ?  avatarSize * 0.62 : -avatarSize * 0.62
+            case .right:          return lifted ? -avatarSize * 0.62 :  avatarSize * 0.62
+            case .top, .bottom:   return 0
+            }
+        }()
+        let anchorY: CGFloat = {
+            switch seatSide {
+            case .left, .right:   return -avatarSize * 0.15
+            case .top, .bottom:   return -avatarSize * 0.65
+            }
+        }()
 
         HStack(spacing: cardGap) {
             ForEach(0..<displayCount, id: \.self) { i in
@@ -2361,7 +2505,15 @@ private struct OpponentHoleCardsView: View {
         // shrinks/recenters". The 0.6x shrink that was here previously was
         // wrong direction — the user wants PLO to read as four real-size
         // cards stacked behind the avatar, matching NLH's two-card stack.
-        .scaleEffect(lifted ? (isPLOWidth ? 1.45 : 2.1) : 1.0, anchor: .bottom)
+        // Revealed scale dialled back: NLH 2.1 → 1.85, PLO 1.45 → 1.3.
+        // 2.1x pushed the 22pt base cards to ~46pt wide which dominated the
+        // felt and overlapped neighbouring seat clusters at full-ring tables.
+        // 1.85x keeps the cards comfortably larger than the face-down state
+        // (still ~2x) but trims ~12% off the cluster width so the hand reads
+        // as "look, I'm showing you" rather than "my cards are the whole
+        // table". PLO drops further so the 4-card cluster (already 2× the
+        // NLH footprint) doesn't sprawl past the felt edge.
+        .scaleEffect(lifted ? (isPLOWidth ? 1.3 : 1.85) : 1.0, anchor: .bottom)
         // Horizontal nudge intentionally LARGER for PLO (+22) than NLH (-6).
         // Why: the parent seat layout pins this view with
         // `.offset(x: -avatarSize * 0.52)` — i.e. the cluster is always
@@ -2385,8 +2537,19 @@ private struct OpponentHoleCardsView: View {
         // we shift the whole PLO cluster -16pt to bring the right edge
         // back in line. The two extra cards naturally extend leftward
         // from that re-anchored position.
-        .offset(x: lifted ? (isPLOWidth ? 22 : -6) : (isPLOWidth ? -16 : 0),
-                y: lifted ? (isPLOWidth ? -12 : -22) : 0)
+        // Final offset = seat-aware anchor + state-specific inner shift.
+        //   anchorX/Y → where the cluster sits relative to the avatar
+        //               (flips outward↔inward by lifted state for side
+        //               seats; constant for top/bottom).
+        //   inner X   → liftedX when lifted (further outward push at
+        //               full scale) or PLO's -16 counter-centering when
+        //               face-down. `liftedX` already carries the seat-
+        //               aware sign so it adds in the same direction as
+        //               the inward anchor.
+        //   inner Y   → -22 (NLH) / -12 (PLO) when lifted to raise the
+        //               cluster off the avatar plate. 0 when face-down.
+        .offset(x: anchorX + (lifted ? liftedX : (isPLOWidth ? -16 : 0)),
+                y: anchorY + (lifted ? (isPLOWidth ? -12 : -22) : 0))
         .zIndex(lifted ? 5 : 0)
         .shadow(color: .black.opacity(lifted ? 0.55 : 0.3),
                 radius: lifted ? 9 : 2,

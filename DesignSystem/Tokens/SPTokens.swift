@@ -64,6 +64,14 @@ enum SPColors {
     static let railLight      = Color(hex: "#5C4838")
     static let railCushion    = Color(hex: "#E8B923")   // mustard cushion edge
 
+    // Sampled from the rendered poker_table.png rail band (y=120–160 at
+    // x=512), mean of five interior samples ≈ #1F100B. Distinct from the
+    // procedural `railOuter`/`railMid` (warmer & lighter brown) because
+    // the image's rail is a deeper, redder near-black. Reused by views
+    // that need to color-match the table rail border directly — e.g. the
+    // right-edge vertical bet slider's outline.
+    static let tableRail      = Color(hex: "#1F100B")
+
     // Playing-card surfaces.
     static let cardBack       = Color(hex: "#8B2C2C")   // maroon
     static let cardFace       = Color(hex: "#F4E4BC")   // paper face

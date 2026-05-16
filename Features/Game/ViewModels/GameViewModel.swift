@@ -488,6 +488,13 @@ final class GameViewModel: ObservableObject {
         if isNowMyTurn && !wasMyTurn {
             haptic(.heavy)
         }
+        if wasMyTurn && !isNowMyTurn {
+            // Server moved past our turn (auto-check on timeout, opponent's
+            // turn, street/hand advance, …) — tear down any in-progress bet
+            // entry so the vertical slider doesn't linger and the action
+            // row returns to default mode on the next decision.
+            showRaiseSlider = false
+        }
 
         let newCardCount = state.seats.first(where: { $0.userId == userId })?.holeCards?.count ?? 0
         if newCardCount > prevCardCount {

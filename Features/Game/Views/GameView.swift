@@ -339,6 +339,17 @@ struct GameView: View {
                         tableArea(isLandscape: false)
                         localPlayerOverlay
                             .padding(.bottom, 4)
+                            // Push hero hole cards down ~16pt so they
+                            // sit clearly below the avatar/chip stack
+                            // instead of crowding it. Pairs with the
+                            // bumped bottom-seat yLift in TableLayout
+                            // (0.10 → 0.12 → 0.14) — together they open
+                            // vertical separation between the avatar
+                            // and the cards. Offset, not padding,
+                            // because the overlay is anchored to the
+                            // ZStack bottom and negative padding doesn't
+                            // push past the anchor.
+                            .offset(y: 16)
                             // Hole cards always render above the table felt. The hero
                             // seat avatar now sits inside the felt (lifted off the
                             // bottom rim), so the old `vm.isMyTurn ? -1 : 1` trick —
@@ -350,7 +361,7 @@ struct GameView: View {
                     }
                 }
 
-                if vm.showRaiseSlider {
+                if vm.showRaiseSlider && vm.isMyTurn {
                     // Transparent backdrop scoped to the table region (the
                     // ActionBar lives in the outer VStack below, so it is
                     // unaffected). `.contentShape(Rectangle())` makes the

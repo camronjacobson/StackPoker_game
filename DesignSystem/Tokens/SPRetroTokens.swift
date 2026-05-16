@@ -43,6 +43,28 @@ enum SPRetro {
     static let maroon      = Color(hex: "#8B2C2C")
     static let maroonDark  = Color(hex: "#5C1818")
 
+    // Sampled directly from the rendered poker_table.png rail band — the
+    // darker red ring that frames the bright playing-surface felt. Mean
+    // of 13,434 "rail-red" pixels (filtered to R 80–160 to exclude the
+    // halftone ink speckles) across both top (y=165–185) and bottom
+    // (y=1260–1280) rail bands ≈ #71201E.
+    //
+    // Distinct from:
+    //   - `maroon` / `maroonDark`  — printed-comic accent palette;
+    //                                neither matches the rail tone
+    //                                (>5% R-channel deviation each way).
+    //   - `SPColors.tableRail`     — the *ink outline* of the rail
+    //                                (#1F100B). This token is the
+    //                                *darker red* of the rail's interior
+    //                                band, so the two are intentionally
+    //                                paired: rail surface (this) + rail
+    //                                outline (SPColors.tableRail).
+    //
+    // Reused by views that need to color-match the table's rail surface
+    // — e.g. the right-edge vertical bet slider track, future on-rail
+    // overlays.
+    static let tableRail   = Color(hex: "#71201E")
+
     // Tertiary pops. Pop blue is the "ZAP!" / superhero blue; teal is the
     // muted secondary used for accents that need to not compete with mustard.
     static let popRed      = Color(hex: "#D33232")

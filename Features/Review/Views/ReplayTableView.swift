@@ -149,11 +149,27 @@ struct ReplayTableView: View {
                         totalSeats: max(frame.seats.count, 2),
                         in: geo.size
                     )
+                    // Same seat-side classification used by the live
+                    // PokerTableView so replay opponent-card clusters
+                    // don't clip off-screen on left/right seats and
+                    // don't overlap the avatar on top seats. Threshold
+                    // is in geo.size units (replay table fills its
+                    // geometry container).
+                    let dx = pos.x - geo.size.width  / 2
+                    let dy = pos.y - geo.size.height / 2
+                    let seatSide: SeatSide = {
+                        if abs(dx) > geo.size.width * 0.15 {
+                            return dx < 0 ? .left : .right
+                        } else {
+                            return dy < 0 ? .top : .bottom
+                        }
+                    }()
                     TargetSeatView(
                         seat:               seat.asGameSeat(),
                         isMe:               false,
                         isMyTurn:           false,                 // no live timer in replay
                         isWinner:           winnerIds.contains(seat.userId),
+                        seatSide:           seatSide,
                         turnProgress:       0,
                         turnSecondsLeft:    0,
                         lastAction:         lastActionForSeat(seat),
