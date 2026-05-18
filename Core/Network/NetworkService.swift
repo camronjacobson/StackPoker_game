@@ -106,6 +106,12 @@ enum APIEndpoint {
     // the iOS-side StorePurchaseService; until that lands, this endpoint
     // 404s and LiveNetworkPurchasePort surfaces it as PurchaseError.network.
     case purchaseCosmetic
+    // POST /cosmetics/equip   — server-authoritative equip (ownership checked).
+    // DELETE /cosmetics/equip/:category — idempotent unequip.
+    // GET /cosmetics/inventory — owned + equipped snapshot for app-load sync.
+    case equipCosmetic
+    case unequipCosmetic(category: String)
+    case cosmeticsInventory
 
     // Invites
     case tableInvites
@@ -163,6 +169,9 @@ enum APIEndpoint {
         case .dailyBonus:            return "/chips/daily"
         case .transferChips:         return "/chips/transfer"
         case .purchaseCosmetic:      return "/cosmetics/purchase"
+        case .equipCosmetic:         return "/cosmetics/equip"
+        case .unequipCosmetic(let c): return "/cosmetics/equip/\(c)"
+        case .cosmeticsInventory:    return "/cosmetics/inventory"
         case .tableInvites:                return "/tables/invites/pending"
         case .respondInvite(let id):       return "/tables/invites/\(id)/respond"
         case .sendInvite(let tid):         return "/tables/\(tid)/invite"

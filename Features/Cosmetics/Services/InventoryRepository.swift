@@ -45,6 +45,14 @@ protocol InventoryRepositoryProtocol: AnyObject {
     func equippedItem(for category: CosmeticCategory) -> CosmeticID?
 
     func unequip(_ category: CosmeticCategory)
+
+    /// Atomically replace the local cache with server truth. Called after
+    /// `EquipService.syncFromServer()` returns. Bypasses the ownership
+    /// guard on `equip(_:in:)` — the server has already validated that
+    /// every equipped id is also owned, so we trust the snapshot wholesale.
+    /// A single @Published broadcast is emitted regardless of how many
+    /// fields changed.
+    func replaceFromServer(ownedIds: Set<CosmeticID>, equipped: [CosmeticCategory: CosmeticID])
 }
 
 // ─── UserDefaults impl ────────────────────────────────────────────────────────
@@ -153,6 +161,29 @@ final class UserDefaultsInventoryRepository: InventoryRepositoryProtocol, Observ
         persist(next, userId: userId)
         inventory = next
         os_log("Unequipped %{public}@", log: Self.log, type: .info, category.rawValue)
+    }
+
+    func replaceFromServer(ownedIds: Set<CosmeticID>, equipped: [CosmeticCategory: CosmeticID]) {
+        guard let userId = activeUserId else {
+            os_log("replaceFromServer(...) called with no active user — refusing write",
+                   log: Self.log, type: .error)
+            return
+        }
+        // Wholesale overwrite — server is the source of truth. We
+        // deliberately do NOT cross-check equipped against ownedIds here;
+        // the server is the side that enforces "must own to equip", and
+        // duplicating that guard would create a false-positive risk if
+        // server semantics diverge slightly in future (e.g. event-granted
+        // equips). Trust the snapshot.
+        let next = PlayerInventory(
+            ownedIDs: ownedIds,
+            equippedByCategory: equipped,
+            schemaVersion: PlayerInventory.currentSchemaVersion
+        )
+        persist(next, userId: userId)
+        inventory = next
+        os_log("Replaced inventory from server: %d owned, %d equipped",
+               log: Self.log, type: .info, ownedIds.count, equipped.count)
     }
 
     // ── Persistence ──────────────────────────────────────────────────────────

@@ -100,6 +100,8 @@
 		B11D001200000000C05E51C1 /* ChipAmountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001200000000C05E51C1 /* ChipAmountTests.swift */; };
 		B11D001300000000C05E51C1 /* StorePeekTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001300000000C05E51C1 /* StorePeekTab.swift */; };
 		B11D001400000000C05E51C1 /* StorePanelDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001400000000C05E51C1 /* StorePanelDrawer.swift */; };
+		B11D001500000000C05E51C1 /* EquipService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001500000000C05E51C1 /* EquipService.swift */; };
+		B11D001600000000C05E51C1 /* NetworkInventoryPort+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001600000000C05E51C1 /* NetworkInventoryPort+Live.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -236,6 +238,8 @@
 		F11E001200000000C05E51C1 /* ChipAmountTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipAmountTests.swift; sourceTree = "<group>"; };
 		F11E001300000000C05E51C1 /* StorePeekTab.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePeekTab.swift; sourceTree = "<group>"; };
 		F11E001400000000C05E51C1 /* StorePanelDrawer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StorePanelDrawer.swift; sourceTree = "<group>"; };
+		F11E001500000000C05E51C1 /* EquipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EquipService.swift; sourceTree = "<group>"; };
+		F11E001600000000C05E51C1 /* NetworkInventoryPort+Live.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NetworkInventoryPort+Live.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -777,7 +781,9 @@
 				F11E000E00000000C05E51C1 /* AchievementProgressSource.swift */,
 				F11E000300000000C05E51C1 /* CosmeticsCatalog.swift */,
 				F11E000700000000C05E51C1 /* CosmeticsContainer.swift */,
+				F11E001500000000C05E51C1 /* EquipService.swift */,
 				F11E000400000000C05E51C1 /* InventoryRepository.swift */,
+				F11E001600000000C05E51C1 /* NetworkInventoryPort+Live.swift */,
 				F11E000600000000C05E51C1 /* NetworkPurchasePort+Live.swift */,
 				F11E000500000000C05E51C1 /* StorePurchaseService.swift */,
 			);
@@ -1065,6 +1071,8 @@
 				B11D001300000000C05E51C1 /* StorePeekTab.swift in Sources */,
 				3681D0C22FB7CBB80066D2EE /* PokerTableView+Previews.swift in Sources */,
 				B11D001400000000C05E51C1 /* StorePanelDrawer.swift in Sources */,
+				B11D001500000000C05E51C1 /* EquipService.swift in Sources */,
+				B11D001600000000C05E51C1 /* NetworkInventoryPort+Live.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -26,6 +26,13 @@ final class CosmeticsContainer: ObservableObject {
     let catalog: CosmeticsCatalogProtocol
     let inventory: InventoryRepositoryProtocol
     let purchaseService: StorePurchaseServiceProtocol
+    /// Server-authoritative equip/unequip + inventory sync. View layer
+    /// always routes through this — direct `inventory.equip(...)` calls
+    /// from the UI are forbidden (the local cache is downstream of server
+    /// truth now). The InventoryRepository protocol still exposes `equip`
+    /// because EquipService itself needs to update the cache after a
+    /// successful network round-trip.
+    let equipService: EquipServiceProtocol
     /// Optional progress feed for achievement-gated cosmetics. Phase 2
     /// ships a stub that always returns nil; Phase 5 supplies a real
     /// implementation backed by the achievements store.
@@ -36,10 +43,12 @@ final class CosmeticsContainer: ObservableObject {
     init(catalog: CosmeticsCatalogProtocol,
          inventory: InventoryRepositoryProtocol,
          purchaseService: StorePurchaseServiceProtocol,
+         equipService: EquipServiceProtocol,
          achievementProgress: AchievementProgressSource = StubAchievementProgressSource()) {
         self.catalog = catalog
         self.inventory = inventory
         self.purchaseService = purchaseService
+        self.equipService = equipService
         self.achievementProgress = achievementProgress
     }
 
@@ -58,24 +67,49 @@ final class CosmeticsContainer: ObservableObject {
             inventory: inventory,
             network:   LiveNetworkPurchasePort()
         )
+        let equip = RemoteEquipService(
+            inventory: inventory,
+            network:   LiveNetworkInventoryPort()
+        )
         return CosmeticsContainer(
             catalog:         catalog,
             inventory:       inventory,
-            purchaseService: purchase
+            purchaseService: purchase,
+            equipService:    equip
         )
     }
 
-    /// Forwards the active userId from auth to the inventory repository.
-    /// Pass a publisher that emits the current userId (or nil when logged
-    /// out). Subscribed via Combine — `setActiveUser` is dedupe-guarded
-    /// inside the repository so a re-emitted same-userId is a no-op.
+    /// Pull canonical inventory state from the server. Called from the
+    /// composition root after auth resolves and on app foreground —
+    /// failures are swallowed (logged inside EquipService) because the
+    /// local cache from disk is a tolerable fallback. Subsequent equip
+    /// attempts will surface fresh server errors on their own.
+    func syncInventoryFromServer() async {
+        do { try await equipService.syncFromServer() }
+        catch { /* logged inside EquipService */ }
+    }
+
+    /// Forwards the active userId from auth to the inventory repository,
+    /// and triggers a one-shot server sync whenever a non-nil userId
+    /// arrives (login, app cold-start with stored session, account switch).
+    /// `removeDuplicates` ensures re-emissions of the same userId don't
+    /// re-fire the sync — `setActiveUser` is also dedupe-guarded inside
+    /// the repository, so both writes are safe to re-emit.
+    /// App-foreground re-sync is deliberately NOT handled here — see
+    /// TECH_DEBT.md "Phase 5: app-foreground inventory refresh".
     func bindToActiveUser<P: Publisher>(_ publisher: P)
         where P.Output == String?, P.Failure == Never
     {
         publisher
             .removeDuplicates()
             .sink { [weak self] userId in
-                self?.inventory.setActiveUser(userId)
+                guard let self else { return }
+                self.inventory.setActiveUser(userId)
+                if userId != nil {
+                    Task { [weak self] in
+                        await self?.syncInventoryFromServer()
+                    }
+                }
             }
             .store(in: &cancellables)
     }

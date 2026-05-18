@@ -86,6 +86,46 @@ struct StoreView: View {
             Text(confirmAlertBody)
         }
 
+        // ── Confirm equip alert ──────────────────────────────────────────────
+        .alert(equipAlertTitle,
+               isPresented: Binding(
+                get:  { if case .confirmingEquip = vm.equipFlow { return true }; return false },
+                set:  { if !$0 { vm.cancelEquip() } })
+        ) {
+            Button(NSLocalizedString("Equip", comment: "Confirm equip"),
+                   action: vm.confirmEquip)
+            Button(NSLocalizedString("Cancel", comment: ""),
+                   role: .cancel, action: vm.cancelEquip)
+        } message: {
+            Text(equipAlertBody)
+        }
+
+        // ── Confirm unequip alert ────────────────────────────────────────────
+        // Separate alert (not branched copy on a shared one) because the
+        // primary button role differs — Unequip is destructive-ish so the
+        // user gets clearer messaging.
+        .alert(unequipAlertTitle,
+               isPresented: Binding(
+                get:  { if case .confirmingUnequip = vm.equipFlow { return true }; return false },
+                set:  { if !$0 { vm.cancelEquip() } })
+        ) {
+            Button(NSLocalizedString("Unequip", comment: "Confirm unequip"),
+                   role: .destructive, action: vm.confirmUnequip)
+            Button(NSLocalizedString("Cancel", comment: ""),
+                   role: .cancel, action: vm.cancelEquip)
+        }
+
+        // ── Equip error toast ────────────────────────────────────────────────
+        .overlay(alignment: .bottom) {
+            if let err = vm.lastEquipError {
+                EquipErrorToast(error: err) { vm.lastEquipError = nil }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: vm.lastEquipError)
+
         // ── Insufficient-funds → chip store sheet ────────────────────────────
         .sheet(isPresented: $vm.showInsufficientFundsSheet,
                onDismiss: { vm.onTopUpTapped(source: .insufficientFundsSheet) }) {
@@ -170,7 +210,7 @@ struct StoreView: View {
                 FeaturedCard(cosmetic: c,
                              currentTime: vm.currentTime,
                              isOwned: vm.ownedIDs.contains(c.id))
-                    .onTapGesture { vm.promptPurchase(c) }
+                    .onTapGesture { handleTap(c) }
                     .padding(.horizontal, 16)
             }
         } else {
@@ -182,9 +222,23 @@ struct StoreView: View {
                 FeaturedCard(cosmetic: c,
                              currentTime: vm.currentTime,
                              isOwned: vm.ownedIDs.contains(c.id))
-                    .onTapGesture { vm.promptPurchase(c) }
+                    .onTapGesture { handleTap(c) }
                     .padding(.horizontal, 16)
             }
+        }
+    }
+
+    /// Owned items route to the equip alert; un-owned items route to
+    /// purchase confirm. Branch lives here (not in the VM) so the VM's
+    /// `promptPurchase` and `promptEquip` retain narrow contracts —
+    /// each one assumes the caller has already gated on ownership. The
+    /// view, which holds the rendered `isOwned` state, is the right
+    /// place to do the gating.
+    private func handleTap(_ c: Cosmetic) {
+        if vm.ownedIDs.contains(c.id) {
+            vm.promptEquip(c)
+        } else {
+            vm.promptPurchase(c)
         }
     }
 
@@ -202,9 +256,10 @@ struct StoreView: View {
                 StoreCosmeticCell(
                     cosmetic: c,
                     isOwned: vm.ownedIDs.contains(c.id),
+                    isEquipped: vm.equippedByCategory[c.category] == c.id,
                     canAfford: vm.balance.canAfford(ChipAmount(c.priceChips))
                 )
-                .onTapGesture { vm.promptPurchase(c) }
+                .onTapGesture { handleTap(c) }
             }
         }
         .padding(.horizontal, 16)
@@ -264,6 +319,34 @@ struct StoreView: View {
             comment: "Purchase confirm body. %1 = price, %2 = remaining balance.")
         return String(format: fmt, priceStr, remStr)
     }
+
+    // ── Equip alert copy ─────────────────────────────────────────────────────
+
+    private var equipAlertTitle: String {
+        if case .confirmingEquip(let c) = vm.equipFlow {
+            return String(format: NSLocalizedString("Equip %@?", comment: "Equip confirm title"), c.name)
+        }
+        return ""
+    }
+
+    private var unequipAlertTitle: String {
+        if case .confirmingUnequip(let c) = vm.equipFlow {
+            return String(format: NSLocalizedString("Unequip %@?", comment: "Unequip confirm title"), c.name)
+        }
+        return ""
+    }
+
+    /// "Replace your current <category>?" if the slot is occupied by a
+    /// different item, otherwise empty — the alert title carries enough
+    /// info on its own.
+    private var equipAlertBody: String {
+        guard case .confirmingEquip(let c) = vm.equipFlow,
+              let currentEquippedId = vm.equippedByCategory[c.category],
+              currentEquippedId != c.id else { return "" }
+        return NSLocalizedString(
+            "This will replace your current item in this slot.",
+            comment: "Equip body — slot is already occupied")
+    }
 }
 
 // ─── Store Cosmetic Cell (grid) ───────────────────────────────────────────────
@@ -276,13 +359,24 @@ struct StoreView: View {
 struct StoreCosmeticCell: View {
     let cosmetic: Cosmetic
     let isOwned: Bool
+    /// Equipped in its slot — overrides the "Owned" badge with the
+    /// brighter "Equipped" label so the player can spot active items at
+    /// a glance. Independent of `isOwned` so a future server-granted
+    /// equip without a local ownership record renders sensibly (treats
+    /// the equipped flag as the visual source of truth).
+    let isEquipped: Bool
     let canAfford: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             CosmeticImageView(cosmetic: cosmetic, size: 140)
                 .overlay(alignment: .topTrailing) {
-                    if isOwned {
+                    if isEquipped {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.blue)
+                            .padding(6)
+                    } else if isOwned {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 22))
                             .foregroundStyle(.green)
@@ -299,7 +393,11 @@ struct StoreCosmeticCell: View {
                     .background(cosmetic.rarity.solidColor.opacity(0.2), in: Capsule())
                     .foregroundStyle(cosmetic.rarity.solidColor)
                 Spacer()
-                if isOwned {
+                if isEquipped {
+                    Text(NSLocalizedString("Equipped", comment: ""))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.blue)
+                } else if isOwned {
                     Text(NSLocalizedString("Owned", comment: ""))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -495,6 +593,49 @@ struct PurchaseErrorToast: View {
         case .validationError:     return NSLocalizedString("Something went wrong. Please try again.", comment: "")
         case .network(let s):      return String(format: NSLocalizedString("Network error: %@", comment: ""), s)
         case .atomicityViolation:  return NSLocalizedString("Purchase partially failed — refresh your balance.", comment: "")
+        }
+    }
+}
+
+// ─── Equip Error Toast ────────────────────────────────────────────────────────
+//
+// Sibling of PurchaseErrorToast. Same look + dismiss behaviour, different
+// underlying error type. Kept as a separate struct rather than a generic
+// because the per-case message dispatch is tighter when the error is
+// concrete — and there are only two of these in the app.
+
+struct EquipErrorToast: View {
+    let error: EquipError
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.system(size: 14, weight: .medium))
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(SPColors.surfaceHighlight, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.orange.opacity(0.6), lineWidth: 1)
+        )
+        .onTapGesture { onDismiss() }
+        .task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            onDismiss()
+        }
+    }
+
+    private var message: String {
+        switch error {
+        case .unknownCosmetic:    return NSLocalizedString("Item not found. Please try again.",                     comment: "")
+        case .notOwned:           return NSLocalizedString("You don't own this item yet.",                          comment: "")
+        case .categoryMismatch:   return NSLocalizedString("This item can't be equipped here.",                     comment: "")
+        case .network(let s):     return String(format: NSLocalizedString("Network error: %@", comment: ""), s)
         }
     }
 }

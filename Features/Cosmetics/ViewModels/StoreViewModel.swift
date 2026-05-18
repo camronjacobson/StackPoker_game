@@ -67,6 +67,12 @@ final class StoreViewModel: ObservableObject {
     @Published private(set) var balance: ChipAmount = .zero
     @Published private(set) var ownedIDs: Set<CosmeticID> = []
 
+    /// Equipped item per category. View reads this to render the
+    /// "Equipped" badge and to drive the equip-vs-unequip branch on tap.
+    /// Sourced from `container.inventory.inventoryPublisher` so updates
+    /// from any path (this VM, syncFromServer, other VMs) propagate.
+    @Published private(set) var equippedByCategory: [CosmeticCategory: CosmeticID] = [:]
+
     // ── Purchase flow ────────────────────────────────────────────────────────
 
     enum PurchaseFlow: Equatable {
@@ -77,6 +83,38 @@ final class StoreViewModel: ObservableObject {
     }
 
     @Published private(set) var purchaseFlow: PurchaseFlow = .idle
+
+    // ── Equip flow ───────────────────────────────────────────────────────────
+    //
+    // Mirror of PurchaseFlow for the equip path. Owned items show an
+    // "Equip" CTA on the cell; tapping an already-equipped item shows
+    // "Unequip" instead. Both go through `EquipService` (server-
+    // authoritative), so the network call drives the cache write — see
+    // RemoteEquipService.
+    //
+    //     idle ──promptEquip(c)──▶ confirmingEquip(c)
+    //                                   │
+    //              cancelEquip ────────┴──▶ idle
+    //                                   │
+    //                   confirm ──────▶ equipping(c)
+    //                                          │
+    //          EquipService ───────────────────┤
+    //          .success ──▶ idle  (cell badge flips via inventoryPublisher)
+    //          .failure(err) ──▶ idle, lastEquipError = err  (toast)
+
+    enum EquipFlow: Equatable {
+        case idle
+        case confirmingEquip(Cosmetic)
+        case confirmingUnequip(Cosmetic)
+        case equipping(Cosmetic)
+        case unequipping(Cosmetic)
+    }
+
+    @Published private(set) var equipFlow: EquipFlow = .idle
+
+    /// Surfaces error toasts for equip/unequip failures (notOwned,
+    /// categoryMismatch, network). Cleared by the view when dismissed.
+    @Published var lastEquipError: EquipError?
 
     /// Surfaces error toasts for non-insufficient-funds failures. Cleared
     /// to nil when the view dismisses the toast.
@@ -140,10 +178,26 @@ final class StoreViewModel: ObservableObject {
 
         // Inventory binding — owned set may change while the Store is open
         // (the player just bought something else, or a season pass granted
-        // an item in another flow).
+        // an item in another flow). Equipped map mirrored for the same
+        // reason — sync-from-server, other VMs, or an in-table equip can
+        // all mutate it while the store is open.
+        self.equippedByCategory = container.inventory.inventory.equippedByCategory
         container.inventory.inventoryPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] inv in self?.ownedIDs = inv.ownedIDs }
+            .sink { [weak self] inv in
+                self?.ownedIDs = inv.ownedIDs
+                self?.equippedByCategory = inv.equippedByCategory
+            }
+            .store(in: &cancellables)
+
+        // Equip-error toast binding. EquipService publishes its lastError
+        // through Combine so the VM doesn't need to thread the error
+        // through every async call site.
+        container.equipService.lastErrorPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] err in
+                if let err { self?.lastEquipError = err }
+            }
             .store(in: &cancellables)
     }
 
@@ -313,6 +367,68 @@ final class StoreViewModel: ObservableObject {
     /// the confetti view's onComplete or a 1.5s timer fallback.
     func celebrationFinished() {
         if case .celebrating = purchaseFlow { purchaseFlow = .idle }
+    }
+
+    // ── Equip flow (owned items) ─────────────────────────────────────────────
+    //
+    // Single entrypoint for owned-item taps: routes to confirmingUnequip
+    // if the item is already equipped in its slot, otherwise to
+    // confirmingEquip. Purchase-vs-equip branching lives in the View
+    // (the cell knows whether it's drawing an Owned badge or not), and
+    // an item that isn't owned never reaches here.
+
+    /// View → VM: user tapped an owned cell.
+    func promptEquip(_ cosmetic: Cosmetic) {
+        if equippedByCategory[cosmetic.category] == cosmetic.id {
+            equipFlow = .confirmingUnequip(cosmetic)
+        } else {
+            equipFlow = .confirmingEquip(cosmetic)
+        }
+    }
+
+    func cancelEquip() {
+        equipFlow = .idle
+    }
+
+    /// View → VM: user tapped Confirm on the Equip alert.
+    func confirmEquip() {
+        guard case .confirmingEquip(let cosmetic) = equipFlow else { return }
+        equipFlow = .equipping(cosmetic)
+        Task { [weak self] in
+            guard let self = self else { return }
+            let result = await self.container.equipService.equip(cosmetic)
+            await MainActor.run {
+                self.handleEquipResult(result)
+            }
+        }
+    }
+
+    /// View → VM: user tapped Confirm on the Unequip alert.
+    func confirmUnequip() {
+        guard case .confirmingUnequip(let cosmetic) = equipFlow else { return }
+        equipFlow = .unequipping(cosmetic)
+        Task { [weak self] in
+            guard let self = self else { return }
+            let result = await self.container.equipService.unequip(cosmetic.category)
+            await MainActor.run {
+                self.handleEquipResult(result)
+            }
+        }
+    }
+
+    /// Both equip and unequip land here. Success is silent — the
+    /// inventoryPublisher binding will flip the cell's badge — failure
+    /// surfaces through `lastEquipError`, which the EquipService also
+    /// publishes (so we don't need to inspect `result.failure` again).
+    private func handleEquipResult(_ result: EquipResult) {
+        equipFlow = .idle
+        // On notOwned: local cache claimed ownership but server disagreed.
+        // Re-sync so subsequent renders match server truth.
+        if case .failure(.notOwned) = result {
+            Task { [weak container] in
+                await container?.syncInventoryFromServer()
+            }
+        }
     }
 
     // ── Computed: balance preview for confirm copy ───────────────────────────

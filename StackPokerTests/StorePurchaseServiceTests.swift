@@ -64,6 +64,13 @@ private final class InMemoryInventoryRepo: InventoryRepositoryProtocol, Observab
     func unequip(_ category: CosmeticCategory) {
         inventory = inventory.unequipping(category)
     }
+    func replaceFromServer(ownedIds: Set<CosmeticID>, equipped: [CosmeticCategory: CosmeticID]) {
+        inventory = PlayerInventory(
+            ownedIDs: ownedIds,
+            equippedByCategory: equipped,
+            schemaVersion: PlayerInventory.currentSchemaVersion
+        )
+    }
 }
 
 import Combine
