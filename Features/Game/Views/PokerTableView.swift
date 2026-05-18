@@ -201,10 +201,17 @@ struct TableLayout {
                 }
             }()
             // Top seat (270°, v3) nudge: the rim math floats the avatar
-            // ~20pt above the felt's painted top edge. A small downward
-            // pull tucks it just inside the rim so it reads as seated
-            // at the top of the table rather than hovering above it.
-            let yDrop: CGFloat = (deg == 270) ? tableHeight * 0.05 : 0
+            // ~20pt above the felt's painted top edge. A downward pull
+            // tucks it just inside the rim so it reads as seated at the
+            // top of the table rather than hovering above it.
+            //
+            // Bumped 0.05 → 0.09 (≈29pt → ≈52pt on phone-sized felts) to
+            // give the action label (Fold / Raise pill, anchored ABOVE
+            // the avatar) and the revealed-cards cluster room to breathe
+            // away from the shop-cart icon at the top of the screen.
+            // Without this, top-seat revealed cards and action labels
+            // were punching into the cart's territory.
+            let yDrop: CGFloat = (deg == 270) ? tableHeight * 0.09 : 0
             return CGPoint(x: cx + rx * rxScale * cos(rad) * xScale,
                            y: cy + ry * sin(rad) - yLift + yDrop)
         }
@@ -2458,6 +2465,32 @@ private struct OpponentHoleCardsView: View {
         }()
         let liftedX: CGFloat = (isPLOWidth ? ploLift : nlhLift) * liftSign
 
+        // Top seat lands its lifted cluster on the avatar's chest via
+        // anchorY (see above), so an additional upward bump here would
+        // push the cards back over the head — exactly the bug we're
+        // fixing. Side / bottom seats keep the -22 (NLH) / -12 (PLO)
+        // upward shift that raises their cluster off the avatar plate.
+        let liftedY: CGFloat = {
+            switch seatSide {
+            case .top:    return 0
+            default:      return isPLOWidth ? -12 : -22
+            }
+        }()
+
+        // scaleEffect anchor — top seat scales from .center so growth is
+        // symmetric around the chest anchor (cards expand UP toward the
+        // face AND DOWN past the avatar's waist equally). The default
+        // .bottom anchor would pin the bottom edge in place and push the
+        // top edge ~40pt upward at 1.85×, dragging the enlarged cards
+        // into the avatar's face. Side/bottom seats keep .bottom — they
+        // grow upward off their below-avatar anchor as before.
+        let scaleAnchor: UnitPoint = {
+            switch seatSide {
+            case .top:    return .center
+            default:      return .bottom
+            }
+        }()
+
         // Seat-aware cluster anchor (was previously a static .offset at
         // the mount site). The X anchor FLIPS direction by lifted state
         // for side seats:
@@ -2481,10 +2514,23 @@ private struct OpponentHoleCardsView: View {
             case .top, .bottom:   return 0
             }
         }()
+        // Top seat anchorY flips between states so the revealed cluster
+        // overlays the avatar's CHEST rather than floating above the head.
+        // Above-the-head reveals were pushing into the shop-cart icon at
+        // the top of the screen; chest-area positioning keeps them inside
+        // the felt and matches the "character holding cards out" mental
+        // model the user wanted. `+avatarSize * 0.25` lands the cluster
+        // center at avatar_center + avatar_radius * 0.5 (i.e. halfway
+        // between the avatar's center and its bottom edge — chest level).
+        // Face-down top-seat cards keep the old -0.65 anchor (above the
+        // head) — this carve-out is reveal-only.
+        // Side seats (left/right) and bottom (hero, dead path here) stay
+        // exactly where they were.
         let anchorY: CGFloat = {
             switch seatSide {
             case .left, .right:   return -avatarSize * 0.15
-            case .top, .bottom:   return -avatarSize * 0.65
+            case .top:            return lifted ?  avatarSize * 0.25 : -avatarSize * 0.65
+            case .bottom:         return -avatarSize * 0.65
             }
         }()
 
@@ -2521,7 +2567,7 @@ private struct OpponentHoleCardsView: View {
         // as "look, I'm showing you" rather than "my cards are the whole
         // table". PLO drops further so the 4-card cluster (already 2× the
         // NLH footprint) doesn't sprawl past the felt edge.
-        .scaleEffect(lifted ? (isPLOWidth ? 1.3 : 1.85) : 1.0, anchor: .bottom)
+        .scaleEffect(lifted ? (isPLOWidth ? 1.3 : 1.85) : 1.0, anchor: scaleAnchor)
         // Horizontal nudge intentionally LARGER for PLO (+22) than NLH (-6).
         // Why: the parent seat layout pins this view with
         // `.offset(x: -avatarSize * 0.52)` — i.e. the cluster is always
@@ -2554,10 +2600,13 @@ private struct OpponentHoleCardsView: View {
         //               face-down. `liftedX` already carries the seat-
         //               aware sign so it adds in the same direction as
         //               the inward anchor.
-        //   inner Y   → -22 (NLH) / -12 (PLO) when lifted to raise the
-        //               cluster off the avatar plate. 0 when face-down.
+        //   inner Y   → `liftedY` when lifted: -22 (NLH) / -12 (PLO) for
+        //               side/bottom seats to raise the cluster off the
+        //               avatar plate, 0 for the top seat (whose anchorY
+        //               already lands on the chest, so no additional
+        //               upward bump). 0 when face-down for every seat.
         .offset(x: anchorX + (lifted ? liftedX : (isPLOWidth ? -16 : 0)),
-                y: anchorY + (lifted ? (isPLOWidth ? -12 : -22) : 0))
+                y: anchorY + (lifted ? liftedY : 0))
         .zIndex(lifted ? 5 : 0)
         .shadow(color: .black.opacity(lifted ? 0.55 : 0.3),
                 radius: lifted ? 9 : 2,
