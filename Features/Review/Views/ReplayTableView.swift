@@ -304,7 +304,13 @@ private extension PFSeat {
             // Same rationale as pendingLeave — mid-hand top-ups don't
             // exist in replay land; persisted history shows post-apply
             // stacks only.
-            pendingTopUp:     nil
+            pendingTopUp:     nil,
+            // Replay frames pre-date cosmetics broadcast (Phase 4) — old
+            // PFSeat snapshots don't carry equipped ids, so render with
+            // the engine default back. Future replays captured after the
+            // broadcast lands can be migrated by snapshotting from the
+            // live GameSeat directly.
+            equippedCosmetics: nil
         )
     }
 }

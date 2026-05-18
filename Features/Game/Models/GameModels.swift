@@ -112,8 +112,20 @@ struct GameSeat: Decodable, Identifiable {
     // stack pill when > 0. Drained into `stack` server-side at end of
     // hand (see PokerGameEngine.applyPendingTopUps).
     let pendingTopUp:    Int?
+    /// Server-broadcast per-seat equipped cosmetics, keyed by category
+    /// rawValue (e.g. "cardBack" → "card_back_classic_red"). Hydrated
+    /// server-side from the `EquippedCosmetic` table at table-join and on
+    /// rejoin. Optional because older server builds don't emit the field
+    /// — decode falls back to nil, which we surface as an empty map at
+    /// the read sites so the UI's "no cosmetic equipped" branch is
+    /// always the same code path. iOS renders an opponent's cosmetic
+    /// from this field without needing the catalog round-trip.
+    let equippedCosmetics: [String: String]?
 
     var id: String { userId }
+    /// Convenience accessor — server may omit the field on older builds.
+    /// Read sites use this to keep dictionary-subscript syntax direct.
+    var equipped: [String: String] { equippedCosmetics ?? [:] }
     var isActive: Bool { status == .active }
     var isLeaving: Bool { pendingLeave == true }
     var pendingTopUpAmount: Int { pendingTopUp ?? 0 }

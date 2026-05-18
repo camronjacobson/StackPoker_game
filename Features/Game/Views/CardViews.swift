@@ -19,6 +19,12 @@ struct PlayingCardView: View {
     // When true, render with a bright per-suit background and white glyphs —
     // used for community cards in the target design. Hole cards stay false.
     var coloredBackground: Bool = false
+    // Optional cosmetic id for the face-down back. nil (or unrecognised id) →
+    // the engine's default maroon back. Recognised ids route through
+    // CardBackRenderer so the same single source of truth controls both
+    // hero hole cards and the opponent reveal cluster. Resolved per-render —
+    // no caching layer, because the catalog itself is constant for a session.
+    var cardBackId: CosmeticID? = nil
 
     enum CardSize: Equatable {
         case small, medium, large, hero
@@ -245,7 +251,23 @@ struct PlayingCardView: View {
 
     // ─── Back ─────────────────────────────────────────────────────────────────
 
+    @ViewBuilder
     private var cardBack: some View {
+        // Cosmetic-aware back. CardBackRenderer.supports gates the procedural
+        // path — unknown / nil ids fall back to the engine's default retro
+        // maroon back so a future server-only catalog addition simply renders
+        // as default until iOS catches up. Same shadow / stroke chassis wraps
+        // both branches via the outer .frame in `body`.
+        if CardBackRenderer.supports(cardBackId) {
+            CardBackRenderer.view(for: cardBackId,
+                                  size: size.width,
+                                  cornerRadius: size.cornerRadius)
+        } else {
+            defaultCardBack
+        }
+    }
+
+    private var defaultCardBack: some View {
         // Retro card back: flat maroon fill (SPColors.cardBack) with an ink
         // panel border, a paper-tinted inset hairline for the "printed
         // border" feel, and a mustard spade pip at the center. Replaces the
@@ -280,6 +302,9 @@ struct FlippableCardView: View {
     let dealDelay: Double   // seconds before the card appears
     let flipDelay: Double   // seconds after appearing before the flip
     var colored:   Bool = true   // 4-color front (default matches HoleCardsView)
+    // Forwarded to the face-down PlayingCardView during the pre-flip phase
+    // so the deal animation matches the equipped back. nil → engine default.
+    var cardBackId: CosmeticID? = nil
 
     @State private var appeared  = false
     @State private var showFront = false
@@ -291,7 +316,8 @@ struct FlippableCardView: View {
                 PlayingCardView(card: card, size: size,
                                 coloredBackground: colored)
             } else {
-                PlayingCardView(card: nil, size: size, isFaceDown: true)
+                PlayingCardView(card: nil, size: size, isFaceDown: true,
+                                cardBackId: cardBackId)
             }
         }
         .scaleEffect(x: flipScaleX, y: 1)
@@ -336,12 +362,17 @@ struct HoleCardsView: View {
     // blue / green / black) palette as the community board. Callers
     // that want the legacy white front (e.g. tutorials) can opt out.
     var colored:   Bool = true
+    // Cosmetic card back id forwarded down to PlayingCardView /
+    // FlippableCardView. nil → engine default. The hero passes their own
+    // equipped id; opponents pass the seat's broadcast id.
+    var cardBackId: CosmeticID? = nil
 
     var body: some View {
         HStack(spacing: size == .large ? 4 : -(size == .hero ? 12 : 6)) {
             if isHidden || cards.isEmpty {
                 ForEach(0..<max(cardCount, isHidden ? 2 : 0), id: \.self) { i in
-                    PlayingCardView(card: nil, size: size, isFaceDown: true)
+                    PlayingCardView(card: nil, size: size, isFaceDown: true,
+                                    cardBackId: cardBackId)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.5).combined(with: .opacity),
                             removal: .opacity
@@ -350,11 +381,12 @@ struct HoleCardsView: View {
             } else if animate {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
                     FlippableCardView(
-                        card:      card,
-                        size:      size,
-                        dealDelay: Double(idx) * 0.18,
-                        flipDelay: 0.22,
-                        colored:   colored
+                        card:       card,
+                        size:       size,
+                        dealDelay:  Double(idx) * 0.18,
+                        flipDelay:  0.22,
+                        colored:    colored,
+                        cardBackId: cardBackId
                     )
                 }
             } else {

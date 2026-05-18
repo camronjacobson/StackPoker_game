@@ -1951,7 +1951,12 @@ struct TargetSeatView: View {
                         winningCardIds:     winningCardIds,
                         partialReveals:     seat.revealed,
                         seatSide:           seatSide,
-                        avatarSize:         avatarSize
+                        avatarSize:         avatarSize,
+                        // Seat-equipped cosmetic id (server-broadcast). Read
+                        // from the seat's `equipped` map keyed by the
+                        // CosmeticCategory.cardBack raw value. nil drops
+                        // through to PlayingCardView's default back.
+                        cardBackId:         seat.equipped[CosmeticCategory.cardBack.rawValue]
                     )
                     .zIndex(8)
                 }
@@ -2356,6 +2361,11 @@ private struct OpponentHoleCardsView: View {
     // call sites keep compiling without forcing them to thread the
     // exact runtime avatarSize through.
     var avatarSize:         CGFloat  = 50
+    // Cosmetic card-back id broadcast from the server in this seat's
+    // `equippedCosmetics["cardBack"]`. nil → engine default back. The
+    // resolved view is rendered by PlayingCardView via CardBackRenderer so
+    // a single source of truth controls both hero and opponent backs.
+    var cardBackId:         CosmeticID? = nil
 
     @State private var revealed:   Bool    = false
     @State private var flipScaleX: CGFloat = 1
@@ -2733,18 +2743,20 @@ private struct OpponentHoleCardsView: View {
     }
 
     private var cardBack: some View {
-        RoundedRectangle(cornerRadius: 3)
-            .fill(
-                LinearGradient(
-                    colors: [Color(hex: "#2D2D4A"), Color(hex: "#1A1A30")],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-            )
-            .frame(width: 18, height: 24)
-            .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
-            )
+        // Delegate face-down rendering to the same PlayingCardView that the
+        // hero and the rest of the table use. This unifies opponent and hero
+        // backs through a single CardBackRenderer surface — when the seat's
+        // owner has a cosmetic equipped, the broadcast id arrives here and
+        // routes to the procedural renderer; nil falls back to PlayingCardView's
+        // default retro maroon back. The 18x24 frame the previous gradient used
+        // is preserved via the .custom(18) size — same footprint inside the
+        // cluster geometry, just cosmetic-aware now.
+        PlayingCardView(
+            card:        nil,
+            size:        .custom(18),
+            isFaceDown:  true,
+            cardBackId:  cardBackId
+        )
     }
 
     // X-axis squish-flip → swap to face-up → expand. Then a small spring
