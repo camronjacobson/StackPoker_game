@@ -2412,17 +2412,21 @@ private struct OpponentHoleCardsView: View {
         //   NLH (count=2): rotations (-5°,    0°)             — 5° spread
         //   PLO (count=4): rotations (-7.5°, -5°, -2.5°, 0°) — 7.5° spread
         //                                  ^ matches NLH's leftmost card exactly
-        // Lifted fan tightened: previously NLH (step 3, base 4.5) put
-        // the pair at -4.5° and -1.5° — both cards leaning ~3° left of
-        // vertical, which read as visibly crooked. Now NLH (step 2,
-        // base 1) gives -1° and +1° — symmetric about vertical, just
-        // a hint of fan. PLO (step 1.5, base 2.25) gives ±2.25° at the
-        // edges, still subtle but lets four cards visually separate.
+        // Lifted fan history: NLH started at step 3 / base 4.5 (visibly
+        // crooked pair leaning left), tightened to step 2 / base 1 (±1°,
+        // still read as crooked at 1.85× scale), and is now FLAT — both
+        // cards at 0° rotation. PLO keeps its small step 1.5 / base 2.25
+        // fan (±2.25° at the edges) because four cards need angular
+        // separation to read as four distinct ranks rather than a stack.
         // Face-down geometry unchanged — the dramatic 5°/2.5° fan is
         // what makes face-down cards read as a stacked deck rather
         // than a flat pair.
-        let fanStep:    Double  = lifted ? (isPLOWidth ? 1.5 : 2)   : (isPLOWidth ? 2.5 : 5)
-        let fanBase:    Double  = lifted ? (isPLOWidth ? 2.25 : 1)  : (isPLOWidth ? 7.5 : 5)
+        // NLH lifted = flat (0° step, 0° base) — at 1.85× scale the previous
+        // ±1° fan read as visibly crooked rather than a subtle hand-feel. PLO
+        // keeps its small fan because four cards need the angular separation
+        // to read as distinct ranks. Face-down geometry unchanged.
+        let fanStep:    Double  = lifted ? (isPLOWidth ? 1.5 : 0)   : (isPLOWidth ? 2.5 : 5)
+        let fanBase:    Double  = lifted ? (isPLOWidth ? 2.25 : 0)  : (isPLOWidth ? 7.5 : 5)
         // Revealed (lifted) gap tightened — previously 3pt (NLH) / 2.5pt (PLO)
         // left a visible felt strip between cards that read as "cards floating
         // apart" rather than "this is my hand". 1pt keeps a hairline of
