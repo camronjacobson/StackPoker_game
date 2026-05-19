@@ -79,6 +79,19 @@ final class StoreViewModel: ObservableObject {
         Dictionary(grouping: catalogItems, by: \.category)
     }
 
+    /// Owned items grouped by category. Same shape as `catalogByCategory`,
+    /// filtered to `ownedIDs`. Used by LockerView to render per-category
+    /// pickers without each section having to re-filter. Inherits the
+    /// rarity-desc / price-asc sort from `catalogItems` because the filter
+    /// preserves order. Aspirational items (titles earned by play) aren't
+    /// in `catalogItems` and won't appear here — fine for Locker v1
+    /// (avatar frames + card backs only), revisit when titles become
+    /// previewable.
+    var ownedByCategory: [CosmeticCategory: [Cosmetic]] {
+        Dictionary(grouping: catalogItems.filter { ownedIDs.contains($0.id) },
+                   by: \.category)
+    }
+
     // ── Balance + ownership ──────────────────────────────────────────────────
 
     @Published private(set) var balance: ChipAmount = .zero

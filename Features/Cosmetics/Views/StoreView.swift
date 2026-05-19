@@ -45,6 +45,13 @@ struct StoreView: View {
     /// a player who opens Store fresh.
     @State private var showOwnedOnly: Bool = false
 
+    /// Drives the Locker full-screen cover. The Locker is a "try on"
+    /// surface — hero preview + coverflow picker per category — entered
+    /// via the tshirt button in the header. Local @State because the
+    /// Locker has no callers outside the Store today; if a second entry
+    /// point appears, promote to the VM.
+    @State private var showLocker: Bool = false
+
     /// Top-level grouping. The associated `categories` array dictates the
     /// section order within a tab — front-loaded toward the cosmetics the
     /// player will reach for first (Card Backs in Style, Deal Animations
@@ -108,6 +115,15 @@ struct StoreView: View {
         }
         .onAppear  { vm.onAppear() }
         .onDisappear { vm.onDisappear() }
+
+        // ── Locker full-screen cover ─────────────────────────────────────────
+        // Try-on surface entered via the tshirt header button. fullScreenCover
+        // (not sheet) so the hero preview gets the full viewport and there's
+        // no system pull-to-dismiss that would fight the carousel swipe
+        // gesture. Locker dismisses via its own top-left X button.
+        .fullScreenCover(isPresented: $showLocker) {
+            LockerView(vm: vm)
+        }
 
         // ── Confirm purchase alert ───────────────────────────────────────────
         .alert(confirmAlertTitle,
@@ -190,6 +206,27 @@ struct StoreView: View {
         HStack(alignment: .center) {
             Text(NSLocalizedString("Store", comment: "Store screen title"))
                 .font(.system(size: 28, weight: .bold, design: .rounded))
+            // Locker entry — small ink-stroked square button sitting
+            // between the title and the balance pill. Tshirt glyph reads
+            // as "wardrobe / try on" without needing a label; tap opens
+            // the full-screen Locker cover. Same 1.5pt ink stroke as the
+            // balance pill so the two header controls feel paired.
+            Button {
+                showLocker = true
+            } label: {
+                Image(systemName: "tshirt.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SPColors.textPrimary)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(SPColors.surfaceElevated, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(SPColors.border, lineWidth: 1.5)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(NSLocalizedString("Locker", comment: "Header button — opens the try-on Locker")))
+            .padding(.leading, 12)
             Spacer()
             // Top-right balance pill — same visual language as ChipsView,
             // tappable to send the user to top-up.

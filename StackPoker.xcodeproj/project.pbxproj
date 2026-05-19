@@ -104,6 +104,7 @@
 		B11D001600000000C05E51C1 /* NetworkInventoryPort+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001600000000C05E51C1 /* NetworkInventoryPort+Live.swift */; };
 		B11D001700000000C05E51C1 /* CardBackRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001700000000C05E51C1 /* CardBackRenderer.swift */; };
 		B11D001800000000C05E51C1 /* AvatarFrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001800000000C05E51C1 /* AvatarFrameRenderer.swift */; };
+		B11D001900000000C05E51C1 /* LockerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E001900000000C05E51C1 /* LockerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -244,6 +245,7 @@
 		F11E001600000000C05E51C1 /* NetworkInventoryPort+Live.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NetworkInventoryPort+Live.swift"; sourceTree = "<group>"; };
 		F11E001700000000C05E51C1 /* CardBackRenderer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CardBackRenderer.swift; sourceTree = "<group>"; };
 		F11E001800000000C05E51C1 /* AvatarFrameRenderer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AvatarFrameRenderer.swift; sourceTree = "<group>"; };
+		F11E001900000000C05E51C1 /* LockerView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LockerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -799,6 +801,7 @@
 			children = (
 				F11E001700000000C05E51C1 /* CardBackRenderer.swift */,
 				F11E001800000000C05E51C1 /* AvatarFrameRenderer.swift */,
+				F11E001900000000C05E51C1 /* LockerView.swift */,
 				F11E000800000000C05E51C1 /* CosmeticImageView.swift */,
 				F11E001100000000C05E51C1 /* PurchaseConfettiView.swift */,
 				F11E001300000000C05E51C1 /* StorePeekTab.swift */,
@@ -1081,6 +1084,7 @@
 				B11D001600000000C05E51C1 /* NetworkInventoryPort+Live.swift in Sources */,
 				B11D001700000000C05E51C1 /* CardBackRenderer.swift in Sources */,
 				B11D001800000000C05E51C1 /* AvatarFrameRenderer.swift in Sources */,
+				B11D001900000000C05E51C1 /* LockerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
