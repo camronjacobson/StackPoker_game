@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 
 // ─── Tab bar visibility coordinator ──────────────────────────────────────────
 // Lets pushed views (e.g. HandReplayView) hide the custom bottom bar so their
@@ -17,19 +18,27 @@ final class TabBarVisibility: ObservableObject {
 struct MainTabView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @EnvironmentObject var subscription: SubscriptionManager
+    @EnvironmentObject var cosmetics: CosmeticsContainer
     @StateObject private var lobbyVM = LobbyViewModel()
     @StateObject private var tabBarVis = TabBarVisibility.shared
     @State private var selectedTab: AppTab = .home
 
+    // Replaced the long-dead `.alerts` tab (no notifications backend, no UI
+    // beyond a placeholder) with `.store` 2026-05-18. Behaves like Home /
+    // Friends — selecting it swaps the content area to StoreView. The other
+    // store entry points (ChipsView, ProfileView) remain `.sheet`-based
+    // because they're contextual; the tab-bar entry is the dedicated
+    // destination, so it gets full-screen navigation and a selected visual
+    // state like every other tab.
     enum AppTab: Int, CaseIterable {
-        case home, history, create, alerts, friends
+        case home, history, create, store, friends
 
         var icon: String {
             switch self {
             case .home:    return "house.fill"
             case .history: return "clock.arrow.circlepath"
             case .create:  return "plus"
-            case .alerts:  return "bell.fill"
+            case .store:   return "cart.fill"
             case .friends: return "person.2.fill"
             }
         }
@@ -39,7 +48,7 @@ struct MainTabView: View {
             case .home:    return "Home"
             case .history: return "Review"
             case .create:  return ""
-            case .alerts:  return "Alerts"
+            case .store:   return "Store"
             case .friends: return "Friends"
             }
         }
@@ -78,7 +87,7 @@ struct MainTabView: View {
                         PaywallView()
                     }
                 case .create:  LobbyView().environmentObject(lobbyVM) // Create triggers sheet, not a tab
-                case .alerts:  AlertsPlaceholderView()
+                case .store:   StoreView(vm: makeStoreViewModel(entryPoint: .lobbyTab))
                 case .friends: FriendsTabView()
                 }
             }
@@ -94,6 +103,23 @@ struct MainTabView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: tabBarVis.isHidden)
         .ignoresSafeArea(.keyboard)
+    }
+
+    /// Factory for the store VM mirrored from ChipsView / ProfileView so the
+    /// in-store balance pill stays in sync with daily-bonus / transfer /
+    /// purchase mutations. ChipAmount tolerates bad payloads — bogus chip
+    /// strings render as .zero instead of crashing.
+    private func makeStoreViewModel(entryPoint: StoreEntryPoint) -> StoreViewModel {
+        let balancePublisher = authVM.$currentUser
+            .map { profile -> ChipAmount in
+                ChipAmount(serverString: profile?.chipBalance ?? "0") ?? .zero
+            }
+            .eraseToAnyPublisher()
+        return StoreViewModel(
+            container:        cosmetics,
+            balancePublisher: balancePublisher,
+            entryPoint:       entryPoint
+        )
     }
 }
 
@@ -162,22 +188,9 @@ struct PokerTabBar: View {
                         selectedTab = tab
                     } label: {
                         VStack(spacing: 3) {
-                            ZStack {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 20, weight: selectedTab == tab ? .black : .bold))
-                                    .foregroundStyle(selectedTab == tab ? SPRetro.ink : SPRetro.inkSoft.opacity(0.55))
-
-                                // Alert badge — pop red with an ink border so
-                                // it sits in the comic-panel system rather
-                                // than reading as a Material-Design dot.
-                                if tab == .alerts {
-                                    Circle()
-                                        .fill(SPRetro.popRed)
-                                        .frame(width: 9, height: 9)
-                                        .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 1))
-                                        .offset(x: 10, y: -8)
-                                }
-                            }
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 20, weight: selectedTab == tab ? .black : .bold))
+                                .foregroundStyle(selectedTab == tab ? SPRetro.ink : SPRetro.inkSoft.opacity(0.55))
 
                             Text(tab.label)
                                 .font(SPRetroFonts.callout(10))
@@ -221,22 +234,6 @@ struct PokerTabBar: View {
 }
 
 // ─── Placeholder views for new tabs ──────────────────────────────────────────
-
-struct AlertsPlaceholderView: View {
-    var body: some View {
-        ZStack {
-            SPColors.background.ignoresSafeArea()
-            VStack(spacing: SPSpacing.md) {
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(SPColors.accent.opacity(0.5))
-                Text("No new alerts")
-                    .font(SPFonts.headline())
-                    .foregroundStyle(SPColors.textSecondary)
-            }
-        }
-    }
-}
 
 // FriendsTabView used to be a placeholder showing only an icon and the word
 // "Friends", which is why mutual friends never appeared in the bottom-bar tab

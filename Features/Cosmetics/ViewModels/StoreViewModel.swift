@@ -516,6 +516,12 @@ enum StoreEntryPoint: String {
     // overload that gesture. The table entry point is now a persistent
     // peek-tab anchored to the top safe-area inset — see StorePeekTab.
     case tableStoreTab            // tapped/dragged the table peek-tab
+    // Added 2026-05-18 when the long-dead Alerts tab in the lobby bottom
+    // bar was replaced with a real Store tab. Unlike the other two store
+    // entries (which present StoreView as a `.sheet`), this one is full
+    // navigation — selecting it swaps MainTabView's content area, same
+    // model as Home / Friends.
+    case lobbyTab                 // selected the Store tab in lobby bottom bar
 }
 
 enum TopUpSource {

@@ -38,6 +38,13 @@ struct StoreView: View {
     /// without resetting on each VM tick.
     @State private var selectedTab: MetaTab = .style
 
+    /// "Owned only" filter toggle. Drives a per-cell ownedIDs predicate
+    /// across every sub-category in the current meta-tab. Resets to false
+    /// on each fresh presentation — intentionally NOT persisted to
+    /// UserDefaults; "show me everything" is the right starting point for
+    /// a player who opens Store fresh.
+    @State private var showOwnedOnly: Bool = false
+
     /// Top-level grouping. The associated `categories` array dictates the
     /// section order within a tab — front-loaded toward the cosmetics the
     /// player will reach for first (Card Backs in Style, Deal Animations
@@ -77,6 +84,7 @@ struct StoreView: View {
             VStack(spacing: 0) {
                 header
                 tabBar
+                ownedFilterPill
                 ScrollView {
                     LazyVStack(spacing: 20) {
                         sectionsForCurrentTab
@@ -238,12 +246,54 @@ struct StoreView: View {
         .padding(.horizontal, 16)
     }
 
+    // ── Owned-only filter pill ───────────────────────────────────────────────
+    //
+    // Small left-aligned toggle that lives between the meta-tab bar and the
+    // scroll content. Same toggle drives every meta-tab (Style / Moves /
+    // Identity). Active state swaps the cream surface for the mustard
+    // accent so the on-state reads as "actively filtering, take action to
+    // turn off" rather than blending into the chrome.
+
+    private var ownedFilterPill: some View {
+        HStack {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { showOwnedOnly.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: showOwnedOnly ? "checkmark.circle.fill" : "checkmark.circle")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(NSLocalizedString("Owned only", comment: "Store filter toggle"))
+                        .font(SPFonts.caption(12))
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .foregroundStyle(showOwnedOnly ? SPColors.textPrimary : SPColors.textSecondary)
+                .background(
+                    showOwnedOnly ? SPColors.accent : SPColors.surfaceElevated,
+                    in: Capsule()
+                )
+                .overlay(Capsule().strokeBorder(SPColors.border, lineWidth: 1.5))
+            }
+            .buttonStyle(.plain)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+
     // ── Sections per meta-tab ────────────────────────────────────────────────
     //
     // Each sub-category renders as a section header + a 2-col grid of cells.
     // Identity adds an "Earned by Play" section at the bottom that uses
     // AspirationalCell instead of StoreCosmeticCell, since those items
     // surface progress / unlock condition rather than price.
+    //
+    // Owned-only filter behaviour: when `showOwnedOnly` is on, each section
+    // header stays rendered (so the structure stays parseable) but the grid
+    // is replaced by a per-section empty-state line when nothing in that
+    // sub-category is owned. Sections whose unfiltered catalog list is
+    // empty are still skipped — the empty state only kicks in for
+    // categories the player *could* own items in.
 
     @ViewBuilder private var sectionsForCurrentTab: some View {
         ForEach(selectedTab.categories, id: \.self) { category in
@@ -263,42 +313,86 @@ struct StoreView: View {
 
     @ViewBuilder
     private func categorySection(category: CosmeticCategory, items: [Cosmetic]) -> some View {
+        // Filter is per-section so the empty-state UX is meaningful: the
+        // section header stays put and the user sees *which* categories
+        // they have gaps in. A single global filter applied above would
+        // just hide whole sections and lose that signal.
+        let visible = showOwnedOnly
+            ? items.filter { vm.ownedIDs.contains($0.id) }
+            : items
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(category.displayName)
-            LazyVGrid(columns: storeColumns, spacing: 16) {
-                ForEach(items) { c in
-                    StoreCosmeticCell(
-                        cosmetic: c,
-                        isOwned: vm.ownedIDs.contains(c.id),
-                        isEquipped: vm.equippedByCategory[c.category] == c.id,
-                        canAfford: vm.balance.canAfford(ChipAmount(c.priceChips))
-                    )
-                    .onTapGesture { handleTap(c) }
+            if visible.isEmpty {
+                // showOwnedOnly == true and no owned items in this category.
+                // displayName is already plural ("Card Backs", "Avatar
+                // Frames", etc.), so lowercasing slots straight into the
+                // template without ad-hoc pluralisation logic.
+                emptyOwnedRow(
+                    String(format: NSLocalizedString(
+                        "No %@ owned yet",
+                        comment: "Store owned-filter empty state. %@ = lowercased plural category name."),
+                           category.displayName.lowercased())
+                )
+            } else {
+                LazyVGrid(columns: storeColumns, spacing: 16) {
+                    ForEach(visible) { c in
+                        StoreCosmeticCell(
+                            cosmetic: c,
+                            isOwned: vm.ownedIDs.contains(c.id),
+                            isEquipped: vm.equippedByCategory[c.category] == c.id,
+                            canAfford: vm.balance.canAfford(ChipAmount(c.priceChips))
+                        )
+                        .onTapGesture { handleTap(c) }
+                    }
                 }
+                .padding(.horizontal, 16)
+                // Rasterize the grid into a Metal layer during the slide-down
+                // animation. Each StoreCosmeticCell renders artwork, rarity
+                // badge, price pill, and an overlay — re-laying out a dozen of
+                // those on every frame of the drawer's spring is the visible
+                // stutter source. .drawingGroup() flattens the grid to a single
+                // textured surface that SwiftUI just translates, so the cost
+                // collapses to a Metal blit per frame.
+                .drawingGroup()
             }
-            .padding(.horizontal, 16)
-            // Rasterize the grid into a Metal layer during the slide-down
-            // animation. Each StoreCosmeticCell renders artwork, rarity
-            // badge, price pill, and an overlay — re-laying out a dozen of
-            // those on every frame of the drawer's spring is the visible
-            // stutter source. .drawingGroup() flattens the grid to a single
-            // textured surface that SwiftUI just translates, so the cost
-            // collapses to a Metal blit per frame.
-            .drawingGroup()
         }
     }
 
     @ViewBuilder private var aspirationalSection: some View {
+        let visible = showOwnedOnly
+            ? vm.aspirationalItems.filter { vm.ownedIDs.contains($0.id) }
+            : vm.aspirationalItems
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(NSLocalizedString("Earned by Play", comment: "Aspirational section header"))
-            LazyVGrid(columns: storeColumns, spacing: 16) {
-                ForEach(vm.aspirationalItems) { c in
-                    AspirationalCell(cosmetic: c, progress: vm.progress(for: c))
+            if visible.isEmpty {
+                emptyOwnedRow(NSLocalizedString(
+                    "No earned items yet",
+                    comment: "Store owned-filter empty state for aspirational/earn-only items."))
+            } else {
+                LazyVGrid(columns: storeColumns, spacing: 16) {
+                    ForEach(visible) { c in
+                        AspirationalCell(cosmetic: c, progress: vm.progress(for: c))
+                    }
                 }
+                .padding(.horizontal, 16)
+                .drawingGroup()
             }
-            .padding(.horizontal, 16)
-            .drawingGroup()
         }
+    }
+
+    /// Italic, full-opacity message row used as the per-section placeholder
+    /// when the Owned filter hides every item in a sub-category. Kept inside
+    /// the section's VStack so the header stays anchored above and the next
+    /// section flows below at the normal 20pt inter-section gap.
+    private func emptyOwnedRow(_ text: String) -> some View {
+        HStack {
+            Text(text)
+                .font(SPFonts.body(13).italic())
+                .foregroundStyle(SPRetro.inkSoft)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     /// Owned items route to the equip alert; un-owned items route to
