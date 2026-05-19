@@ -41,7 +41,14 @@ struct StackPokerApp: App {
                 .environmentObject(subscriptionManager)
                 .environmentObject(dailyBonusPresenter)
                 .environmentObject(cosmetics)
-                .preferredColorScheme(.dark)
+                // Pinned to light to match the retro newsprint design language —
+                // cream paper, ink text, mustard / maroon accents. The aesthetic
+                // is built for light surfaces; dark-mode system chrome (sheet
+                // dimming, keyboard, status-bar inversion) fights the design,
+                // and every SPColors / SPRetro token is a static hex literal
+                // (no dynamic light/dark variant) so there is no second palette
+                // to tune. One-line lock is the right tactical choice.
+                .preferredColorScheme(.light)
                 // Bridge the Auth → Cosmetics seam. We forward the current
                 // userId publisher into the inventory repo so cosmetics
                 // state automatically scopes to whoever is signed in.
