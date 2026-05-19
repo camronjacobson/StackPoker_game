@@ -47,20 +47,37 @@ final class StoreViewModel: ObservableObject {
 
     // ── Sections ─────────────────────────────────────────────────────────────
 
-    /// Limited-time live drops, soonest-deadline first. Empty array
-    /// triggers the view's "Staff Picks" fallback strip.
+    // TODO: Parked for future Featured banner (post-2026-05-18 store redesign).
+    // Not currently consumed by StoreView — the redesigned store dropped the
+    // Featured tab because the shipped catalog has zero limited-time items,
+    // so the rail rendered as Staff Picks 100% of the time and the surface
+    // pretended at scarcity it didn't actually have. The compute logic stays
+    // because limited drops are a real Phase-5 plan; re-bind when a real
+    // banner-style Featured surface returns to the store top.
     @Published private(set) var featuredItems: [Cosmetic] = []
 
-    /// Curated fallback shown when there are no live limited drops. Picks
-    /// the top legendaries / mythics so the hero space always has weight.
+    // TODO: Parked alongside featuredItems for the future Featured banner.
+    // Was the "no live drops" fallback; deliberate to keep the compute path
+    // so re-binding is a one-line view change later.
     @Published private(set) var staffPicks: [Cosmetic] = []
 
     /// All purchasable items, default sort (rarity desc / price asc).
     @Published private(set) var catalogItems: [Cosmetic] = []
 
     /// Achievement / leaderboard / season-pass items shown in the
-    /// "Aspirational" rail with optional progress bars.
+    /// "Earned by Play" section of the Identity meta-tab with optional
+    /// progress bars.
     @Published private(set) var aspirationalItems: [Cosmetic] = []
+
+    /// Purchasable items grouped by their `CosmeticCategory`, derived from
+    /// `catalogItems`. The redesigned store reads this to render sub-category
+    /// sections within each meta-tab (Style / Moves / Identity). Sorting
+    /// inside each bucket is preserved from `catalogItems` (rarity desc /
+    /// price asc), so the section header is the only thing the view needs
+    /// to layer on top.
+    var catalogByCategory: [CosmeticCategory: [Cosmetic]] {
+        Dictionary(grouping: catalogItems, by: \.category)
+    }
 
     // ── Balance + ownership ──────────────────────────────────────────────────
 
