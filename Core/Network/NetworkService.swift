@@ -25,7 +25,7 @@ enum APIConfig {
     // 127.0.0.1 works for the iOS Simulator (which shares the Mac's network
     // stack). For a physical device on the same LAN, swap to the Mac's
     // current LAN IP from `ipconfig getifaddr en0`.
-    private static let host = "http://127.0.0.1:3000"
+    private static let host = "http://192.168.0.42:3000"
     #else
     private static let host = "https://stackpoker-backend-production.up.railway.app"
     #endif
@@ -126,6 +126,10 @@ enum APIEndpoint {
     case adminBan(userId: String)
     case adminReset(tableId: String)
     case adminGrantChips(userId: String)
+    // Debug-only: mints all 8 StackBot profiles as friends with varied
+    // equipped avatar frames. iOS call site is `#if DEBUG`-gated; server
+    // additionally enforces `isAdmin`. Idempotent — second tap is a no-op.
+    case adminSeedTestFriends
 
     var path: String {
         switch self {
@@ -180,6 +184,7 @@ enum APIEndpoint {
         case .adminBan(let uid):           return "/admin/users/\(uid)/ban"
         case .adminReset(let tid):         return "/admin/tables/\(tid)/reset"
         case .adminGrantChips(let uid):    return "/admin/users/\(uid)/grant-chips"
+        case .adminSeedTestFriends:        return "/admin/seed-test-friends"
         }
     }
 }

@@ -16,6 +16,11 @@ struct LobbyView: View {
   @EnvironmentObject var vm: LobbyViewModel
   @StateObject private var fvm = FriendsViewModel()
   @EnvironmentObject var authVM: AuthViewModel
+  // Phase 4b: lobby header shows the hero's equipped avatar frame.
+  // CosmeticsContainer is injected at the app root (StackPokerApp) and
+  // hands us the local inventory cache that the equip flow keeps in
+  // sync with the server.
+  @EnvironmentObject var cosmetics: CosmeticsContainer
 
   @State private var showBuyInSheet:  TableListItem?
   @State private var showFriends      = false
@@ -133,7 +138,12 @@ struct LobbyView: View {
           Circle()
             .fill(SPRetro.paperShade)
           if let user = authVM.currentUser {
-            AvatarView(avatarId: user.avatarId, size: 40)
+            AvatarView(
+              avatarId:      user.avatarId,
+              size:          40,
+              // Hero-facing site: lobby top-bar avatar tile.
+              avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame)
+            )
           }
         }
         .frame(width: 46, height: 46)

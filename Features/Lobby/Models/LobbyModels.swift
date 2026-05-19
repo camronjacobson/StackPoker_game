@@ -147,10 +147,21 @@ struct Friend: Decodable, Identifiable {
   let isOnline: Bool
   let currentTableId: String?
   let chipBalance: String
+  // Wire shape from backend: { "avatarFrame": "avatar_frame_gold", … } —
+  // same per-user equipped dict the seat broadcast uses. Optional for
+  // back-compat with older server builds that haven't shipped the friends-
+  // payload extension yet; `equipped` below coerces to an empty dict so
+  // call sites don't deal with the optional.
+  let equippedCosmetics: [String: String]?
 
   var id: String { friendshipId }
 
   var formattedChips: String { formatChips(chipBalance) }
+
+  // Convenience accessor matching the pattern used by `GameSeat.equipped`
+  // (see GameModels.swift). Call sites read e.g. `friend.equipped["avatarFrame"]`
+  // to get an optional cosmeticId without dealing with double-optionality.
+  var equipped: [String: String] { equippedCosmetics ?? [:] }
 }
 
 struct FriendsResponse: Decodable {

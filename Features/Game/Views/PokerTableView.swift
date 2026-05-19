@@ -1892,6 +1892,22 @@ struct TargetSeatView: View {
                         radius: seat.status == .allIn ? (allInPulse ? 10 : 3) : 5,
                         y: 2
                     )
+                    // Phase 4b cosmetic frame overlay. seat.equipped is the
+                    // server-broadcast map ({} when no cosmetics). Renderer
+                    // gates on supports() so unknown ids fall through to the
+                    // existing default avatar without an overlay. Anchored
+                    // OUTSIDE the disc so it doesn't fight the ink-border /
+                    // winnerPulse / allInPulse layers above — those state
+                    // borders stay fully visible underneath the cosmetic.
+                    // Inherits the folded/leaving opacity from the parent
+                    // Circle's .opacity by being attached as an .overlay
+                    // on the same view chain.
+                    .overlay {
+                        let frameId = seat.equipped[CosmeticCategory.avatarFrame.rawValue]
+                        if AvatarFrameRenderer.supports(frameId) {
+                            AvatarFrameRenderer.view(for: frameId, diameter: avatarSize)
+                        }
+                    }
 
                 // Last-5-seconds countdown — sits in front of the avatar at
                 // half opacity so it reads as a subtle urgency cue without

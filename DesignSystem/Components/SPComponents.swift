@@ -431,6 +431,13 @@ struct AvatarView: View {
     let avatarId: String
     var size: CGFloat = 44
     var showBorder: Bool = false
+    // Phase 4b cosmetic. nil (or unrecognised id) → no frame drawn — the
+    // existing ink hairline / 2.5pt selection border is unaffected so
+    // cosmetic frames stack orthogonally with the "me" / selected state.
+    // The frame ring sits OUTSIDE the disc (AvatarFrameRenderer anchors at
+    // diameter + thickness), so passing this never shifts the avatar's
+    // emoji or paper-fill — only adds a halo of decoration.
+    var avatarFrameId: CosmeticID? = nil
 
     private var avatar: AvatarOption { AvatarOption.find(avatarId) }
 
@@ -458,6 +465,16 @@ struct AvatarView: View {
                 .strokeBorder(SPRetro.ink,
                               lineWidth: showBorder ? 2.5 : 1)
                 .frame(width: size, height: size)
+
+            // Cosmetic frame overlay. Gated by supports() so unknown ids
+            // (older catalog entries, future server-only additions) silently
+            // fall through to the default avatar disc above. Rendered LAST
+            // so the frame paints on top of the ink-hairline border — they
+            // touch but don't fight each other since the frame's anchor
+            // diameter is `size + thickness`.
+            if AvatarFrameRenderer.supports(avatarFrameId) {
+                AvatarFrameRenderer.view(for: avatarFrameId, diameter: size)
+            }
         }
         .frame(width: size, height: size)
     }

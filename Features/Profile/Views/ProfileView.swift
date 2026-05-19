@@ -45,7 +45,18 @@ struct ProfileView: View {
         if let user = authVM.currentUser {
             VStack(spacing: SPSpacing.md) {
                 ZStack(alignment: .bottomTrailing) {
-                    AvatarView(avatarId: user.avatarId, size: 90, showBorder: true)
+                    AvatarView(
+                        avatarId:      user.avatarId,
+                        size:          90,
+                        showBorder:    true,
+                        // Hero-facing site: profile header. Reads the
+                        // hero's own equipped frame from the local
+                        // CosmeticsContainer (server is the source of
+                        // truth; container reflects the most recent
+                        // sync). Friends/invite/picker sites stay nil
+                        // pending the deferred user-payload extension.
+                        avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame)
+                    )
 
                     Circle()
                         .fill(SPColors.success)
@@ -292,6 +303,9 @@ struct SettingsRow: View {
 
 struct SettingsSheet: View {
     @EnvironmentObject var authVM: AuthViewModel
+    // Read once so the profile-edit header can render the equipped avatar
+    // frame around the hero's avatar (Phase 4b hero-facing site).
+    @EnvironmentObject var cosmetics: CosmeticsContainer
     @Environment(\.dismiss) var dismiss
 
     @AppStorage("tableThemeId") private var tableThemeId: String = "classic_blue"
@@ -303,6 +317,10 @@ struct SettingsSheet: View {
     @State private var showLogoutConfirm = false
     @State private var isSavingAvatar    = false
     @State private var isGrantingChips   = false
+    // Phase 4b debug helper: mints 8 StackBot friends with varied equipped
+    // frames so friends-list cosmetic rendering can be eyeballed without
+    // creating real test accounts. Debounce flag mirrors `isGrantingChips`.
+    @State private var isSeedingFriends  = false
     @State private var toastMessage: String?
 
     var body: some View {
@@ -389,7 +407,13 @@ struct SettingsSheet: View {
     private var header: some View {
         if let user = authVM.currentUser {
             VStack(spacing: SPSpacing.sm) {
-                AvatarView(avatarId: user.avatarId, size: 88, showBorder: true)
+                AvatarView(
+                    avatarId:      user.avatarId,
+                    size:          88,
+                    showBorder:    true,
+                    // Hero-facing site: profile settings header.
+                    avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame)
+                )
                     .overlay(alignment: .bottomTrailing) {
                         if isSavingAvatar {
                             // Retro saving badge: mustard disc with ink
@@ -548,6 +572,24 @@ struct SettingsSheet: View {
                     Task { await grantSelfChips(amount: 10_000) }
                 }
                 .disabled(isGrantingChips)
+
+                // Debug-only seeding helper. `#if DEBUG` is the build-flag
+                // gate that guarantees the button doesn't compile into App
+                // Store builds; the backend additionally enforces isAdmin so
+                // even a leaked debug build couldn't mint friends without an
+                // admin-flagged account. Friends list re-fetches on sheet
+                // open, so the workflow is: tap → toast → close/reopen
+                // FriendsSheet to see the 8 bots.
+                #if DEBUG
+                SettingsRow(
+                    icon: "person.2.badge.plus.fill",
+                    label: isSeedingFriends ? "Seeding…" : "Add Test Friends",
+                    showChevron: false
+                ) {
+                    Task { await seedTestFriends() }
+                }
+                .disabled(isSeedingFriends)
+                #endif
             }
         }
         .padding(.horizontal, SPSpacing.md)
@@ -573,6 +615,53 @@ struct SettingsSheet: View {
             toastMessage = e.localizedDescription
         } catch {
             toastMessage = "Top-up failed"
+        }
+
+        try? await Task.sleep(nanoseconds: 1_800_000_000)
+        toastMessage = nil
+    }
+
+    // Phase 4b debug helper. Calls the admin seed-test-friends endpoint which
+    // mints all 8 StackBot profiles as accepted friends and equips a different
+    // avatar frame on each — see admin.service.ts:seedTestFriends for the
+    // server-side mapping (Alpha=control, Bravo=bronze … Hotel=mythic).
+    //
+    // Idempotent server-side: a second tap reports `alreadyFriends: true` per
+    // bot, no duplicate rows. We surface a different toast based on whether
+    // anything net-new was added so the tester gets immediate feedback.
+    //
+    // No NotificationCenter / live-refresh hop — the FriendsSheet re-fetches
+    // on every `.task` so closing/reopening the sheet picks up the new rows.
+    // Adding push-refresh plumbing for a test-only flow isn't worth the
+    // permanent surface area; see the Step 2 plan discussion.
+    private func seedTestFriends() async {
+        guard !isSeedingFriends else { return }
+        isSeedingFriends = true
+        defer { isSeedingFriends = false }
+
+        struct Resp: Decodable {
+            struct Entry: Decodable {
+                let username: String
+                let frameId: String?
+                let alreadyFriends: Bool
+            }
+            let seeded: [Entry]
+            let totalFriends: Int
+        }
+
+        do {
+            let resp: Resp = try await NetworkService.shared.request(
+                .adminSeedTestFriends,
+                method: .POST
+            )
+            let newCount = resp.seeded.filter { !$0.alreadyFriends }.count
+            toastMessage = newCount > 0
+                ? "Added \(newCount) test friends"
+                : "All test friends already added"
+        } catch let e as NetworkError {
+            toastMessage = e.localizedDescription
+        } catch {
+            toastMessage = "Seeding failed"
         }
 
         try? await Task.sleep(nanoseconds: 1_800_000_000)

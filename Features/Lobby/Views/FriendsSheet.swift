@@ -260,7 +260,15 @@ struct FriendRow: View {
         // separated by SPDivider's ink hairline.
         HStack(spacing: SPSpacing.md) {
             ZStack(alignment: .bottomTrailing) {
-                AvatarView(avatarId: friend.avatarId, size: 44)
+                AvatarView(
+                    avatarId:      friend.avatarId,
+                    size:          44,
+                    // Non-self avatar surface — render the friend's equipped
+                    // avatar frame (Phase 4b cosmetics). Friend payload now
+                    // carries `equippedCosmetics`; pull the avatarFrame
+                    // category through to the centralized renderer.
+                    avatarFrameId: friend.equipped[CosmeticCategory.avatarFrame.rawValue]
+                )
                 if friend.isOnline {
                     Circle()
                         .fill(SPRetro.teal)
