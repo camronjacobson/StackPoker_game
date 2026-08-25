@@ -133,24 +133,48 @@ struct LobbyView: View {
     HStack(alignment: .center, spacing: SPSpacing.sm) {
       // Profile avatar — wrapped in an ink ring so it sits inside the
       // comic-page styling instead of floating loose. Tap → Settings.
+      //
+      // PNG-backed frames (gold / mythic) extend ~2.1× past the disc,
+      // so the 46pt ink wrapper would either clip the frame visually
+      // (the stroke paints over the frame outer edge) or compete with
+      // the frame as a redundant decoration. Suppress the wrapper
+      // (paper-shade fill, ink stroke, ink shadow) when a PNG frame is
+      // equipped — the PNG already IS the decoration. Procedural-frame
+      // and no-frame paths keep the original ink wrapper unchanged.
       Button { showSettings = true } label: {
+        let frameId    = cosmetics.inventory.equippedItem(for: .avatarFrame)
+        let isPNGFrame = AvatarFrameRenderer.isPNGBacked(frameId)
+        // Wrapper footprint matches AvatarView.pngExpansion (2.1×40 = 84)
+        // when a PNG frame is equipped so the layout slot reserves the
+        // full canvas. Otherwise the original 46pt ink-ring footprint.
+        let slot: CGFloat = isPNGFrame ? 84 : 46
+
         ZStack {
-          Circle()
-            .fill(SPRetro.paperShade)
+          if !isPNGFrame {
+            Circle()
+              .fill(SPRetro.paperShade)
+          }
           if let user = authVM.currentUser {
             AvatarView(
               avatarId:      user.avatarId,
               size:          40,
               // Hero-facing site: lobby top-bar avatar tile.
-              avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame)
+              avatarFrameId: frameId,
+              expandForFrame: true
             )
           }
         }
-        .frame(width: 46, height: 46)
-        .overlay(Circle().strokeBorder(SPRetro.ink, lineWidth: 2.5))
-        .background(
-          Circle().fill(SPRetro.ink).offset(x: 2, y: 2)   // hard ink shadow
-        )
+        .frame(width: slot, height: slot)
+        .overlay {
+          if !isPNGFrame {
+            Circle().strokeBorder(SPRetro.ink, lineWidth: 2.5)
+          }
+        }
+        .background {
+          if !isPNGFrame {
+            Circle().fill(SPRetro.ink).offset(x: 2, y: 2)   // hard ink shadow
+          }
+        }
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Settings")

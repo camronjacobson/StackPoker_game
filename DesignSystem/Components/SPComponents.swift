@@ -438,8 +438,39 @@ struct AvatarView: View {
     // diameter + thickness), so passing this never shifts the avatar's
     // emoji or paper-fill — only adds a halo of decoration.
     var avatarFrameId: CosmeticID? = nil
+    // Expand the outer layout footprint to `size × pngExpansion` when a
+    // PNG-backed frame is equipped, so parent VStacks / ScrollViews lay
+    // out around the full PNG canvas (~2.1×D) instead of clipping the
+    // frame at the disc bounds. Procedural frames (~D + ~10pt) don't
+    // need this — they fit comfortably inside the bare `size × size`
+    // footprint, and expanding would add a useless gap. Pass true at
+    // hero sites (profile header, lobby header, profile-edit) where
+    // the user expects to see the whole frame; leave default at
+    // non-hero sites (friend rows, search results) that assume a
+    // bare-avatar footprint for layout density.
+    var expandForFrame: Bool = false
 
     private var avatar: AvatarOption { AvatarOption.find(avatarId) }
+
+    // PNG canvas multiplier — covers gold (2.083×) and mythic (2.049×)
+    // with a couple pt of slack so the outer ZStack frame doesn't
+    // clip when the asset has marginal padding past its measured
+    // outer-edge. Keep this in sync with the largest 1/innerRatio in
+    // AvatarFrameRenderer when new PNG frames land.
+    private static let pngExpansion: CGFloat = 2.1
+
+    /// Outer layout footprint. Expands to `size × pngExpansion` only
+    /// when the caller opts in AND a PNG-backed frame is equipped —
+    /// every other code path reports the bare `size × size` it always
+    /// has, so non-hero call sites stay byte-compatible with the
+    /// pre-PNG layout.
+    private var outerSize: CGFloat {
+        guard expandForFrame,
+              AvatarFrameRenderer.isPNGBacked(avatarFrameId) else {
+            return size
+        }
+        return size * Self.pngExpansion
+    }
 
     var body: some View {
         // Retro avatar disc: when `showBorder` is true (selection/me
@@ -476,6 +507,11 @@ struct AvatarView: View {
                 AvatarFrameRenderer.view(for: avatarFrameId, diameter: size)
             }
         }
-        .frame(width: size, height: size)
+        // Outer frame may be `size` (procedural / no-frame paths — every
+        // pre-PNG call site behavior preserved) or `size × pngExpansion`
+        // (hero sites with PNG frame equipped). The disc + ink hairline
+        // are framed at `size` inside this ZStack, so they stay centered
+        // regardless of which footprint applies.
+        .frame(width: outerSize, height: outerSize)
     }
 }

@@ -35,17 +35,26 @@ enum AvatarFrameRenderer {
     /// this as an `.overlay` on top of the avatar disc — so the ring sits
     /// outside the disc and grows the visual footprint by 2×thickness.
     /// EmptyView for unknown ids; callers should gate with `supports(_:)`.
+    ///
+    /// `compact` only affects PNG-backed frames — procedural frames ignore
+    /// it (they have no wisps zone; their geometry is exact). Pass
+    /// `compact: true` at surfaces with a high-contrast (dark) background
+    /// where the avatar disc silhouette is sharp and any sliver between
+    /// the disc edge and the PNG ornament reads as a perceptible gap.
+    /// See the comment block above the PNG section for full rationale.
     @ViewBuilder
-    static func view(for id: CosmeticID?, diameter: CGFloat) -> some View {
+    static func view(for id: CosmeticID?,
+                     diameter: CGFloat,
+                     compact: Bool = false) -> some View {
         switch id {
         case "avatar_frame_bronze":           bronze(diameter: diameter)
         case "avatar_frame_silver":           silver(diameter: diameter)
-        case "avatar_frame_gold":             gold(diameter: diameter)
+        case "avatar_frame_gold":             goldPNG(diameter: diameter, compact: compact)
         case "avatar_frame_platinum":         platinum(diameter: diameter)
         case "avatar_frame_diamond":          diamond(diameter: diameter)
         case "avatar_frame_royal":            royal(diameter: diameter)
         case "avatar_frame_champion":         champion(diameter: diameter)
-        case "avatar_frame_mythic_inferno":   mythicInferno(diameter: diameter)
+        case "avatar_frame_mythic_inferno":   mythicInfernoPNG(diameter: diameter, compact: compact)
         default:
             // Sentinel — AvatarView / TargetSeatView check `supports(_:)`
             // before calling this, so the default branch is only ever hit
@@ -68,6 +77,23 @@ enum AvatarFrameRenderer {
              "avatar_frame_diamond",
              "avatar_frame_royal",
              "avatar_frame_champion",
+             "avatar_frame_mythic_inferno":
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Returns true for ids whose `view(for:diameter:)` renders a PNG asset
+    /// that extends well past the avatar disc (~2.1–2.3× diameter). Layout
+    /// containers with a fixed footprint (store preview cells, locker tiles)
+    /// use this to budget space — procedural frames fit comfortably at
+    /// avatar+~10pt, but PNG frames need ~2.3× the avatar diameter of
+    /// headroom or their outer spikes clip at the container edge.
+    /// Update this list every time a procedural frame is migrated to a PNG.
+    static func isPNGBacked(_ id: CosmeticID?) -> Bool {
+        switch id {
+        case "avatar_frame_gold",
              "avatar_frame_mythic_inferno":
             return true
         default:
@@ -102,15 +128,125 @@ enum AvatarFrameRenderer {
 
     // ── Rare (medium, decoration starts here) ────────────────────────────────
 
-    private static func gold(diameter: CGFloat) -> some View {
-        // Solid gold ring + 4 cardinal dots. Dots sized as a fraction of the
-        // ring diameter so they read at lobby (40pt) and profile (100pt).
-        ZStack {
-            SolidRing(diameter: diameter, thickness: 2.5, color: goldC)
-            CardinalDots(ringDiameter: diameter + 2.5,
-                         dotSize: max(3, diameter * 0.07),
-                         color: goldC)
-        }
+    // ─── PNG-backed frame section ─────────────────────────────────────────────
+    //
+    // Why two ratios exist per PNG (regular + compact)
+    // ------------------------------------------------
+    // Every hand-illustrated frame PNG has a "wisps zone" — a band of sparse
+    // pigment (decorative tendrils, hairline glints, soft fades) that
+    // extends inward from the dense ring body toward the avatar disc. The
+    // alpha-channel scan picks up that band as the "inner edge" of the
+    // image, but the user's eye perceives the DENSE ring body as the inner
+    // edge of the frame. The wisps zone reads as ornament on a cream
+    // background (low contrast → wisps blend with page) but reads as a
+    // visible gap on a dark background (high contrast → cream disc silhouette
+    // is sharp, wisps look like sparse decoration floating in empty space).
+    //
+    // We size with two ratios:
+    //   • `regularRatio` — anchored to the hard-pigment first-pixel point
+    //     (the wisp edge). Math gives pixel-perfect or sub-pixel overlap at
+    //     the disc edge. Right answer on cream backgrounds where the wisps
+    //     read as ornament, not gap.
+    //   • `compactRatio` — anchored deeper into the frame, so the dense
+    //     ring body itself sits ~1.3pt INSIDE the avatar disc edge at small
+    //     sizes. This pushes the ornament physically onto the disc,
+    //     eliminating any perceptible cream-on-dark gap. Right answer on
+    //     felt-green or similarly high-contrast backgrounds.
+    //
+    // When to pass `compact: true`
+    // ----------------------------
+    // Pass at surfaces where the avatar disc has a high-contrast background
+    // making its silhouette sharp. Today that's only `TargetSeatView` (poker
+    // felt). Lobby header, profile header, store preview, locker tile, etc.
+    // all sit on cream paper and stay default (`compact: false`).
+    //
+    // Future spectator/popup surfaces that overlay the felt should also use
+    // `compact: true`. When friend-row cosmetic plumbing lands (see
+    // TECH_DEBT) the friend rows themselves stay default — they sit on
+    // cream paper.
+    //
+    // How to measure both ratios for a new PNG
+    // -----------------------------------------
+    // 1. Run an alpha-channel scan from canvas center outward in all four
+    //    cardinal directions.
+    // 2. `regularRatio` = average of the E/W (side) measurements where alpha
+    //    first exceeds 200 (hard pigment). Side avg is preferred over global
+    //    avg because asymmetric frames (bottom tips, top spikes) skew the
+    //    global avg and the user's eye anchors to the sides.
+    // 3. `compactRatio` = side avg from a DENSE pigment scan (window of ~16
+    //    consecutive pixels with ≥60% alpha>128), then divide by ~0.93 to
+    //    push the dense body ~1.3pt inside the disc at D=40. Equivalent:
+    //    `dense_sides / 0.93`. Verify on a felt-background mockup.
+    //
+    // Both ratios MUST be declared per-PNG below; the pngFrame helper picks
+    // the right one based on the `compact` flag passed by the caller.
+    // -----------------------------------------------------------------------
+
+    /// Shared helper for PNG-backed frames. Every PNG renders as a
+    /// `.resizable().fit` Image sized so the alpha-scan inner-hole position
+    /// equals (or just-overlaps) the avatar disc edge. Picks `compactInner`
+    /// when the caller is rendering against a high-contrast background.
+    @ViewBuilder
+    private static func pngFrame(asset: String,
+                                 innerRatio: CGFloat,
+                                 compactInnerRatio: CGFloat,
+                                 diameter: CGFloat,
+                                 compact: Bool) -> some View {
+        let r = compact ? compactInnerRatio : innerRatio
+        let canvas = diameter / r
+        Image(asset)
+            .renderingMode(.original)       // preserve PNG colors; don't tint
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: canvas, height: canvas)
+    }
+
+    // Gold (Rare, PNG-backed)
+    //
+    // regularRatio = 0.485 — sides hard-pigment avg from alpha-scan
+    // (E=0.4824, W=0.4883). Sub-pixel overlap with disc edge at the wisps
+    // zone; perfect on cream paper.
+    //
+    // compactRatio = 0.500 — middle ground between "wisps-fuzzy" at 0.485
+    // (visible cream sliver on felt) and "clipping disc" at 0.525 (dense
+    // ring body cuts into the avatar disc edge). 0.500 lands the PNG
+    // inner edge at ~D-1pt at D=40 — disc edge meets PNG inner edge
+    // cleanly without geometric clip. A small static gap may remain at
+    // table size on felt; that's accepted as the cost of not clipping
+    // the avatar. The deeper fix is a unified view hierarchy where the
+    // disc and frame animate together (winner pulse / turn indicator
+    // currently desync because they live in different view trees) —
+    // tracked separately, not fixable via ratio tuning.
+    private static let goldPNGInnerRatio:        CGFloat = 0.485
+    private static let goldPNGInnerRatioCompact: CGFloat = 0.500
+
+    // Mythic Inferno (Mythic, PNG-backed)
+    //
+    // regularRatio = 0.495 — sides hard-pigment avg (E=0.4833, W=0.4880) +
+    // 2.6% margin so the disc gets ~0.5pt overlap at D=40 with the wisps
+    // zone on cream paper.
+    //
+    // compactRatio = 0.500 — same rationale as gold (see above). The demon
+    // head at top still intrudes regardless (intrinsic ratio 0.24 at N),
+    // so apex-tier silhouette is preserved. Matched to gold's compact
+    // ratio for uniform tightness across PNG-backed frames at the table.
+    private static let mythicInfernoPNGInnerRatio:        CGFloat = 0.495
+    private static let mythicInfernoPNGInnerRatioCompact: CGFloat = 0.500
+
+    private static func goldPNG(diameter: CGFloat, compact: Bool) -> some View {
+        // Sepia poker-engraved ornate ring (cards, chips, dice, horseshoe,
+        // clover). Roughly symmetric except for a small fleur tip at the
+        // bottom (~12% inner-radius asymmetry) that just-grazes the avatar's
+        // bottom edge — reads as "avatar sitting in the frame," not as clip.
+        //
+        // Footprint: PNG canvas ≈ 2.06×diameter (regular) or 1.90×diameter
+        // (compact). Larger than procedural gold's avatar+5pt; intentional
+        // Phase 5 art lift.
+        pngFrame(asset:             "avatar_frame_gold",
+                 innerRatio:        goldPNGInnerRatio,
+                 compactInnerRatio: goldPNGInnerRatioCompact,
+                 diameter:          diameter,
+                 compact:           compact)
     }
 
     private static func platinum(diameter: CGFloat) -> some View {
@@ -177,46 +313,27 @@ enum AvatarFrameRenderer {
         }
     }
 
-    // ── Mythic (gradient + spikes + outer glow) ──────────────────────────────
+    // ── Mythic (PNG-backed apex tier) ────────────────────────────────────────
 
-    private static func mythicInferno(diameter: CGFloat) -> some View {
-        // AngularGradient flame palette (red → orange → yellow → red) painted
-        // around the ring, plus 4 cardinal spike triangles, plus a soft red
-        // glow halo. Static v1 — animation is a follow-up polish pass once
-        // category landing is validated (see TECH_DEBT.md).
-        let flame = AngularGradient(
-            gradient: Gradient(colors: [
-                Color(red: 0.78, green: 0.16, blue: 0.10),
-                Color(red: 0.95, green: 0.50, blue: 0.16),
-                Color(red: 0.98, green: 0.83, blue: 0.27),
-                Color(red: 0.95, green: 0.50, blue: 0.16),
-                Color(red: 0.78, green: 0.16, blue: 0.10),
-            ]),
-            center: .center
-        )
-        return ZStack {
-            // Outer flame glow — larger blurred halo behind the gradient
-            // ring. Red-shifted so the glow reads as "heat" rather than
-            // matching the gold/yellow tint of champion.
-            Circle()
-                .strokeBorder(Color(red: 0.95, green: 0.30, blue: 0.10)
-                                  .opacity(0.50),
-                              lineWidth: 8)
-                .frame(width: diameter + 12, height: diameter + 12)
-                .blur(radius: 6)
-
-            // Gradient flame ring.
-            Circle()
-                .strokeBorder(flame, lineWidth: 4.5)
-                .frame(width: diameter + 4.5, height: diameter + 4.5)
-
-            // 4 cardinal flame spikes — small filled triangles pointing
-            // outward. Spike length scales with diameter so the silhouette
-            // reads at small sizes too.
-            CardinalSpikes(ringDiameter: diameter + 4.5,
-                           spikeSize: max(5, diameter * 0.13),
-                           color: Color(red: 0.98, green: 0.66, blue: 0.20))
-        }
+    private static func mythicInfernoPNG(diameter: CGFloat, compact: Bool) -> some View {
+        // Demonic flame ring at apex tier — black/red/orange flames with a
+        // horned demon head at top and inward-pointing spikes around.
+        //
+        // Asymmetry: the demon head + horns intrude regardless of the chosen
+        // ratio (intrinsic ratio 0.24 at N). The demon covers the top
+        // ~25–30% of the avatar disc, hovering over the empty area above the
+        // centered emoji. Reads as "demon menacing the avatar" — on-brand
+        // for mythic and accepted as a deliberate art choice.
+        //
+        // Footprint: PNG canvas ≈ 2.02×diameter (regular) or 1.90×diameter
+        // (compact). The set is intentionally non-uniform — each tier's
+        // illustration carries its own proportions; normalizing would
+        // require re-illustrating or padding the source PNGs.
+        pngFrame(asset:             "avatar_frame_mythic_inferno",
+                 innerRatio:        mythicInfernoPNGInnerRatio,
+                 compactInnerRatio: mythicInfernoPNGInnerRatioCompact,
+                 diameter:          diameter,
+                 compact:           compact)
     }
 }
 

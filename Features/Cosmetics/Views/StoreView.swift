@@ -543,12 +543,25 @@ private struct StoreCosmeticPreview: View {
             )
             .frame(width: size, height: size)
         case .avatarFrame where AvatarFrameRenderer.supports(cosmetic.id):
-            // Placeholder avatar disc + the procedural frame as an overlay
-            // ring (matches AvatarFrameRenderer's "outside the disc"
-            // contract). Disc is ~72% of the slot; the ring's thickness
-            // pushes the frame's outer edge to ~84% — still well inside
-            // the cell so the section grid stays even.
-            let discDiameter = size * 0.66
+            // Placeholder avatar disc + the frame as an overlay ring (matches
+            // AvatarFrameRenderer's "outside the disc" contract).
+            //
+            // Disc-to-cell ratio depends on frame type:
+            //   • Procedural frames render at avatar+~10pt total and fit
+            //     comfortably at 0.66 of the slot (95pt disc in a 144pt cell).
+            //   • PNG frames render at ~2.3× the avatar diameter (see
+            //     AvatarFrameRenderer.goldPNG / mythicInfernoPNG sizing math),
+            //     so the disc must shrink to 0.42 of the slot to keep the
+            //     PNG's outer spikes inside the cell:
+            //         144 × 0.42 = 60.5pt disc
+            //         gold:   60.5 / 0.480 = 126.0pt total → ~9pt margin/side
+            //         mythic: 60.5 / 0.440 = 137.5pt total → ~3pt margin/side
+            // Both PNG-backed frames share the same 60.5pt disc so previews
+            // stay visually consistent across the pair even though gold and
+            // mythic have slightly different natural footprints (2.08× vs
+            // 2.27×).
+            let isPNG = AvatarFrameRenderer.isPNGBacked(cosmetic.id)
+            let discDiameter = size * (isPNG ? 0.42 : 0.66)
             Circle()
                 .fill(SPColors.surface)
                 .frame(width: discDiameter, height: discDiameter)

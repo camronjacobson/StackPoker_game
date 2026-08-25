@@ -250,15 +250,21 @@ private struct LockerSection: View {
                 avatarFrameId: previewedCosmetic?.id
             )
         case .cardBack:
-            // 120pt wide; aspect ratio inherits from CardBackRenderer
-            // (~0.72). For .none sentinel render a paper outline of
-            // the same dimensions so layout stays stable when toggling.
+            // 120pt wide × 120/0.72 ≈ 167pt tall — playing-card aspect
+            // ratio. CardBackRenderer's internal ZStack has no .frame
+            // (its `size:` parameter only scales pattern density, not
+            // bounds), so without this explicit frame it would expand
+            // to fill whatever parent slot we drop it in — losing the
+            // card silhouette. Matches the .none placeholder below so
+            // layout stays stable when toggling between sentinel and
+            // a rendered back.
             if let id = previewedCosmetic?.id {
                 CardBackRenderer.view(
                     for: id,
                     size: 120,
                     cornerRadius: 12
                 )
+                .frame(width: 120, height: 120 / 0.72)
             } else {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(SPColors.surface)
