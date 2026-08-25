@@ -56,10 +56,6 @@ final class LobbyViewModel: ObservableObject {
   // Create form
   @Published var newTableName     = ""
   @Published var selectedPreset   = BlindPreset.presets[0]
-  @Published var customSmallBlind = ""
-  @Published var customBigBlind   = ""
-  @Published var customMinBuyIn   = ""
-  @Published var customMaxBuyIn   = ""
   @Published var newMaxPlayers    = 6
   // Default to public so other users can see the table in the lobby list.
   // Backend's `listTables` filters out isPrivate=true tables by design — they
@@ -279,10 +275,10 @@ final class LobbyViewModel: ObservableObject {
     isCreating = true
     createError = nil
 
-    let sb = selectedPreset.label == "Custom" ? Int(customSmallBlind) ?? 0 : selectedPreset.smallBlind
-    let bb = selectedPreset.label == "Custom" ? Int(customBigBlind) ?? 0  : selectedPreset.bigBlind
-    let min = selectedPreset.label == "Custom" ? Int(customMinBuyIn) ?? 0 : selectedPreset.defaultMinBuyIn
-    let max = selectedPreset.label == "Custom" ? Int(customMaxBuyIn) ?? 0 : selectedPreset.defaultMaxBuyIn
+    let sb  = selectedPreset.smallBlind
+    let bb  = selectedPreset.bigBlind
+    let min = selectedPreset.defaultMinBuyIn
+    let max = selectedPreset.defaultMaxBuyIn
 
     let req = CreateTableRequest(
       name: newTableName.trimmingCharacters(in: .whitespaces),
@@ -448,27 +444,16 @@ final class LobbyViewModel: ObservableObject {
     if newTableName.trimmingCharacters(in: .whitespaces).count < 2 {
       createError = "Table name must be at least 2 characters"; return false
     }
-    if selectedPreset.label == "Custom" {
-      guard let sb = Int(customSmallBlind), sb > 0 else { createError = "Enter small blind"; return false }
-      guard let bb = Int(customBigBlind),  bb > 0 else { createError = "Enter big blind";   return false }
-      if bb != sb * 2 { createError = "Big blind must be 2× small blind"; return false }
-      guard let min = Int(customMinBuyIn), min >= bb * 10 else {
-        createError = "Min buy-in must be at least 10× big blind"; return false
-      }
-      guard let max = Int(customMaxBuyIn), max >= min else {
-        createError = "Max buy-in must be ≥ min buy-in"; return false
-      }
-    }
+    // Blind/buy-in validation no longer needed: the four fixed presets are
+    // baked into BlindPreset.presets and selectedPreset is non-optional, so
+    // every (sb, bb, min, max) tuple submitted here is guaranteed valid by
+    // construction. Kept as a guard for the table-name check.
     return true
   }
 
   private func resetCreateForm() {
     newTableName = ""
     selectedPreset = BlindPreset.presets[0]
-    customSmallBlind = ""
-    customBigBlind = ""
-    customMinBuyIn = ""
-    customMaxBuyIn = ""
     newMaxPlayers = 6
     newIsPrivate = false
     newGameType = "TEXAS_HOLDEM"

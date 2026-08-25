@@ -253,11 +253,15 @@ struct BlindPreset: Identifiable {
 }
 
 extension BlindPreset {
+  // Four fixed stake tiers. Each label maps 1:1 to a pre-rendered table
+  // illustration via tableImageName(forSmallBlind:bigBlind:) in
+  // PokerTableView.swift. Buy-in window is 10×–100× big blind for all tiers
+  // (10×BB min is the existing convention; 10×min max keeps the range tight
+  // enough that all four tiers feel "normal" but loose enough for deep stacks).
   static let presets: [BlindPreset] = [
-    BlindPreset(label: "Micro",  smallBlind: 5,    bigBlind: 10,   defaultMinBuyIn: 200,    defaultMaxBuyIn: 1_000),
-    BlindPreset(label: "Low",    smallBlind: 25,   bigBlind: 50,   defaultMinBuyIn: 1_000,  defaultMaxBuyIn: 5_000),
-    BlindPreset(label: "Mid",    smallBlind: 100,  bigBlind: 200,  defaultMinBuyIn: 4_000,  defaultMaxBuyIn: 20_000),
-    BlindPreset(label: "High",   smallBlind: 500,  bigBlind: 1000, defaultMinBuyIn: 20_000, defaultMaxBuyIn: 100_000),
-    BlindPreset(label: "Custom", smallBlind: 0,    bigBlind: 0,    defaultMinBuyIn: 0,      defaultMaxBuyIn: 0),
+    BlindPreset(label: "Casual",      smallBlind: 1,  bigBlind: 2,   defaultMinBuyIn: 20,    defaultMaxBuyIn: 200),
+    BlindPreset(label: "Standard",    smallBlind: 5,  bigBlind: 10,  defaultMinBuyIn: 100,   defaultMaxBuyIn: 1_000),
+    BlindPreset(label: "Casino",      smallBlind: 10, bigBlind: 20,  defaultMinBuyIn: 200,   defaultMaxBuyIn: 2_000),
+    BlindPreset(label: "High Roller", smallBlind: 50, bigBlind: 100, defaultMinBuyIn: 1_000, defaultMaxBuyIn: 10_000),
   ]
 }

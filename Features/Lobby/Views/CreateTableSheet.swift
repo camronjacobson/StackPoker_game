@@ -68,48 +68,11 @@ struct CreateTableSheet: View {
               }
               .padding(.horizontal, SPSpacing.md)
 
-              // Custom fields
-              if vm.selectedPreset.label == "Custom" {
-                VStack(spacing: SPSpacing.sm) {
-                  HStack(spacing: SPSpacing.sm) {
-                    SPTextField(
-                      placeholder: "Small blind",
-                      text: $vm.customSmallBlind,
-                      icon: "chevron.left.2",
-                      keyboardType: .numberPad
-                    )
-                    SPTextField(
-                      placeholder: "Big blind",
-                      text: $vm.customBigBlind,
-                      icon: "chevron.right.2",
-                      keyboardType: .numberPad
-                    )
-                  }
-                  HStack(spacing: SPSpacing.sm) {
-                    SPTextField(
-                      placeholder: "Min buy-in",
-                      text: $vm.customMinBuyIn,
-                      icon: "arrow.down.circle",
-                      keyboardType: .numberPad
-                    )
-                    SPTextField(
-                      placeholder: "Max buy-in",
-                      text: $vm.customMaxBuyIn,
-                      icon: "arrow.up.circle",
-                      keyboardType: .numberPad
-                    )
-                  }
-                }
+              // One-line stakes readout for the currently selected tier.
+              // Reads as natural English: "5 / 10 blinds · Buy-in 100–1K".
+              StakesSummary(preset: vm.selectedPreset)
                 .padding(.horizontal, SPSpacing.md)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-              } else {
-                // One-line stakes readout — replaces the previous three
-                // labeled-value stacks. Reads as natural English:
-                // "5 / 10 blinds · Buy-in 200–1K".
-                StakesSummary(preset: vm.selectedPreset)
-                  .padding(.horizontal, SPSpacing.md)
-                  .transition(.opacity)
-              }
+                .transition(.opacity)
             }
             .animation(.spring(response: 0.35), value: vm.selectedPreset.id)
 
@@ -239,38 +202,6 @@ struct CreateTableSheet: View {
     .onAppear {
       seatsSlider = Double(vm.newMaxPlayers)
     }
-  }
-}
-
-// ─── Blind Preset Chip ────────────────────────────────────────────────────────
-
-struct BlindPresetChip: View {
-  let preset: BlindPreset
-  let isSelected: Bool
-  let onTap: () -> Void
-
-  var body: some View {
-    Button(action: onTap) {
-      VStack(spacing: 2) {
-        Text(preset.label)
-          .font(SPFonts.headline(13))
-          .foregroundStyle(isSelected ? .white : SPColors.textPrimary)
-        if preset.label != "Custom" {
-          Text("\(formatChips(String(preset.smallBlind)))/\(formatChips(String(preset.bigBlind)))")
-            .font(SPFonts.caption(11))
-            .foregroundStyle(isSelected ? .white.opacity(0.8) : SPColors.textTertiary)
-        }
-      }
-      .padding(.horizontal, SPSpacing.md)
-      .padding(.vertical, SPSpacing.sm)
-      .background(isSelected ? SPColors.accent : SPColors.surfaceElevated)
-      .clipShape(RoundedRectangle(cornerRadius: SPRadius.md))
-      .overlay(
-        RoundedRectangle(cornerRadius: SPRadius.md)
-          .strokeBorder(isSelected ? SPColors.accent : SPColors.border, lineWidth: 1)
-      )
-    }
-    .buttonStyle(ScaleButtonStyle())
   }
 }
 
