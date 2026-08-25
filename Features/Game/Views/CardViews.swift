@@ -89,6 +89,36 @@ struct PlayingCardView: View {
         .animation(.spring(response: 0.3), value: isHighlighted)
     }
 
+    // ─── Card-illustration palette (appearance-invariant) ────────────────────
+    //
+    // Cards are illustrated objects: the suit fills below are hardcoded
+    // (a red heart is red, a blue diamond is blue, etc.) and the
+    // foreground elements painted ON those fills — outer ink border,
+    // inset paper hairline, rank glyph, centered suit glyph — must be
+    // hardcoded too, so the on-card contrast composition stays correct
+    // regardless of the user's appearance preference.
+    //
+    // Using `SPRetro.ink` / `SPRetro.paper` here would have made these
+    // foreground elements theme-flip while the suit fills did not — in
+    // Night mode that produced dark-sepia rank text on a red heart fill
+    // (illegible) and a cream outer border on the colored panel (wrong
+    // against the hardcoded fill).
+    //
+    // Values are the Day-mode `SPRetroPalette.day` paper/ink hexes, so
+    // Day-mode rendering is byte-identical to the prior `SPRetro.*`
+    // call sites. Night mode now renders the cards identically to Day
+    // — intentional: the rest of the table view follows the user's
+    // appearance preference; only these illustrated card elements are
+    // locked.
+    //
+    // Scope is intentionally limited to `coloredFront` / its sub-views
+    // (`compactCornerIndicator`, `standardLargeFront`). `whiteFront`
+    // and `defaultCardBack` continue to use `SPRetro.*` because their
+    // fills also theme-flip — those compositions flip coherently as
+    // a unit.
+    private static let cardInk   = Color(hex: "#1A1410")
+    private static let cardPaper = Color(hex: "#F4E4BC")
+
     // ─── Suit colors (for coloredBackground mode) ─────────────────────────────
 
     // True four-color deck: hearts red, diamonds blue, clubs green, spades
@@ -181,13 +211,15 @@ struct PlayingCardView: View {
                 .fill(fill)
 
             // Ink panel border — same hairline weight as every other
-            // comic panel on the page.
+            // comic panel on the page. Hardcoded (Self.cardInk) — see
+            // the card-illustration palette block near suitFillColor.
             RoundedRectangle(cornerRadius: size.cornerRadius)
-                .strokeBorder(SPRetro.ink, lineWidth: 1.2)
+                .strokeBorder(Self.cardInk, lineWidth: 1.2)
 
             // Paper inner border for the printed-stamp inset feel.
+            // Hardcoded (Self.cardPaper) for the same reason.
             RoundedRectangle(cornerRadius: max(2, size.cornerRadius - 1))
-                .strokeBorder(SPRetro.paper.opacity(0.85), lineWidth: 1)
+                .strokeBorder(Self.cardPaper.opacity(0.85), lineWidth: 1)
                 .padding(2)
 
             if isCompact {
@@ -213,12 +245,12 @@ struct PlayingCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(card.displayRank)
                 .font(.custom("ChalkboardSE-Bold", size: size.width * 0.55))
-                .foregroundStyle(SPRetro.paper)
+                .foregroundStyle(Self.cardPaper)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text(card.suitSymbol)
                 .font(.system(size: size.width * 0.34, weight: .bold))
-                .foregroundStyle(SPRetro.paper)
+                .foregroundStyle(Self.cardPaper)
                 .offset(y: -size.width * 0.08)   // pull suit up under the rank
         }
         .padding(.leading, 4)
@@ -233,19 +265,19 @@ struct PlayingCardView: View {
     // rank.
     @ViewBuilder
     private func standardLargeFront(_ card: PokerCard) -> some View {
-        // Rank (top-left) — ChalkboardSE-Bold paper.
+        // Rank (top-left) — ChalkboardSE-Bold cream (Self.cardPaper).
         Text(card.displayRank)
             .font(.custom("ChalkboardSE-Bold", size: size.rankSize * 1.15))
-            .foregroundStyle(SPRetro.paper)
+            .foregroundStyle(Self.cardPaper)
             .padding(.leading, 5)
             .padding(.top, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-        // Large centered suit glyph — paper for contrast on the
-        // colored face.
+        // Large centered suit glyph — cream for contrast on the
+        // colored face. Hardcoded (Self.cardPaper).
         Text(card.suitSymbol)
             .font(.system(size: size.width * 0.62, weight: .bold))
-            .foregroundStyle(SPRetro.paper)
+            .foregroundStyle(Self.cardPaper)
             .offset(y: size.width * 0.12)
     }
 

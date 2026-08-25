@@ -36,6 +36,14 @@ struct RootView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authViewModel: AuthViewModel
 
+    // Day / Night appearance. Stored as a String so a future addition
+    // (e.g. "autoSunset") doesn't shift integer codes. Drives the `.id(...)`
+    // rebuild on the route Group below. Default `.day` resolves on first
+    // launch via the absence-of-stored-value semantics in
+    // `AppearanceMode.current` — see SPRetroTokens.swift.
+    @AppStorage(AppearanceMode.storageKey)
+    private var appearanceModeRaw: String = AppearanceMode.day.rawValue
+
     // Two parallel events gate the splash dismissal: video playback ends
     // and `checkSession()` completes. We track them as separate flags so
     // either can fire first without racing — the splash dismisses when
@@ -68,6 +76,14 @@ struct RootView: View {
                     MainTabView()
                 }
             }
+            // Forces full view rebuild on appearance change. Resets local
+            // @State (text fields, scroll positions, animations) inside the
+            // route subtree. Acceptable because the toggle is in Settings
+            // and rarely hit — once-or-twice-ever per user. This is the
+            // mechanism that makes the SPRetro / SPColors computed-token
+            // swap take effect: SwiftUI re-evaluates every Color binding
+            // when the subtree's structural identity changes.
+            .id(appearanceModeRaw)
             .transition(.opacity.animation(.easeInOut(duration: 0.35)))
 
             // Toast overlay

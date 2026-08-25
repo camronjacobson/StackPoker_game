@@ -1,86 +1,93 @@
 import SwiftUI
 
 // ─── Color Tokens ─────────────────────────────────────────────────────────────
-// All colors defined for dark mode default with light mode variants
-
-// ─── Retro Comic Theme Remap ──────────────────────────────────────────────────
-// The token names below are unchanged so every existing call site keeps
-// compiling, but the values now point at the SPRetro palette. This is the
-// foundation that automatically retros every screen without hand-editing all
-// 60+ Swift files individually — `SPColors.background` is now cream paper,
-// `SPColors.textPrimary` is warm-black ink, `SPColors.accent` is mustard, and
-// so on. Screens that need extra retro flair (halftone, comic panel borders,
-// burst CTAs) get their own bespoke treatments on top of this base.
 //
-// Old semantic meanings preserved:
-//   • background / surface / surfaceElevated → paper / paper-shade / shade2
+// Every appearance-variant SPColors token is a computed `static var` that
+// resolves to a value from SPRetroPalette.current (see SPRetroTokens.swift).
+// This keeps SPColors and SPRetro in lockstep across the Day / Night swap —
+// they share one source of truth instead of being parallel hex-literal sets.
+//
+// Original "retro remap" semantic mapping preserved:
+//   • background / surface / surfaceElevated → paper / paperShade / shade2
 //   • accent (was purple)                   → mustard
 //   • textPrimary (was off-white)           → ink
 //   • danger (was red-orange)               → maroon
 //   • success (was teal-green)              → muted teal
-//   • felt (was green)                      → paper-shade w/ ink (we'll
-//                                              overlay a halftone on top)
-//   • cardBack (was navy)                   → maroon (matches the daily-bonus
-//                                              red→maroon shift)
+//   • felt (was green)                      → paper-shade
+//   • cardBack (was navy)                   → maroon
+//
+// `tableRail` is the one appearance-invariant token: sampled from the rendered
+// poker_table_standard.png rail band, must not change between Day and Night.
 
 enum SPColors {
     // Backgrounds — aged paper page tones.
-    static let background     = Color(hex: "#F4E4BC")   // paper
-    static let surface        = Color(hex: "#E8D49A")   // paperShade
-    static let surfaceElevated = Color(hex: "#DCC58A")  // shade2 (modal/sheet)
-    static let surfaceHighlight = Color(hex: "#CFB57A") // shade3 (hover/press)
+    static var background:        Color { SPRetroPalette.current.paper }            // paper
+    static var surface:           Color { SPRetroPalette.current.paperShade }       // paperShade
+    static var surfaceElevated:   Color { SPRetroPalette.current.surfaceElevated }  // shade2 (modal/sheet)
+    static var surfaceHighlight:  Color { SPRetroPalette.current.surfaceHighlight } // shade3 (hover/press)
 
     // Brand — mustard yellow replaces purple.
-    static let accent         = Color(hex: "#E8B923")
-    static let accentLight    = Color(hex: "#F1CE5C")
-    static let accentDark     = Color(hex: "#B68A14")
+    static var accent:            Color { SPRetroPalette.current.mustard }
+    static var accentLight:       Color { SPRetroPalette.current.accentLight }
+    static var accentDark:        Color { SPRetroPalette.current.mustardDark }
 
-    // Chip colors — retro mustard.
-    static let chipGold       = Color(hex: "#E8B923")
-    static let chipGoldDark   = Color(hex: "#B68A14")
+    // Chip colors — retro mustard. (Same values as accent / accentDark; kept
+    // as separate tokens so chip-specific tuning can diverge later without
+    // affecting button accents.)
+    static var chipGold:          Color { SPRetroPalette.current.mustard }
+    static var chipGoldDark:      Color { SPRetroPalette.current.mustardDark }
 
     // Semantic — pulled into the retro palette so alerts/badges don't look
     // like foreign Material-Design colors next to the cream page.
-    static let success        = Color(hex: "#2E7C8B")   // muted teal
-    static let warning        = Color(hex: "#E8B923")   // mustard
-    static let danger         = Color(hex: "#8B2C2C")   // maroon
-    static let info           = Color(hex: "#2A6DB5")   // pop blue
+    static var success:           Color { SPRetroPalette.current.teal }     // muted teal
+    static var warning:           Color { SPRetroPalette.current.mustard }
+    static var danger:            Color { SPRetroPalette.current.maroon }
+    static var info:              Color { SPRetroPalette.current.popBlue }
 
-    // Text — warm-black ink, with progressively lighter tones for hierarchy.
-    static let textPrimary    = Color(hex: "#1A1410")
-    static let textSecondary  = Color(hex: "#3A2E22")
-    static let textTertiary   = Color(hex: "#5C4838")
+    // Text — warm-black ink in Day mode, cream in Night mode.
+    static var textPrimary:       Color { SPRetroPalette.current.ink }
+    static var textSecondary:     Color { SPRetroPalette.current.inkSoft }
+    static var textTertiary:      Color { SPRetroPalette.current.inkMuted }
 
     // Table felt — paper substrate. The PokerTableView gets a halftone
     // overlay on top so it reads as a printed comic page, not a flat fill.
-    static let felt           = Color(hex: "#F4E4BC")
-    static let feltDark       = Color(hex: "#E8D49A")
-    static let feltBorder     = Color(hex: "#1A1410")
+    // Both fall back to the appearance-variant paper tones; the table view
+    // itself doesn't use these (it uses tier-specific PNGs), so they remain
+    // variant for any non-table "felt-styled" badge that consumes them.
+    static var felt:              Color { SPRetroPalette.current.paper }
+    static var feltDark:          Color { SPRetroPalette.current.paperShade }
+    static var feltBorder:        Color { SPRetroPalette.current.ink }
 
     // Table rail — solid ink "panel border" instead of walnut wood. Same
     // values for outer/mid/light so the rail reads as a single ink frame.
-    static let railOuter      = Color(hex: "#1A1410")
-    static let railMid        = Color(hex: "#3A2E22")
-    static let railLight      = Color(hex: "#5C4838")
-    static let railCushion    = Color(hex: "#E8B923")   // mustard cushion edge
+    static var railOuter:         Color { SPRetroPalette.current.ink }
+    static var railMid:           Color { SPRetroPalette.current.inkSoft }
+    static var railLight:         Color { SPRetroPalette.current.inkMuted }
+    static var railCushion:       Color { SPRetroPalette.current.mustard }    // mustard cushion edge
 
-    // Sampled from the rendered poker_table.png rail band (y=120–160 at
-    // x=512), mean of five interior samples ≈ #1F100B. Distinct from the
-    // procedural `railOuter`/`railMid` (warmer & lighter brown) because
-    // the image's rail is a deeper, redder near-black. Reused by views
-    // that need to color-match the table rail border directly — e.g. the
-    // right-edge vertical bet slider's outline.
-    static let tableRail      = Color(hex: "#1F100B")
+    // Appearance-invariant — sampled from the rendered poker_table_standard.png
+    // rail band (y=120–160 at x=512), mean of five interior samples ≈ #1F100B.
+    // Distinct from the procedural `railOuter`/`railMid` (warmer & lighter
+    // brown) because the image's rail is a deeper, redder near-black. Reused
+    // by views that need to color-match the table rail border directly —
+    // e.g. the right-edge vertical bet slider's outline. The table is
+    // excluded from appearance theming, so this token must not change
+    // between Day and Night.
+    static let tableRail          = Color(hex: "#1F100B")
 
-    // Playing-card surfaces.
-    static let cardBack       = Color(hex: "#8B2C2C")   // maroon
-    static let cardFace       = Color(hex: "#F4E4BC")   // paper face
-    static let cardRed        = Color(hex: "#D33232")   // pop red for hearts/diamonds
-    static let cardBlack      = Color(hex: "#1A1410")   // ink for spades/clubs
+    // Playing-card surfaces. NOTE: these resolve through the palette so a
+    // card-back rendered in a non-table context (Locker preview, Store grid)
+    // picks up the Night-mode maroon. On the table itself the renderer reads
+    // the cosmetic cardBack asset, not this token, so table cards are
+    // unaffected.
+    static var cardBack:          Color { SPRetroPalette.current.maroon }
+    static var cardFace:          Color { SPRetroPalette.current.paper }
+    static var cardRed:           Color { SPRetroPalette.current.popRed }
+    static var cardBlack:         Color { SPRetroPalette.current.ink }
 
     // Borders — ink hairlines.
-    static let border         = Color(hex: "#1A1410")
-    static let borderLight    = Color(hex: "#3A2E22")
+    static var border:            Color { SPRetroPalette.current.ink }
+    static var borderLight:       Color { SPRetroPalette.current.inkSoft }
 }
 
 // ─── Typography ───────────────────────────────────────────────────────────────
