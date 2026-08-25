@@ -9,6 +9,10 @@ struct ProfileView: View {
     /// Drives the cosmetics store sheet from the Account section row.
     /// Local @State — purely view lifecycle.
     @State private var showCosmeticsStore = false
+    /// Which legal doc to present in a sheet, or nil for none. Used by the
+    /// About / Terms / Privacy rows. Identifiable via LegalDocument's Hashable
+    /// conformance below so .sheet(item:) can drive presentation.
+    @State private var presentedLegalDoc: LegalDocument?
 
     var body: some View {
         NavigationStack {
@@ -35,6 +39,12 @@ struct ProfileView: View {
             } message: {
                 Text("You'll need to sign in again to play.")
             }
+            // Presents the in-app Terms or Privacy doc when the About-row
+            // taps set `presentedLegalDoc`. The view supplies its own
+            // NavigationStack and Done button.
+            .sheet(item: $presentedLegalDoc) { doc in
+                LegalDocumentView(document: doc)
+            }
         }
     }
 
@@ -55,7 +65,14 @@ struct ProfileView: View {
                         // truth; container reflects the most recent
                         // sync). Friends/invite/picker sites stay nil
                         // pending the deferred user-payload extension.
-                        avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame)
+                        avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame),
+                        // PNG-backed frames render a 2.1×D canvas — without
+                        // this opt-in, the AvatarView reports 90×90 and the
+                        // enclosing ScrollView clips ~50pt off the top/bottom
+                        // of the frame. Expanding the layout footprint lets
+                        // the VStack lay out displayName below the full
+                        // frame instead of through it.
+                        expandForFrame: true
                     )
 
                     Circle()
@@ -189,9 +206,13 @@ struct ProfileView: View {
 
             SPCard {
                 VStack(spacing: 0) {
-                    SettingsRow(icon: "doc.text", label: "Terms of Service", showChevron: true)
+                    SettingsRow(icon: "doc.text", label: "Terms of Service", showChevron: true) {
+                        presentedLegalDoc = .terms
+                    }
                     SPDivider()
-                    SettingsRow(icon: "hand.raised", label: "Privacy Policy", showChevron: true)
+                    SettingsRow(icon: "hand.raised", label: "Privacy Policy", showChevron: true) {
+                        presentedLegalDoc = .privacy
+                    }
                     SPDivider()
 
                     // Required App Store social game disclosure
@@ -311,6 +332,13 @@ struct SettingsSheet: View {
     @AppStorage("tableThemeId") private var tableThemeId: String = "classic_blue"
     @AppStorage(SoundManager.enabledKey) private var soundEnabled: Bool = true
     @AppStorage(SoundManager.volumeKey)  private var soundVolume: Double = 0.8
+    // Day / Night palette toggle. Drives the RootView `.id(appearanceMode)`
+    // rebuild that re-resolves every SPRetro / SPColors computed token. Stored
+    // as the raw String so a future addition (e.g. "autoSunset") doesn't shift
+    // integer codes. Default "day" matches AppearanceMode.current's
+    // absence-of-stored-value resolution.
+    @AppStorage(AppearanceMode.storageKey)
+    private var appearanceModeRaw: String = AppearanceMode.day.rawValue
 
     @State private var showAvatarPicker = false
     @State private var showEditName     = false
@@ -322,6 +350,10 @@ struct SettingsSheet: View {
     // creating real test accounts. Debounce flag mirrors `isGrantingChips`.
     @State private var isSeedingFriends  = false
     @State private var toastMessage: String?
+    /// Drives the in-app Terms / Privacy sheet from the About section rows.
+    /// Same pattern as ProfileView.presentedLegalDoc — `.sheet(item:)` runs
+    /// off this and dismisses on nil.
+    @State private var presentedLegalDoc: LegalDocument?
 
     var body: some View {
         NavigationStack {
@@ -332,6 +364,7 @@ struct SettingsSheet: View {
                     VStack(spacing: SPSpacing.xl) {
                         header
                         accountSection
+                        dayNightSection
                         appearanceSection
                         soundSection
                         devSection
@@ -387,6 +420,9 @@ struct SettingsSheet: View {
                 })
                 .environmentObject(authVM)
             }
+            .sheet(item: $presentedLegalDoc) { doc in
+                LegalDocumentView(document: doc)
+            }
             .confirmationDialog("Sign Out", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
                 Button("Sign Out", role: .destructive) {
                     authVM.logout()
@@ -412,7 +448,12 @@ struct SettingsSheet: View {
                     size:          88,
                     showBorder:    true,
                     // Hero-facing site: profile settings header.
-                    avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame)
+                    avatarFrameId: cosmetics.inventory.equippedItem(for: .avatarFrame),
+                    // Same rationale as the tabbed-root profile header
+                    // above — PNG canvas needs the expanded footprint
+                    // so the enclosing ScrollView doesn't clip the
+                    // frame top/bottom.
+                    expandForFrame: true
                 )
                     .overlay(alignment: .bottomTrailing) {
                         if isSavingAvatar {
@@ -459,6 +500,37 @@ struct SettingsSheet: View {
                         showEditName = true
                     }
                 }
+            }
+        }
+        .padding(.horizontal, SPSpacing.md)
+    }
+
+    private var dayNightSection: some View {
+        VStack(spacing: 0) {
+            SPSectionHeader(title: "Appearance")
+                .padding(.bottom, SPSpacing.sm)
+
+            SPCard {
+                // Two-segment Day / Night picker. Binding writes to the
+                // shared @AppStorage("appearanceMode") key that RootView's
+                // `.id(...)` modifier observes — toggling here forces the
+                // full app subtree to rebuild with the new palette. Pickers
+                // bound to RawRepresentable enums need a Binding<String>
+                // here because the @AppStorage is a String; we map both
+                // ways inline so the rest of the app's surface (RootView,
+                // SPRetroPalette.current) keeps working with raw String
+                // storage.
+                Picker("Appearance", selection: Binding<AppearanceMode>(
+                    get: { AppearanceMode(rawValue: appearanceModeRaw) ?? .day },
+                    set: { appearanceModeRaw = $0.rawValue }
+                )) {
+                    Text("Day").tag(AppearanceMode.day)
+                    Text("Night").tag(AppearanceMode.night)
+                }
+                .pickerStyle(.segmented)
+                .tint(SPColors.accent)
+                .padding(.horizontal, SPSpacing.md)
+                .padding(.vertical, SPSpacing.sm + 4)
             }
         }
         .padding(.horizontal, SPSpacing.md)
@@ -675,15 +747,17 @@ struct SettingsSheet: View {
 
             SPCard {
                 VStack(spacing: 0) {
-                    Link(destination: URL(string: "https://stackpoker.app/terms")!) {
-                        SettingsRow(icon: "doc.text", label: "Terms of Service", showChevron: true)
+                    // Open the in-app legal docs rather than linking out to
+                    // the marketing site. Keeps the rows working pre-launch
+                    // (no live domain required) and lets App Store review
+                    // verify the text without leaving the binary.
+                    SettingsRow(icon: "doc.text", label: "Terms of Service", showChevron: true) {
+                        presentedLegalDoc = .terms
                     }
-                    .buttonStyle(.plain)
                     SPDivider()
-                    Link(destination: URL(string: "https://stackpoker.app/privacy")!) {
-                        SettingsRow(icon: "hand.raised", label: "Privacy Policy", showChevron: true)
+                    SettingsRow(icon: "hand.raised", label: "Privacy Policy", showChevron: true) {
+                        presentedLegalDoc = .privacy
                     }
-                    .buttonStyle(.plain)
                     SPDivider()
                     HStack(spacing: SPSpacing.sm) {
                         Image(systemName: "info.circle")

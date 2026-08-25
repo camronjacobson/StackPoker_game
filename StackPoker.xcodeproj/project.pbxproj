@@ -11,6 +11,7 @@
 		3681CECC2FABD98B0066D2EE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3681CECB2FABD98B0066D2EE /* SwiftUI.framework */; };
 		3681CED92FABD98D0066D2EE /* PokerActionWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3681CEC72FABD98B0066D2EE /* PokerActionWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		3681D0C22FB7CBB80066D2EE /* PokerTableView+Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3681D0C12FB7CBB80066D2EE /* PokerTableView+Previews.swift */; };
+		3681D0F12FB7E1000066D2EE /* VerticalChipSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3681D0F02FB7E1000066D2EE /* VerticalChipSlider.swift */; };
 		36C91CD22F7F592A00697E42 /* StackPokerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CD12F7F592A00697E42 /* StackPokerTests.swift */; };
 		36C91CDC2F7F592A00697E42 /* StackPokerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDB2F7F592A00697E42 /* StackPokerUITests.swift */; };
 		36C91CDE2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91CDD2F7F592A00697E42 /* StackPokerUITestsLaunchTests.swift */; };
@@ -32,7 +33,6 @@
 		36C91D402F7F5B8B00697E42 /* GameModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D092F7F5B8A00697E42 /* GameModels.swift */; };
 		36C91D412F7F5B8B00697E42 /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */; };
 		36C91D422F7F5B8B00697E42 /* ActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */; };
-		3681D0F12FB7E1000066D2EE /* VerticalChipSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3681D0F02FB7E1000066D2EE /* VerticalChipSlider.swift */; };
 		36C91D432F7F5B8B00697E42 /* AdminPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */; };
 		36C91D442F7F5B8B00697E42 /* CardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D0F2F7F5B8A00697E42 /* CardViews.swift */; };
 		36C91D452F7F5B8B00697E42 /* GameHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D102F7F5B8A00697E42 /* GameHUD.swift */; };
@@ -50,6 +50,7 @@
 		36C91D512F7F5B8B00697E42 /* ChipsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D242F7F5B8A00697E42 /* ChipsViewModel.swift */; };
 		36C91D522F7F5B8B00697E42 /* ChipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D262F7F5B8A00697E42 /* ChipsView.swift */; };
 		36C91D532F7F5B8B00697E42 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D272F7F5B8A00697E42 /* ProfileView.swift */; };
+		36DEADBE2F7F5B8B00697E42 /* LegalDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36DEADBF2F7F5B8A00697E42 /* LegalDocumentView.swift */; };
 		36C91D542F7F5B8B00697E42 /* SPComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */; };
 		36C91D552F7F5B8B00697E42 /* SPTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */; };
 		36C91D562F7F5B8B00697E43 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C91D572F7F5B8B00697E43 /* SoundManager.swift */; };
@@ -150,6 +151,7 @@
 		3681CEC92FABD98B0066D2EE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		3681CECB2FABD98B0066D2EE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		3681D0C12FB7CBB80066D2EE /* PokerTableView+Previews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PokerTableView+Previews.swift"; sourceTree = "<group>"; };
+		3681D0F02FB7E1000066D2EE /* VerticalChipSlider.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VerticalChipSlider.swift; sourceTree = "<group>"; };
 		36C91CBD2F7F592800697E42 /* StackPoker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StackPoker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CCD2F7F592A00697E42 /* StackPokerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StackPokerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		36C91CD12F7F592A00697E42 /* StackPokerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackPokerTests.swift; sourceTree = "<group>"; };
@@ -174,7 +176,6 @@
 		36C91D092F7F5B8A00697E42 /* GameModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameModels.swift; sourceTree = "<group>"; };
 		36C91D0B2F7F5B8A00697E42 /* GameViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
 		36C91D0D2F7F5B8A00697E42 /* ActionBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
-		3681D0F02FB7E1000066D2EE /* VerticalChipSlider.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VerticalChipSlider.swift; sourceTree = "<group>"; };
 		36C91D0E2F7F5B8A00697E42 /* AdminPanelView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AdminPanelView.swift; sourceTree = "<group>"; };
 		36C91D0F2F7F5B8A00697E42 /* CardViews.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CardViews.swift; sourceTree = "<group>"; };
 		36C91D102F7F5B8A00697E42 /* GameHUD.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameHUD.swift; sourceTree = "<group>"; };
@@ -192,6 +193,7 @@
 		36C91D242F7F5B8A00697E42 /* ChipsViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipsViewModel.swift; sourceTree = "<group>"; };
 		36C91D262F7F5B8A00697E42 /* ChipsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChipsView.swift; sourceTree = "<group>"; };
 		36C91D272F7F5B8A00697E42 /* ProfileView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		36DEADBF2F7F5B8A00697E42 /* LegalDocumentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LegalDocumentView.swift; sourceTree = "<group>"; };
 		36C91D2C2F7F5B8B00697E42 /* SPComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPComponents.swift; sourceTree = "<group>"; };
 		36C91D2E2F7F5B8B00697E42 /* SPTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SPTokens.swift; sourceTree = "<group>"; };
 		36C91D572F7F5B8B00697E43 /* SoundManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
@@ -609,6 +611,7 @@
 			children = (
 				36C91D262F7F5B8A00697E42 /* ChipsView.swift */,
 				36C91D272F7F5B8A00697E42 /* ProfileView.swift */,
+				36DEADBF2F7F5B8A00697E42 /* LegalDocumentView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1015,6 +1018,7 @@
 				36C91D442F7F5B8B00697E42 /* CardViews.swift in Sources */,
 				36C91D4C2F7F5B8B00697E42 /* CreateTableSheet.swift in Sources */,
 				36C91D532F7F5B8B00697E42 /* ProfileView.swift in Sources */,
+				36DEADBE2F7F5B8B00697E42 /* LegalDocumentView.swift in Sources */,
 				36C91D502F7F5B8B00697E42 /* TableCardView.swift in Sources */,
 				36C91D322F7F5B8B00697E42 /* MainTabView.swift in Sources */,
 				36C91D412F7F5B8B00697E42 /* GameViewModel.swift in Sources */,
@@ -1332,7 +1336,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.33;
+				MARKETING_VERSION = 3.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1366,7 +1370,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.33;
+				MARKETING_VERSION = 3.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobson.StackPoker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
