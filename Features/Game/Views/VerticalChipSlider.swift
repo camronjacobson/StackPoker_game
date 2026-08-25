@@ -189,7 +189,7 @@ struct VerticalChipSlider: View {
     // Felt-rail design — the slider track reads as an extension of the
     // poker table's *rail*, not its bright playing-surface felt center:
     //   - Fill        : SPRetro.tableRail (#71201E, the darker red band
-    //                   sampled from the rail surface of poker_table.png).
+    //                   sampled from the rail surface of poker_table_standard.png).
     //                   Earlier iteration mistakenly used the brighter
     //                   felt-center tone (#BB1A1C) which read as pink
     //                   against the rail — switched to the rail-band
@@ -201,7 +201,7 @@ struct VerticalChipSlider: View {
     //                   feel. Sits between the fill and the FeltTexture
     //                   so the halftone speckle still reads as the
     //                   topmost surface texture (matching the rail's
-    //                   actual look in poker_table.png: darker-red base +
+    //                   actual look in poker_table_standard.png: darker-red base +
     //                   speckle on top).
     //   - Texture     : FeltTexture() overlay (same noise/dot pattern
     //                   used on the main table felt, .blendMode(.overlay)
@@ -246,7 +246,7 @@ struct VerticalChipSlider: View {
 
     // ─── Wood grain ──────────────────────────────────────────────────
     // Scattered short ink dashes — matches how the rail grain in
-    // poker_table.png actually looks (near-black streaks of varied
+    // poker_table_standard.png actually looks (near-black streaks of varied
     // length, loosely vertical, clustered not uniform). NOT continuous
     // pinstripes — an earlier iteration used 10 parallel lines in a
     // subtly-darkened red and read as "painted block with stripes"

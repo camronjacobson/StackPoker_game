@@ -17,6 +17,56 @@ import SwiftUI
 // - TableTheme (colors) .................... L1646
 // - FeltTexture ............................ L1692
 
+// ─── Table theme — image selection by stake tier ─────────────────────────────
+//
+// Stake-tier → asset-name mapping for the four fixed blind levels. Each tier
+// has its own pre-rendered top-down table illustration in Assets.xcassets
+// (poker_table_casual / _standard / _casino / _high_roller), with matching
+// 1024×1536 (2:3 portrait) canvas dimensions so TableLayout's geometry
+// (tableWidth / tableHeight / tableCenter) works unchanged across all four.
+// Adding a new tier = new imageset + new case here; layout stays put.
+//
+// Fallback policy: any unmapped (sb, bb) pair returns "poker_table_standard"
+// so legacy DB tables created before the four-tier restructure (e.g. 25/50,
+// 100/200 from the old preset structure, or Custom-preset tables) still render
+// with a valid table image instead of a broken Image() placeholder.
+//
+// Colocated with PokerTableView (its only consumer) instead of a separate
+// TableTheme.swift to avoid an Xcode project.pbxproj entry — the main target
+// is not filesystem-synchronized, so new top-level files need pbxproj surgery
+// to enter the build. Move to its own file if a second call site appears.
+
+/// Returns the asset name for the table image based on the table's blinds.
+/// Maps the four fixed stake tiers to their corresponding table art.
+/// Falls back to "poker_table_standard" for any unmapped blinds.
+func tableImageName(forSmallBlind sb: Int, bigBlind bb: Int) -> String {
+    switch (sb, bb) {
+    case (1, 2):    return "poker_table_casual"
+    case (5, 10):   return "poker_table_standard"
+    case (10, 20):  return "poker_table_casino"
+    case (50, 100): return "poker_table_high_roller"
+    default:        return "poker_table_standard"
+    }
+}
+
+/// Returns the asset name for the room background paired with each table.
+/// Each table tier has its own full-screen background illustration (saloon
+/// floor, casino carpet, parquet) that GameView renders behind the table.
+/// The background and table image are a locked artistic pair — selected by
+/// the same (sb, bb) inputs that drive `tableImageName(...)` above, NOT by
+/// the user-facing `tableThemeId` "Table Color" picker (which controls a
+/// vestigial felt-gradient system; see notes in TableTheme at the bottom of
+/// this file). Falls back to the standard background for unmapped blinds.
+func tableBackgroundName(forSmallBlind sb: Int, bigBlind bb: Int) -> String {
+    switch (sb, bb) {
+    case (1, 2):    return "poker_table_casual_background"       // after-hours saloon
+    case (5, 10):   return "poker_table_standard_background"     // mid-game saloon
+    case (10, 20):  return "poker_table_casino_background"       // casino carpet
+    case (50, 100): return "poker_table_high_roller_background"  // parquet
+    default:        return "poker_table_standard_background"
+    }
+}
+
 // ─── Table Layout ─────────────────────────────────────────────────────────────
 
 struct TableLayout {
@@ -24,7 +74,7 @@ struct TableLayout {
     let isLandscape: Bool
 
     // Felt dimensions — sized to fill ~92% of available width while
-    // preserving the poker_table.png intrinsic aspect ratio (1 : 1.5 W:H).
+    // preserving the poker_table_standard.png intrinsic aspect ratio (1 : 1.5 W:H).
     // The image is the source of truth for the silhouette now, so the frame
     // matches it exactly — no more letterboxing inside a taller pill.
     // Landscape kept on the old oval math (image is portrait-shaped;
@@ -60,7 +110,7 @@ struct TableLayout {
     // Community cards
     // Sized so the 5-card row spans ~64% of the table width, leaving
     // comfortable breathing room against the narrower middle felt section
-    // of the new poker_table.png illustration. Total span =
+    // of the new poker_table_standard.png illustration. Total span =
     // 5 * cardWidth + 4 * cardSpacing = 5*0.112 + 4*0.020 = 0.640.
     // Width factor was 0.145 prior to the 2026-05-15 image swap — at that
     // size all five river cards crowded into the inner rim where the new
@@ -121,7 +171,15 @@ struct TableLayout {
     }
 
     // Seats
-    var seatAvatarSize: CGFloat { isLandscape ? 52 : 56 }
+    // Shrunk from 52/56 → 38/40 in Phase 4b cosmetics pass: PNG-backed
+    // avatar frames render a ~2.05× canvas, so at the old 56pt disc the
+    // outer footprint reached ~117pt — large enough to crowd neighbouring
+    // seats at 9-handed. 40pt brings the PNG outer to ~83pt, close enough
+    // to the procedural champion's ~50pt footprint that mythic-equipped
+    // seats read as "haloed" rather than "dominant." Procedural-tier seats
+    // shrink proportionally; emoji font multiplier below bumps to 0.65
+    // (was 0.58) to recover legibility at the smaller disc.
+    var seatAvatarSize: CGFloat { isLandscape ? 38 : 40 }
 
     // ── Forced perspective ───────────────────────────────────────────────────
     // The felt is rendered as a trapezoid (wider at the bottom, near the
@@ -218,7 +276,7 @@ struct TableLayout {
     }
 }
 
-// TODO: Dead code after poker_table.png swap (2026-05-15).
+// TODO: Dead code after poker_table_standard.png swap (2026-05-15).
 // Remove in follow-up cleanup commit unless procedural rendering is revived.
 // ─── Table Perspective Shape ──────────────────────────────────────────────────
 // Forced-perspective table silhouette: a smaller circle at the top (further
@@ -356,7 +414,7 @@ struct PokerTableView: View {
     @ObservedObject var vm: GameViewModel
     var isLandscape: Bool = false
 
-    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // TODO: Dead code after poker_table_standard.png swap (2026-05-15).
     // Remove in follow-up cleanup commit unless procedural rendering is revived.
     // (GameView still reads tableThemeId for the room background gradient;
     // only this view's local @AppStorage + theme are orphaned.)
@@ -528,7 +586,7 @@ struct PokerTableView: View {
     // bevel, saddle stitching, inner rim gleam, themed felt radial gradient,
     // cloth weave, top-light, bowl vignette, ink rim, directional contact
     // shadow, inset betting line). Replaced 2026-05-15 with a single
-    // illustrated PNG (poker_table.png in Assets.xcassets). The image carries
+    // illustrated PNG (poker_table_standard.png in Assets.xcassets). The image carries
     // the rail / felt / shadows / texture all baked in.
     //
     // Geometry preserved verbatim: tableWidth/tableHeight/tableCenter from
@@ -542,7 +600,7 @@ struct PokerTableView: View {
     // intentionally left untouched in this commit — visual swap only,
     // positioning math is a follow-up.
     //
-    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // TODO: Dead code after poker_table_standard.png swap (2026-05-15).
     // The orphaned procedural rendering helpers (TablePerspectiveShape,
     // railLayer, feltSurface, FeltTexture, railWidth static, the
     // PokerTableView-local @AppStorage("tableThemeId") + theme) are kept in
@@ -551,7 +609,14 @@ struct PokerTableView: View {
     private static let railWidth: CGFloat = 22
 
     private func feltOval(_ l: TableLayout) -> some View {
-        Image("poker_table")
+        // Theme picker: choose the table illustration for the current blinds.
+        // vm.gameState may be nil pre-first-state — fall back to standard so
+        // we never render a blank Image() during the brief load window.
+        let imageName = tableImageName(
+            forSmallBlind: vm.gameState?.smallBlind ?? 5,
+            bigBlind:      vm.gameState?.bigBlind   ?? 10
+        )
+        return Image(imageName)
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: l.tableWidth, height: l.tableHeight)
@@ -559,7 +624,7 @@ struct PokerTableView: View {
             .allowsHitTesting(false)
     }
 
-    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // TODO: Dead code after poker_table_standard.png swap (2026-05-15).
     // Remove in follow-up cleanup commit unless procedural rendering is revived.
     // ── Rail (padded leather) ────────────────────────────────────────────────
 
@@ -624,7 +689,7 @@ struct PokerTableView: View {
         .allowsHitTesting(false)
     }
 
-    // TODO: Dead code after poker_table.png swap (2026-05-15).
+    // TODO: Dead code after poker_table_standard.png swap (2026-05-15).
     // Remove in follow-up cleanup commit unless procedural rendering is revived.
     // ── Felt surface ─────────────────────────────────────────────────────────
 
@@ -1808,6 +1873,14 @@ struct TargetSeatView: View {
                     )
                     .padding(.bottom, 3)
                     .transition(.scale.combined(with: .opacity))
+                    // PNG-backed cosmetic frames render a ~2.1×D canvas that
+                    // overflows the avatar ZStack's `avatarSize + 10` frame
+                    // upward into the bubble slot. Force the bubble to paint
+                    // on top so action / fold indicators stay readable
+                    // through the frame's outer rays/spikes. Procedural
+                    // frames don't overflow this far, but the zIndex is
+                    // cheap and applies uniformly.
+                    .zIndex(2)
             } else if seat.isLeaving {
                 // Mid-hand leave: server-side `pendingLeave` flag. Takes
                 // priority over the "Folded" badge so the rest of the
@@ -1829,6 +1902,7 @@ struct TargetSeatView: View {
                             .strokeBorder(SPRetro.ink.opacity(0.5), lineWidth: 1)
                     )
                     .padding(.bottom, 3)
+                    .zIndex(2)   // same rationale as the action-bubble branch above
             } else if seat.status == .folded {
                 // "Folded" stamp — maroon ink so it reads as a struck-out
                 // print stamp on the paper page.
@@ -1836,6 +1910,7 @@ struct TargetSeatView: View {
                     .font(.custom("AmericanTypewriter-Bold", size: 11))
                     .foregroundStyle(SPRetro.maroon)
                     .padding(.bottom, 3)
+                    .zIndex(2)   // same rationale as the action-bubble branch above
             }
 
             ZStack {
@@ -1875,8 +1950,15 @@ struct TargetSeatView: View {
                     )
                     .frame(width: avatarSize, height: avatarSize)
                     .overlay(
+                        // Emoji multiplier bumped 0.58 → 0.65 alongside the
+                        // seat disc shrink (56 → 40 portrait). At the new
+                        // size, 0.65 yields ~26pt glyphs — still readable at
+                        // arm's length, and only ~6.5pt smaller than what
+                        // shipped before the cosmetics pass. Tuned to keep
+                        // the emoji recognisable across the table without
+                        // pushing into the ink-hairline border.
                         Text(AvatarOption.find(seat.avatarId).emoji)
-                            .font(.system(size: avatarSize * 0.58))
+                            .font(.system(size: avatarSize * 0.65))
                     )
                     // Same dimmed treatment for `isLeaving` as for folded —
                     // the player has already mentally checked out, so the
@@ -1905,7 +1987,17 @@ struct TargetSeatView: View {
                     .overlay {
                         let frameId = seat.equipped[CosmeticCategory.avatarFrame.rawValue]
                         if AvatarFrameRenderer.supports(frameId) {
-                            AvatarFrameRenderer.view(for: frameId, diameter: avatarSize)
+                            // `compact: true` — the seat sits on the
+                            // dark felt, where the cream avatar disc has
+                            // a sharp silhouette and any sub-pt sliver
+                            // between disc edge and PNG inner reads as a
+                            // visible gap. Compact ratios push the
+                            // dense ring body ~1.3pt inside the disc so
+                            // the ornament physically overlaps the disc
+                            // edge. Procedural frames ignore this flag.
+                            AvatarFrameRenderer.view(for: frameId,
+                                                     diameter: avatarSize,
+                                                     compact: true)
                         }
                     }
 
@@ -2043,6 +2135,12 @@ struct TargetSeatView: View {
                     }
                 )
                 .offset(y: -4)
+                // Force-paint above the avatar ZStack's downward PNG-frame
+                // overflow (~avatarSize × 0.55pt below the disc). VStack
+                // sibling order alone isn't a reliable z-order guarantee
+                // once a child overflows its own frame, so make it
+                // explicit here.
+                .zIndex(2)
 
             // ── Stack pill ─ dedicated chip-amount area beneath the icon
             // Chip-tier-colored accents so the value reads at a glance and
@@ -2090,6 +2188,11 @@ struct TargetSeatView: View {
                     }
                 }
                 .animation(.spring(response: 0.35), value: seat.pendingTopUpAmount)
+                // StackPill sits two slots below the avatar — the PNG
+                // frame's bottom rays land at roughly the StackPill's
+                // top edge. Force-paint above the avatar ZStack so the
+                // chip value stays unambiguously readable.
+                .zIndex(2)
         }
         .onAppear {
             if seat.status == .allIn { startAllInPulse() }
@@ -2905,7 +3008,7 @@ struct TableTheme: Identifiable, Equatable {
 // across renders and identical for every table). The result is a subtle noise
 // that breaks up the gradient and reads as fabric instead of plastic.
 
-// TODO: Dead code after poker_table.png swap (2026-05-15).
+// TODO: Dead code after poker_table_standard.png swap (2026-05-15).
 // Remove in follow-up cleanup commit unless procedural rendering is revived.
 // (Was previously also reused by the lobby background per the comment above;
 // confirm no other call sites before removing.)

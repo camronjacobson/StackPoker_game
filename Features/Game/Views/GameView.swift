@@ -61,31 +61,86 @@ struct GameView: View {
     }
 
     var body: some View {
+        // ARCHITECTURAL INVARIANT — DO NOT VIOLATE:
+        //
+        // (1) GeometryReader MUST be the root view of body.
+        // The entire portrait layout silently depends on GR-as-root
+        // providing safe-area-inset bounds via geo.size — that's how
+        // ActionBar gets its home-indicator clearance. ActionBar sits
+        // at the bottom of portraitLayout's outer VStack which fills
+        // geo.size; if geo.size reports full-screen bounds, ActionBar
+        // drops into the home-indicator zone (and so do the hero hole
+        // cards + hand label anchored to an inner ZStack bottom).
+        //
+        // GR does NOT anchor the safe-area context — .ignoresSafeArea()
+        // applied at any descendant level that isn't isolated by a
+        // layout-boundary modifier will propagate UP through GR and
+        // collapse safe-inset reporting. Verified via prior regressions
+        // (Image-as-direct-child-of-outer-wrapper + .ignoresSafeArea()
+        // → ActionBar in home-indicator zone).
+        //
+        // (2) The background Image MUST live in a `.background { … }`
+        // modifier on the main ZStack — NOT as a layout sibling inside
+        // the ZStack. A ZStack sizes itself to fit its largest child.
+        // Image with `.resizable().scaledToFill()` and no fixed .frame
+        // reports an ideal size derived from the PNG's intrinsic point
+        // dimensions (1024×1536 for the poker_table_*_background assets,
+        // declared 1x in Contents.json so 1pt = 1px). As a ZStack child
+        // that ideal-size signal grows the ZStack's bounds past
+        // geo.size; the ZStack then proposes its overgrown bounds to
+        // every sibling, including portraitLayout. portraitLayout's
+        // VStack + tableArea (`.frame(maxWidth: .infinity)`) +
+        // PokerTableView's inner GR all consume the inflated proposal
+        // and scale table/seats/community cards/ActionBar up. ActionBar
+        // (`.frame(maxWidth: .infinity)`) then runs past the physical
+        // screen edge, clipping the right-side Bet button.
+        //
+        // `.background(content:)` isolates the background's sizing —
+        // the modified view (the ZStack) is the size authority and the
+        // Image inside .background can never grow it. This is the
+        // SwiftUI primitive for "decorative behind-layer with zero
+        // layout coupling."
+        //
+        // (3) `.ignoresSafeArea()` MUST be applied INSIDE the
+        // .background closure (on the Image), NOT on the ZStack nor
+        // on the .background modifier itself. The .background modifier
+        // bounds the propagation — .ignoresSafeArea() inside it extends
+        // only the background's painted region past safe areas. Applied
+        // outside (e.g. on the ZStack-with-background), it would
+        // propagate up through GR and re-collapse safe-inset bounds.
+        //
+        // The RadialGradient overlay inside the main ZStack stays as-is
+        // — it has no intrinsic size and contributes no ideal-size
+        // signal, so it cannot grow the ZStack.
+        //
+        // DO NOT:
+        //   • Move the Image back into the main ZStack as a sibling.
+        //   • Lift .ignoresSafeArea() out of the .background closure.
+        //   • Wrap this GeometryReader in an outer container.
+        //   • Apply .ignoresSafeArea() to the GR's content directly.
         GeometryReader { geo in
             let landscape = geo.size.width > geo.size.height
             ZStack {
-                // ── Room background — follows the selected table theme
-                ZStack {
-                    LinearGradient(
-                        colors: [Color(hex: theme.roomTop), Color(hex: theme.roomBottom)],
-                        startPoint: .top, endPoint: .bottom
-                    ).ignoresSafeArea()
-
-                    // Radial glow tinted with the theme's primary color
-                    RadialGradient(
-                        colors: [
-                            theme.primaryColor.opacity(0.22),
-                            theme.edgeColor.opacity(0.10),
-                            Color.clear,
-                        ],
-                        center: .center,
-                        startRadius: 40,
-                        endRadius: max(geo.size.width, geo.size.height) * 0.65
-                    )
-                    .ignoresSafeArea()
-                    .blendMode(.plusLighter)
-                    .allowsHitTesting(false)
-                }
+                // Residual radial glow — tinted with the (vestigial)
+                // tableThemeId color. Reduced from 0.22 → 0.12 (and the
+                // mid-stop from 0.10 → 0.05) so it reads as a soft
+                // center vignette over the background art instead of a
+                // competing color wash. The linear gradient that used
+                // to sit beneath this was removed when the per-table
+                // PNG background landed.
+                RadialGradient(
+                    colors: [
+                        theme.primaryColor.opacity(0.12),
+                        theme.edgeColor.opacity(0.05),
+                        Color.clear,
+                    ],
+                    center: .center,
+                    startRadius: 40,
+                    endRadius: max(geo.size.width, geo.size.height) * 0.65
+                )
+                .ignoresSafeArea()
+                .blendMode(.plusLighter)
+                .allowsHitTesting(false)
 
                 if landscape {
                     landscapeLayout(geo: geo)
@@ -293,10 +348,45 @@ struct GameView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.75), value: vm.showWinners)
             .animation(.easeInOut(duration: 0.2), value: vm.errorMessage != nil)
             .animation(.easeInOut(duration: 0.3), value: landscape)
+            // ── Background — per-table image, applied as a
+            // `.background(content:)` modifier on the main ZStack so
+            // it is structurally NOT a layout sibling. See rules (2)
+            // and (3) of the architectural invariant above the GR
+            // declaration: this is the ONLY safe place for the Image,
+            // and `.ignoresSafeArea()` MUST live inside this closure
+            // (on the Image), not on the modifier itself.
+            //
+            // Paired with the table image by stake tier — background
+            // and table art are a locked artistic set (saloon floor /
+            // casino carpet / parquet), selected by the same
+            // (smallBlind, bigBlind) inputs that drive feltOval's
+            // table-image lookup in PokerTableView. Not bound to the
+            // user-facing `tableThemeId` "Table Color" picker (which
+            // controls the vestigial felt-gradient system inside the
+            // ZStack — see the residual radial glow comment).
+            //
+            // Fallback to (5, 10) → "poker_table_standard_background"
+            // matches feltOval's fallback so the room/table pair stays
+            // consistent during the brief gameState-loading window.
+            .background {
+                Image(tableBackgroundName(
+                    forSmallBlind: vm.gameState?.smallBlind ?? 5,
+                    bigBlind:      vm.gameState?.bigBlind   ?? 10
+                ))
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
         }
-        // NOTE: do NOT apply .ignoresSafeArea() here — it was pushing the
-        // top bar (and its back button) up underneath the Dynamic Island.
-        // The background Color already extends edge-to-edge on its own.
+        // NOTE: do NOT apply .ignoresSafeArea() here — per the
+        // architectural invariant above the GR declaration, an
+        // .ignoresSafeArea() at this level would collapse GR's
+        // safe-inset reporting (pushing the top bar under the
+        // Dynamic Island and dropping ActionBar into the home-
+        // indicator zone). The background Image extends edge-to-edge
+        // from inside the .background closure on the ZStack — see
+        // rules (2) and (3) of the invariant block.
         .navigationBarHidden(true)
         .onAppear  { vm.onAppear() }
         .onDisappear { vm.onDisappear() }
